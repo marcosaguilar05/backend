@@ -22,6 +22,10 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', message: 'Servidor funcionando correctamente' });
 });
 
+app.get('/', (req, res) => {
+    res.send('API Backend is running 🚀');
+});
+
 export default app;
 
 if (require.main === module) {
