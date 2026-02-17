@@ -15,7 +15,8 @@
         "moduleResolution": "node"
     },
     "include": [
-        "src/**/*"
+        "src/**/*",
+        "api/**/*"
     ],
     "exclude": [
         "node_modules"
