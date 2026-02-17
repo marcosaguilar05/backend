@@ -22,6 +22,10 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', message: 'Servidor funcionando correctamente' });
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-});
+export default app;
+
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+    });
+}
