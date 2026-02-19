@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "nodemon --exec ts-node src/server.ts",
     "build": "node node_modules/typescript/bin/tsc",
-    "start": "node dist/src/server.js"
+    "start": "node dist/server.js"
   },
   "keywords": [],
   "author": "",
