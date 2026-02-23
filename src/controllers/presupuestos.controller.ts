@@ -198,7 +198,8 @@ export const presupuestosController = {
                     areas_operacion(id, nombre),
                     empresas(id, empresa),
                     grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(id, codigo, nombre),
-                    rubro:maestro_rubros!presupuestos_rubro_id_fkey(id, codigo, nombre)
+                    rubro:maestro_rubros!presupuestos_rubro_id_fkey(id, codigo, nombre),
+                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo)
                 `, { count: 'exact' });
 
             // Filtros directos por ID
@@ -315,7 +316,8 @@ export const presupuestosController = {
                     ),
                     area:areas_operacion(id, nombre),
                     grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre, rubro_padre_id),
-                    rubro:maestro_rubros!rubro_id(id, codigo, nombre)
+                    rubro:maestro_rubros!rubro_id(id, codigo, nombre),
+                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo)
                 `)
                 .eq('id', id)
                 .single();
@@ -364,7 +366,8 @@ export const presupuestosController = {
                     grupo_rubro_id: presupuestoData.grupo_rubro_id,
                     rubro_id: presupuestoData.rubro_id,
                     anio: presupuestoData.anio,
-                    estado: presupuestoData.estado || 'BORRADOR'
+                    estado: presupuestoData.estado || 'BORRADOR',
+                    empleado_id: presupuestoData.empleado_id || null
                 })
                 .select()
                 .single();
@@ -625,13 +628,20 @@ export const presupuestosController = {
                 .eq('activo', true)
                 .order('nombre');
 
+            // Personal (tipos de empleado)
+            const { data: personalData } = await dbClient
+                .from('Personal')
+                .select('id, tipo')
+                .order('tipo');
+
             res.json({
                 anios,
                 areas: areasData || [],
                 empresas: empresasData || [],
                 vehiculos,
                 grupos_rubro: gruposRubroData || [],
-                sub_rubros: subRubrosData || []
+                sub_rubros: subRubrosData || [],
+                personal: personalData || []
             });
         } catch (error) {
             console.error('Error en getFilterOptions:', error);

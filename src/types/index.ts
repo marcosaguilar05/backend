@@ -235,6 +235,7 @@ export interface Presupuesto {
     rubro_id: number;
     anio: number;
     estado: 'BORRADOR' | 'APROBADO';
+    empleado_id?: number | null;
     created_at?: string;
 }
 
