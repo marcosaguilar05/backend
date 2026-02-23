@@ -17,17 +17,17 @@ const router = Router();
 // Todas las rutas requieren autenticación
 router.use(authenticateToken);
 
+// Rutas de catálogos (deben ir ANTES de /:id)
+router.get('/catalogos/conductores', getConductores);
+router.get('/catalogos/placas', getPlacas);
+router.get('/catalogos/bombas', getBombas);
+router.get('/catalogos/areas', getAreasOperacion);
+
 // Rutas de tanqueos
 router.get('/', getTanqueos);
 router.get('/:id', getTanqueoById);
 router.post('/', createTanqueo);
 router.put('/:id', updateTanqueo);
 router.delete('/:id', deleteTanqueo);
-
-// Rutas de catálogos
-router.get('/catalogos/conductores', getConductores);
-router.get('/catalogos/placas', getPlacas);
-router.get('/catalogos/bombas', getBombas);
-router.get('/catalogos/areas', getAreasOperacion);
 
 export default router;
