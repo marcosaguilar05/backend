@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const flota_controller_1 = require("../controllers/flota.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authMiddleware);
+router.get('/vehiculos', flota_controller_1.getVehiculos);
+router.post('/sync', flota_controller_1.syncVehiculos);
+router.get('/vehiculos/:id', flota_controller_1.getVehiculoDetalle);
+router.get('/catalogos', flota_controller_1.getCatalogos);
+exports.default = router;

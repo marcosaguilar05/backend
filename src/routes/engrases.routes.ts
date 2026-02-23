@@ -1,38 +1,34 @@
 import { Router } from 'express';
-import {
-    getEngrases, getEngraseById, createEngrase, updateEngrase, deleteEngrase,
-    getEngraseFilterOptions, getEngrasesDashboardKPIs, getEngrasesSpendingOverTime,
-    getEngrasesServiceComparison, getEngrasesByPlaca, getEngrasePlacaMonthly,
-    getEngrasesByArea, getEngrasesAlerts, getEngraseAlertRecords,
-    getEngrasesDetailedTable, getEngrasesPlacaMonthMatrix, getEngrasesDashboardLink,
-    getEngraseFinancialReport, getEngraseGeneralReport,
-} from '../controllers/engrases.controller';
-import { authenticateToken } from '../middleware/auth';
+import { engrasesController } from '../controllers/engrases.controller';
+import { engrasesDashboardController } from '../controllers/engrases-dashboard.controller';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
-router.use(authenticateToken);
 
-// Rutas específicas ANTES de /:id
-router.get('/filter-options', getEngraseFilterOptions);
-router.get('/dashboard-link', getEngrasesDashboardLink);
-router.get('/reportes/financiero', getEngraseFinancialReport);
-router.get('/reportes/general', getEngraseGeneralReport);
-router.get('/dashboard/kpis', getEngrasesDashboardKPIs);
-router.get('/dashboard/spending-time', getEngrasesSpendingOverTime);
-router.get('/dashboard/service-comparison', getEngrasesServiceComparison);
-router.get('/dashboard/by-placa', getEngrasesByPlaca);
-router.get('/dashboard/placa-monthly/:placa', getEngrasePlacaMonthly);
-router.get('/dashboard/by-area', getEngrasesByArea);
-router.get('/dashboard/alerts', getEngrasesAlerts);
-router.get('/dashboard/alert-records/:alertType', getEngraseAlertRecords);
-router.get('/dashboard/detailed-table', getEngrasesDetailedTable);
-router.get('/dashboard/placa-month-matrix', getEngrasesPlacaMonthMatrix);
+// Todas las rutas requieren autenticación
+router.use(authMiddleware);
 
-// CRUD
-router.get('/', getEngrases);
-router.get('/:id', getEngraseById);
-router.post('/', createEngrase);
-router.put('/:id', updateEngrase);
-router.delete('/:id', deleteEngrase);
+// Dashboard routes (before :id to avoid conflicts)
+router.get('/dashboard/kpis', engrasesDashboardController.getKPIs);
+router.get('/dashboard/spending-time', engrasesDashboardController.getSpendingOverTime);
+router.get('/dashboard/service-comparison', engrasesDashboardController.getServiceComparison);
+router.get('/dashboard/by-placa', engrasesDashboardController.getByPlaca);
+router.get('/dashboard/placa-monthly/:placa', engrasesDashboardController.getPlacaMonthly);
+router.get('/dashboard/by-area', engrasesDashboardController.getByArea);
+router.get('/dashboard/alerts', engrasesDashboardController.getAlerts);
+router.get('/dashboard/alert-records/:alertType', engrasesDashboardController.getAlertRecords);
+router.get('/dashboard/detailed-table', engrasesDashboardController.getDetailedTable);
+router.get('/dashboard/placa-month-matrix', engrasesDashboardController.getPlacaMonthMatrix);
+
+router.get('/', engrasesController.getAll);
+router.get('/filter-options', engrasesController.getFilterOptions);
+router.get('/reportes/financiero', engrasesController.getFinancialReport);
+router.get('/reportes/general', engrasesController.getExportData);
+router.get('/dashboard-link', engrasesController.getDashboardLink);
+router.get('/:id', engrasesController.getById);
+router.post('/', engrasesController.create);
+router.put('/:id', engrasesController.update);
+router.delete('/:id', engrasesController.delete);
 
 export default router;
+

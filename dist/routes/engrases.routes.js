@@ -1,0 +1,30 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const engrases_controller_1 = require("../controllers/engrases.controller");
+const engrases_dashboard_controller_1 = require("../controllers/engrases-dashboard.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const router = (0, express_1.Router)();
+// Todas las rutas requieren autenticación
+router.use(auth_middleware_1.authMiddleware);
+// Dashboard routes (before :id to avoid conflicts)
+router.get('/dashboard/kpis', engrases_dashboard_controller_1.engrasesDashboardController.getKPIs);
+router.get('/dashboard/spending-time', engrases_dashboard_controller_1.engrasesDashboardController.getSpendingOverTime);
+router.get('/dashboard/service-comparison', engrases_dashboard_controller_1.engrasesDashboardController.getServiceComparison);
+router.get('/dashboard/by-placa', engrases_dashboard_controller_1.engrasesDashboardController.getByPlaca);
+router.get('/dashboard/placa-monthly/:placa', engrases_dashboard_controller_1.engrasesDashboardController.getPlacaMonthly);
+router.get('/dashboard/by-area', engrases_dashboard_controller_1.engrasesDashboardController.getByArea);
+router.get('/dashboard/alerts', engrases_dashboard_controller_1.engrasesDashboardController.getAlerts);
+router.get('/dashboard/alert-records/:alertType', engrases_dashboard_controller_1.engrasesDashboardController.getAlertRecords);
+router.get('/dashboard/detailed-table', engrases_dashboard_controller_1.engrasesDashboardController.getDetailedTable);
+router.get('/dashboard/placa-month-matrix', engrases_dashboard_controller_1.engrasesDashboardController.getPlacaMonthMatrix);
+router.get('/', engrases_controller_1.engrasesController.getAll);
+router.get('/filter-options', engrases_controller_1.engrasesController.getFilterOptions);
+router.get('/reportes/financiero', engrases_controller_1.engrasesController.getFinancialReport);
+router.get('/reportes/general', engrases_controller_1.engrasesController.getExportData);
+router.get('/dashboard-link', engrases_controller_1.engrasesController.getDashboardLink);
+router.get('/:id', engrases_controller_1.engrasesController.getById);
+router.post('/', engrases_controller_1.engrasesController.create);
+router.put('/:id', engrases_controller_1.engrasesController.update);
+router.delete('/:id', engrases_controller_1.engrasesController.delete);
+exports.default = router;

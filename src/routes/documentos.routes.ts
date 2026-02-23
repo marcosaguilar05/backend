@@ -1,26 +1,20 @@
 import { Router } from 'express';
-import {
-    getDocumentos, getDocumentoById, createDocumento, updateDocumento, deleteDocumento,
-    getDocumentoFilterOptions, getDocumentosDashboardKPIs, getDocumentosCalendar,
-    getDocumentosExpiringList, getDocumentosByArea,
-} from '../controllers/documentos.controller';
-import { authenticateToken } from '../middleware/auth';
+import { documentosController } from '../controllers/documentos.controller';
+import { documentosDashboardController } from '../controllers/documentos-dashboard.controller';
 
 const router = Router();
-router.use(authenticateToken);
 
-// Rutas específicas ANTES de /:id
-router.get('/filters', getDocumentoFilterOptions);
-router.get('/dashboard/kpis', getDocumentosDashboardKPIs);
-router.get('/dashboard/calendar', getDocumentosCalendar);
-router.get('/dashboard/expiring-list', getDocumentosExpiringList);
-router.get('/dashboard/by-area', getDocumentosByArea);
+// Dashboard routes (antes de rutas con params)
+router.get('/dashboard/kpis', documentosDashboardController.getKPIs);
+router.get('/dashboard/calendar', documentosDashboardController.getCalendarEvents);
+router.get('/dashboard/expiring-list', documentosDashboardController.getExpiringList);
+router.get('/dashboard/by-area', documentosDashboardController.getByArea);
 
-// CRUD
-router.get('/', getDocumentos);
-router.get('/:id', getDocumentoById);
-router.post('/', createDocumento);
-router.put('/:id', updateDocumento);
-router.delete('/:id', deleteDocumento);
+router.get('/', documentosController.getAll);
+router.get('/filters', documentosController.getFilterOptions);
+router.get('/:id', documentosController.getById);
+router.post('/', documentosController.create);
+router.put('/:id', documentosController.update);
+router.delete('/:id', documentosController.delete);
 
 export default router;

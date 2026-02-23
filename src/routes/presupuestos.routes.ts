@@ -1,32 +1,28 @@
 import { Router } from 'express';
-import {
-    getRubros, getTipos, getConceptos, getPresupuestoFilterOptions,
-    getPresupuestos, getPresupuestoById, createPresupuesto, updatePresupuesto, deletePresupuesto,
-    addPresupuestoItem, updatePresupuestoItem, deletePresupuestoItem,
-} from '../controllers/presupuestos.controller';
-import { authenticateToken } from '../middleware/auth';
+import { presupuestosController } from '../controllers/presupuestos.controller';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
-router.use(authenticateToken);
 
-// Catálogos y filtros (ANTES de /:id)
-router.get('/rubros', getRubros);
-router.get('/tipos', getTipos);
-router.get('/conceptos', getConceptos);
-router.get('/filters', getPresupuestoFilterOptions);
+// Proteger todas las rutas
+router.use(authMiddleware);
 
-// Items (ANTES de /:id)
-router.put('/items/:itemId', updatePresupuestoItem);
-router.delete('/items/:itemId', deletePresupuestoItem);
+// Catálogos
+router.get('/rubros', presupuestosController.getRubros);
+router.get('/tipos', presupuestosController.getTipos);
+router.get('/conceptos', presupuestosController.getConceptos);
+router.get('/filters', presupuestosController.getFilterOptions);
 
-// CRUD
-router.get('/', getPresupuestos);
-router.get('/:id', getPresupuestoById);
-router.post('/', createPresupuesto);
-router.put('/:id', updatePresupuesto);
-router.delete('/:id', deletePresupuesto);
+// CRUD Presupuestos
+router.get('/', presupuestosController.getAll);
+router.get('/:id', presupuestosController.getById);
+router.post('/', presupuestosController.create);
+router.put('/:id', presupuestosController.update);
+router.delete('/:id', presupuestosController.delete);
 
-// Items de un presupuesto específico
-router.post('/:presupuestoId/items', addPresupuestoItem);
+// Items
+router.post('/:id/items', presupuestosController.addItem);
+router.put('/items/:itemId', presupuestosController.updateItem);
+router.delete('/items/:itemId', presupuestosController.deleteItem);
 
 export default router;

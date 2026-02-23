@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const mantenimiento_controller_1 = require("../controllers/mantenimiento.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authMiddleware);
+router.get('/eventos', mantenimiento_controller_1.getEventos);
+router.post('/eventos', mantenimiento_controller_1.createEvento);
+router.get('/planes', mantenimiento_controller_1.getPlanes);
+router.post('/planes', mantenimiento_controller_1.createPlan);
+router.put('/planes/:id', mantenimiento_controller_1.updatePlan);
+router.get('/tipos', mantenimiento_controller_1.getTiposMantenimiento);
+router.get('/talleres', mantenimiento_controller_1.getTalleres);
+exports.default = router;

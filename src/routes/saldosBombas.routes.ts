@@ -1,11 +1,9 @@
 import { Router } from 'express';
-import { getSaldosBombas, getSaldosBombasFilterOptions } from '../controllers/saldosBombas.controller';
-import { authenticateToken } from '../middleware/auth';
+import { saldosBombasController } from '../controllers/saldosBombas.controller';
 
 const router = Router();
-router.use(authenticateToken);
 
-router.get('/filters', getSaldosBombasFilterOptions);
-router.get('/', getSaldosBombas);
+router.get('/', saldosBombasController.getAll);
+router.get('/filters', saldosBombasController.getFilterOptions);
 
 export default router;

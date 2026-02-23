@@ -1,251 +1,363 @@
 import { Response } from 'express';
 import { supabase } from '../config/supabase';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, Engrase, EngraseRelacion } from '../types';
 
-// ── CRUD ────────────────────────────────────────────────────────────────────
+// Caché simple en memoria para filter options (5 minutos)
+let filterOptionsCache: { data: any; timestamp: number } | null = null;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
-export const getEngrases = async (req: AuthRequest, res: Response) => {
-    try {
-        const { page = 1, limit = 20, conductor, placa, area_operacion, fecha_inicio, fecha_fin } = req.query as any;
-        const from = (Number(page) - 1) * Number(limit);
-        const to = from + Number(limit) - 1;
+export const engrasesController = {
+    // Obtener todos los engrases con paginación y filtros
+    async getAll(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 20;
+            const offset = (page - 1) * limit;
 
-        let query = supabase.from('engrase_relaciones').select('*', { count: 'exact' });
-        if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-        if (placa) query = query.eq('placa', placa);
-        if (area_operacion) query = query.eq('area_operacion', area_operacion);
-        if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
-        if (fecha_fin) query = query.lte('fecha', fecha_fin);
-        query = query.order('fecha', { ascending: false }).range(from, to);
+            // Filtros
+            const conductor = req.query.conductor as string;
+            const placa = req.query.placa as string;
+            const area_operacion = req.query.area_operacion as string;
+            const fecha_inicio = req.query.fecha_inicio as string;
+            const fecha_fin = req.query.fecha_fin as string;
 
-        const { data, error, count } = await query;
-        if (error) return res.status(500).json({ error: error.message });
+            // Query base
+            let query = supabase
+                .from('engrases_relaciones')
+                .select('*', { count: 'exact' });
 
-        res.json({
-            data,
-            pagination: { page: Number(page), limit: Number(limit), total: count || 0, totalPages: Math.ceil((count || 0) / Number(limit)) }
-        });
-    } catch (e) { res.status(500).json({ error: 'Error al obtener engrases' }); }
-};
+            // Aplicar filtros
+            if (conductor) {
+                query = query.ilike('conductor', `%${conductor}%`);
+            }
+            if (placa) {
+                query = query.ilike('placa', `%${placa}%`);
+            }
+            if (area_operacion) {
+                query = query.ilike('area_operacion', `%${area_operacion}%`);
+            }
+            if (fecha_inicio) {
+                query = query.gte('fecha', fecha_inicio);
+            }
+            if (fecha_fin) {
+                query = query.lte('fecha', fecha_fin);
+            }
 
-export const getEngraseById = async (req: AuthRequest, res: Response) => {
-    try {
-        const { id } = req.params;
-        const { data, error } = await supabase.from('engrase_relaciones').select('*').eq('id', id).single();
-        if (error) return res.status(404).json({ error: error.message });
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Error al obtener engrase' }); }
-};
+            // Ordenamiento
+            const sort_by = (req.query.sort_by as string) || 'fecha';
+            const sort_order = req.query.sort_order as string;
+            const ascending = sort_order === 'asc';
 
-export const createEngrase = async (req: AuthRequest, res: Response) => {
-    try {
-        const body = { ...req.body, creado_por: req.user.id };
-        const { data, error } = await supabase.from('engrase').insert([body]).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        res.status(201).json(data);
-    } catch (e) { res.status(500).json({ error: 'Error al crear engrase' }); }
-};
+            // Aplicar ordenamiento
+            if (sort_order) {
+                query = query.order(sort_by, { ascending }).order('id', { ascending: false });
+            } else {
+                query = query.order('fecha', { ascending: false }).order('id', { ascending: false });
+            }
 
-export const updateEngrase = async (req: AuthRequest, res: Response) => {
-    try {
-        const { id } = req.params;
-        const body = { ...req.body, actualizado_por: req.user.id, actualizado_en: new Date().toISOString() };
-        const { data, error } = await supabase.from('engrase').update(body).eq('id', id).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Error al actualizar engrase' }); }
-};
+            const { data, error, count } = await query
+                .range(offset, offset + limit - 1);
 
-export const deleteEngrase = async (req: AuthRequest, res: Response) => {
-    try {
-        const { id } = req.params;
-        const { error } = await supabase.from('engrase').delete().eq('id', id);
-        if (error) return res.status(500).json({ error: error.message });
-        res.json({ message: 'Engrase eliminado' });
-    } catch (e) { res.status(500).json({ error: 'Error al eliminar engrase' }); }
-};
+            if (error) {
+                console.error('Error en getAll Engrases:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
 
-// ── FILTER OPTIONS ───────────────────────────────────────────────────────────
+            res.json({
+                data: data as EngraseRelacion[],
+                pagination: {
+                    page,
+                    limit,
+                    total: count || 0,
+                    totalPages: Math.ceil((count || 0) / limit)
+                }
+            });
+        } catch (error) {
+            console.error('Error obteniendo engrases:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
 
-export const getEngraseFilterOptions = async (req: AuthRequest, res: Response) => {
-    try {
-        const [conductoresRes, placasRes, areasRes, engrasesRes] = await Promise.all([
-            supabase.from('areas_conductores').select('conductor').order('conductor'),
-            supabase.from('areas_placas').select('placa').eq('estado', 'ACTIVADA').order('placa'),
-            supabase.from('areas_operacion').select('nombre').order('nombre'),
-            supabase.from('engrase_relaciones').select('area_operacion'),
-        ]);
-        const unique = (arr: (string | null | undefined)[]) => [...new Set(arr.filter(Boolean))].sort() as string[];
-        res.json({
-            conductores: unique((conductoresRes.data || []).map((c: any) => c.conductor)),
-            placas: unique((placasRes.data || []).map((p: any) => p.placa)),
-            areas_operacion: unique((areasRes.data || []).map((a: any) => a.nombre)),
-        });
-    } catch (e) { res.status(500).json({ error: 'Error al obtener opciones de filtro' }); }
-};
+    // Obtener valores únicos para los filtros - Con RLS aplicado
+    async getFilterOptions(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            // Usar cliente autenticado para que RLS aplique automáticamente
+            const dbClient = req.supabase || supabase;
 
-// ── DASHBOARD ────────────────────────────────────────────────────────────────
+            // Ejecutar queries en paralelo para mejorar rendimiento
+            const [
+                conductoresRes,
+                placasRes,
+                areasRes
+            ] = await Promise.all([
+                dbClient.from('areas_conductores').select('conductor').order('conductor'),
+                dbClient.from('areas_placas').select('placa').eq('estado', 'ACTIVADA').order('placa'),
+                dbClient.from('areas_operacion').select('nombre').order('nombre')
+            ]);
 
-export const getEngrasesDashboardKPIs = async (req: AuthRequest, res: Response) => {
-    try {
-        const { data, error } = await supabase.from('engrase_relaciones').select('*');
-        if (error) return res.status(500).json({ error: error.message });
-        const rows = data || [];
-        const totalGastado = rows.reduce((s: number, r: any) => s + (Number(r.total) || 0), 0);
-        const totalLavado = rows.reduce((s: number, r: any) => s + (Number(r.lavado) || 0), 0);
-        const totalEngrase = rows.reduce((s: number, r: any) => s + (Number(r.engrase) || 0), 0);
-        const totalOtros = rows.reduce((s: number, r: any) => s + (Number(r.otros) || 0), 0);
-        res.json({
-            totalGastado, totalLavado, totalEngrase, totalOtros,
-            totalIntervenciones: rows.length,
-            placasIntervenidas: new Set(rows.map((r: any) => r.placa)).size,
-            conductoresActivos: new Set(rows.map((r: any) => r.conductor)).size,
-            conLavado: rows.filter((r: any) => Number(r.lavado) > 0).length,
-            conEngrase: rows.filter((r: any) => Number(r.engrase) > 0).length,
-            conAmbos: rows.filter((r: any) => Number(r.lavado) > 0 && Number(r.engrase) > 0).length,
-            promedioLavado: rows.length ? totalLavado / rows.length : 0,
-            promedioEngrase: rows.length ? totalEngrase / rows.length : 0,
-            promedioTotal: rows.length ? totalGastado / rows.length : 0,
-        });
-    } catch (e) { res.status(500).json({ error: 'Error en KPIs de dashboard' }); }
-};
+            // Extraer valores únicos
+            const conductores = [...new Set(conductoresRes.data?.map(t => t.conductor))].filter(Boolean).sort();
+            const placas = [...new Set(placasRes.data?.map(t => t.placa))].filter(Boolean).sort();
+            const areas = [...new Set(areasRes.data?.map(t => t.nombre))].filter(Boolean).sort();
 
-export const getEngrasesSpendingOverTime = async (req: AuthRequest, res: Response) => {
-    try {
-        const { data, error } = await supabase.from('engrase_relaciones').select('fecha,lavado,engrase,otros,total').order('fecha');
-        if (error) return res.status(500).json({ error: error.message });
-        const map: Record<string, any> = {};
-        (data || []).forEach((r: any) => {
-            const mes = r.fecha?.substring(0, 7);
-            if (!mes) return;
-            if (!map[mes]) map[mes] = { mes, lavado: 0, engrase: 0, otros: 0, total: 0, intervenciones: 0 };
-            map[mes].lavado += Number(r.lavado) || 0;
-            map[mes].engrase += Number(r.engrase) || 0;
-            map[mes].otros += Number(r.otros) || 0;
-            map[mes].total += Number(r.total) || 0;
-            map[mes].intervenciones++;
-        });
-        res.json(Object.values(map));
-    } catch (e) { res.status(500).json({ error: 'Error en gráfico de tiempo' }); }
-};
+            const responseData = {
+                conductores,
+                placas,
+                areas_operacion: areas
+            };
 
-export const getEngrasesServiceComparison = async (req: AuthRequest, res: Response) => {
-    try {
-        const { data, error } = await supabase.from('engrase_relaciones').select('fecha,lavado,engrase').order('fecha');
-        if (error) return res.status(500).json({ error: error.message });
-        const map: Record<string, any> = {};
-        (data || []).forEach((r: any) => {
-            const mes = r.fecha?.substring(0, 7);
-            if (!mes) return;
-            if (!map[mes]) map[mes] = { mes, lavado: 0, engrase: 0, countLavado: 0, countEngrase: 0 };
-            if (Number(r.lavado) > 0) { map[mes].lavado += Number(r.lavado); map[mes].countLavado++; }
-            if (Number(r.engrase) > 0) { map[mes].engrase += Number(r.engrase); map[mes].countEngrase++; }
-        });
-        res.json(Object.values(map));
-    } catch (e) { res.status(500).json({ error: 'Error en comparación de servicios' }); }
-};
+            res.json(responseData);
+        } catch (error) {
+            console.error('Error obteniendo opciones de filtros engrases:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
 
-export const getEngrasesByPlaca = async (req: AuthRequest, res: Response) => {
-    try {
-        const { data, error } = await supabase.from('engrase_relaciones').select('*');
-        if (error) return res.status(500).json({ error: error.message });
-        const map: Record<string, any> = {};
-        (data || []).forEach((r: any) => {
-            const p = r.placa;
-            if (!map[p]) map[p] = { placa: p, conductor: r.conductor, totalLavado: 0, totalEngrase: 0, totalOtros: 0, totalAcumulado: 0, numLavados: 0, numEngrases: 0, numIntervenciones: 0, ultimaFecha: '' };
-            map[p].totalLavado += Number(r.lavado) || 0;
-            map[p].totalEngrase += Number(r.engrase) || 0;
-            map[p].totalOtros += Number(r.otros) || 0;
-            map[p].totalAcumulado += Number(r.total) || 0;
-            if (Number(r.lavado) > 0) map[p].numLavados++;
-            if (Number(r.engrase) > 0) map[p].numEngrases++;
-            map[p].numIntervenciones++;
-            if (!map[p].ultimaFecha || r.fecha > map[p].ultimaFecha) map[p].ultimaFecha = r.fecha;
-        });
-        res.json(Object.values(map).sort((a: any, b: any) => b.totalAcumulado - a.totalAcumulado));
-    } catch (e) { res.status(500).json({ error: 'Error en datos por placa' }); }
-};
+    async getById(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
 
-export const getEngrasePlacaMonthly = async (req: AuthRequest, res: Response) => {
-    try {
-        const { placa } = req.params;
-        const { data, error } = await supabase.from('engrase_relaciones').select('*').eq('placa', placa).order('fecha');
-        if (error) return res.status(500).json({ error: error.message });
-        const map: Record<string, any> = {};
-        (data || []).forEach((r: any) => {
-            const mes = r.fecha?.substring(0, 7);
-            if (!mes) return;
-            if (!map[mes]) map[mes] = { fecha: mes, lavado: 0, engrase: 0, otros: 0, total: 0, tieneLabado: false, tieneEngrase: false, observaciones: [] };
-            map[mes].lavado += Number(r.lavado) || 0;
-            map[mes].engrase += Number(r.engrase) || 0;
-            map[mes].otros += Number(r.otros) || 0;
-            map[mes].total += Number(r.total) || 0;
-            if (Number(r.lavado) > 0) map[mes].tieneLabado = true;
-            if (Number(r.engrase) > 0) map[mes].tieneEngrase = true;
-            if (r.observaciones) map[mes].observaciones.push(r.observaciones);
-        });
-        res.json(Object.values(map));
-    } catch (e) { res.status(500).json({ error: 'Error en datos mensuales de placa' }); }
-};
+            const { data, error } = await supabase
+                .from('engrases_relaciones')
+                .select('*')
+                .eq('id', id)
+                .single();
 
-export const getEngrasesByArea = async (req: AuthRequest, res: Response) => {
-    try {
-        const { data, error } = await supabase.from('engrase_relaciones').select('area_operacion,lavado,engrase,otros,total');
-        if (error) return res.status(500).json({ error: error.message });
-        const map: Record<string, any> = {};
-        let totalGlobal = 0;
-        (data || []).forEach((r: any) => {
-            const a = r.area_operacion || 'Sin área';
-            if (!map[a]) map[a] = { area_operacion: a, totalLavado: 0, totalEngrase: 0, totalOtros: 0, totalGasto: 0, intervenciones: 0, porcentaje: 0 };
-            map[a].totalLavado += Number(r.lavado) || 0;
-            map[a].totalEngrase += Number(r.engrase) || 0;
-            map[a].totalOtros += Number(r.otros) || 0;
-            map[a].totalGasto += Number(r.total) || 0;
-            map[a].intervenciones++;
-            totalGlobal += Number(r.total) || 0;
-        });
-        const areas = Object.values(map).map((a: any) => ({ ...a, porcentaje: totalGlobal ? (a.totalGasto / totalGlobal) * 100 : 0 }));
-        res.json({ areas, totalGlobal });
-    } catch (e) { res.status(500).json({ error: 'Error en datos por área' }); }
-};
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
 
-export const getEngrasesAlerts = async (req: AuthRequest, res: Response) => {
-    res.json([]);
-};
+            res.json(data as EngraseRelacion);
+        } catch (error) {
+            console.error('Error obteniendo engrase:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
 
-export const getEngraseAlertRecords = async (req: AuthRequest, res: Response) => {
-    res.json([]);
-};
+    async create(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const engraseData: Engrase = {
+                fecha: req.body.fecha,
+                conductor_id: parseInt(req.body.conductor_id),
+                placa_id: parseInt(req.body.placa_id),
+                area_operacion_id: parseInt(req.body.area_operacion_id),
+                lavado: parseFloat(req.body.lavado) || 0,
+                engrase: parseFloat(req.body.engrase) || 0,
+                otros: parseFloat(req.body.otros) || 0,
+                observaciones: req.body.observaciones || null,
+                creado_por: req.user?.id,
+                suma: (parseFloat(req.body.lavado) || 0) + (parseFloat(req.body.engrase) || 0) + (parseFloat(req.body.otros) || 0)
+            };
 
-export const getEngrasesDetailedTable = async (req: AuthRequest, res: Response) => {
-    const { page = 1, limit = 20 } = req.query as any;
-    const from = (Number(page) - 1) * Number(limit);
-    const to = from + Number(limit) - 1;
-    const { data, error, count } = await supabase.from('engrase_relaciones').select('*', { count: 'exact' }).order('fecha', { ascending: false }).range(from, to);
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ data, pagination: { page: Number(page), limit: Number(limit), total: count || 0, totalPages: Math.ceil((count || 0) / Number(limit)) } });
-};
+            const { data, error } = await supabase
+                .from('engrase')
+                .insert([engraseData])
+                .select();
 
-export const getEngrasesPlacaMonthMatrix = async (req: AuthRequest, res: Response) => {
-    res.json({ meses: [], matrix: [] });
-};
+            if (error) {
+                console.error('Error en create engrase:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
 
-export const getEngrasesDashboardLink = async (req: AuthRequest, res: Response) => {
-    res.json({ link: null });
-};
+            res.status(201).json(data[0]);
+        } catch (error) {
+            console.error('Error creando engrase:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
 
-export const getEngraseFinancialReport = async (req: AuthRequest, res: Response) => {
-    try {
-        const { data, error } = await supabase.from('engrase_relaciones').select('*').order('fecha', { ascending: false });
-        if (error) return res.status(500).json({ error: error.message });
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Error en reporte financiero' }); }
-};
+    async update(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
 
-export const getEngraseGeneralReport = async (req: AuthRequest, res: Response) => {
-    try {
-        const { data, error } = await supabase.from('engrase_relaciones').select('*').order('fecha', { ascending: false });
-        if (error) return res.status(500).json({ error: error.message });
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Error en reporte general' }); }
+            const updateData: Partial<Engrase> = {
+                fecha: req.body.fecha,
+                conductor_id: parseInt(req.body.conductor_id),
+                placa_id: parseInt(req.body.placa_id),
+                area_operacion_id: parseInt(req.body.area_operacion_id),
+                lavado: parseFloat(req.body.lavado) || 0,
+                engrase: parseFloat(req.body.engrase) || 0,
+                otros: parseFloat(req.body.otros) || 0,
+                observaciones: req.body.observaciones || null,
+                actualizado_por: req.user?.id,
+                actualizado_en: new Date().toISOString()
+            };
+
+            updateData.suma = (updateData.lavado || 0) + (updateData.engrase || 0) + (updateData.otros || 0);
+
+            const { data, error } = await supabase
+                .from('engrase')
+                .update(updateData)
+                .eq('id', id)
+                .select();
+
+            if (error) {
+                console.error('Error en update engrase:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            if (!data || data.length === 0) {
+                res.status(404).json({ error: 'Engrase no encontrado' });
+                return;
+            }
+
+            res.json(data[0]);
+        } catch (error) {
+            console.error('Error actualizando engrase:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    async delete(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+
+            const { error } = await supabase
+                .from('engrase')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                console.error('Error en delete engrase:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.json({ message: 'Engrase eliminado exitosamente' });
+        } catch (error) {
+            console.error('Error eliminando engrase:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    async getFinancialReport(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const fecha_inicio = req.query.fecha_inicio as string;
+            const fecha_fin = req.query.fecha_fin as string;
+            // Otros filtros
+            const conductor = req.query.conductor as string;
+            const placa = req.query.placa as string;
+            const area_operacion = req.query.area_operacion as string;
+
+            let query = supabase.from('engrase_financiero').select('*');
+
+            // Filtros de fecha ("Fecha de Creacion" segun estructura dada)
+            if (fecha_inicio) query = query.gte('Fecha de Creacion', fecha_inicio);
+            if (fecha_fin) query = query.lte('Fecha de Creacion', fecha_fin);
+
+            // Mapeo de filtros a columnas de la vista financiera
+            if (conductor) query = query.ilike('Responsable', `%${conductor}%`);
+            if (placa) query = query.ilike('Placa', `%${placa}%`);
+            if (area_operacion) query = query.ilike('Área de Operacion', `%${area_operacion}%`);
+
+            query = query.order('Fecha de Creacion', { ascending: false });
+
+            const { data, error } = await query;
+
+            if (error) {
+                console.error('Error fetching financial report engrases:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.json(data);
+        } catch (error) {
+            console.error('Error fetching financial report engrases:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    async getExportData(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const conductor = req.query.conductor as string;
+            const placa = req.query.placa as string;
+            const area_operacion = req.query.area_operacion as string;
+            const fecha_inicio = req.query.fecha_inicio as string;
+            const fecha_fin = req.query.fecha_fin as string;
+
+            let query = supabase.from('engrases_relaciones').select('*');
+
+            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
+            if (placa) query = query.ilike('placa', `%${placa}%`);
+            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
+            if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
+            if (fecha_fin) query = query.lte('fecha', fecha_fin);
+
+            const { data, error } = await query.order('fecha', { ascending: false });
+
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            res.json(data);
+        } catch (error) {
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Reusing logic for Dashboard link
+    async getDashboardLink(req: AuthRequest, res: Response): Promise<void> {
+        // Same logic as Tanqueos, checking user area
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                res.status(401).json({ error: 'Usuario no autenticado' });
+                return;
+            }
+
+            const { data: userData } = await supabase
+                .from('usuarios')
+                .select('area_operacion_id')
+                .eq('id', userId)
+                .single();
+
+            const userAreaId = userData?.area_operacion_id || null;
+
+            // In this case, user asked to check 'tableros' table again, specifically 'link_engrase' field from the example?
+            // "usa la columna que dice solo 'link'" for tanqueos.
+            // For engrases, the example JSON showed: "link_engrase":"https://..."
+            // I should verify if I need to fetch 'link_engrase' instead of 'link'.
+            // The user request said: "usa la columna que dice solo link" (referring to the previous dashboard task).
+            // BUT in the example data in the PROMPT for this task:
+            // "link":"https://...", "link_engrase":"https://..."
+            // It strongly suggests I should use 'link_engrase' for this module.
+
+            let query = supabase.from('tableros').select('link_engrase').limit(1);
+
+            if (userAreaId) {
+                const { data: specificBoard } = await supabase
+                    .from('tableros')
+                    .select('link_engrase')
+                    .eq('area_operacion_id', userAreaId)
+                    .single();
+
+                if (specificBoard?.link_engrase) {
+                    res.json({ link: specificBoard.link_engrase });
+                    return;
+                }
+            }
+
+            // Fallback
+            const { data: defaultBoard, error: defaultError } = await supabase
+                .from('tableros')
+                .select('link_engrase')
+                .is('area_operacion_id', null)
+                .single();
+
+            if (defaultError || !defaultBoard) {
+                res.json({ link: null });
+                return;
+            }
+
+            res.json({ link: defaultBoard.link_engrase });
+
+        } catch (error) {
+            console.error('Error link dashboard engrase:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    }
 };

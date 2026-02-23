@@ -1,142 +1,641 @@
 import { Response } from 'express';
 import { supabase } from '../config/supabase';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, Presupuesto, PresupuestoItem } from '../types';
 
-// ── CATÁLOGOS ────────────────────────────────────────────────────────────────
+export const presupuestosController = {
+    // ==================== CATÁLOGOS ====================
 
-export const getRubros = async (req: AuthRequest, res: Response) => {
-    try {
-        let query = supabase.from('maestro_rubros').select('*');
-        if (req.query.tipo) query = query.eq('tipo', req.query.tipo);
-        if (req.query.nivel) query = query.eq('nivel', req.query.nivel);
-        if (req.query.padre_id) query = query.eq('padre_id', req.query.padre_id);
-        const { data, error } = await query.order('nombre');
-        if (error) return res.status(500).json({ error: error.message });
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Error al obtener rubros' }); }
-};
+    // Obtener maestro de rubros
+    async getRubros(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const tipo = req.query.tipo as string;
+            const nivel = req.query.nivel as string;
+            const padre_id = req.query.padre_id as string;
 
-export const getTipos = async (req: AuthRequest, res: Response) => {
-    try {
-        let query = supabase.from('tipos_presupuesto').select('*');
-        if (req.query.padre_id) query = query.eq('padre_id', req.query.padre_id);
-        const { data, error } = await query.order('nombre');
-        if (error) return res.status(500).json({ error: error.message });
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Error al obtener tipos' }); }
-};
+            let query = supabase
+                .from('maestro_rubros')
+                .select('*')
+                .eq('activo', true)
+                .order('codigo');
 
-export const getConceptos = async (req: AuthRequest, res: Response) => {
-    try {
-        let query = supabase.from('conceptos_presupuesto').select('*');
-        if (req.query.tipo_id) query = query.eq('tipo_id', req.query.tipo_id);
-        const { data, error } = await query.order('nombre');
-        if (error) return res.status(500).json({ error: error.message });
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Error al obtener conceptos' }); }
-};
+            if (tipo) query = query.eq('tipo', tipo);
+            if (nivel) query = query.eq('nivel', parseInt(nivel));
+            if (padre_id) query = query.eq('rubro_padre_id', parseInt(padre_id));
 
-export const getPresupuestoFilterOptions = async (req: AuthRequest, res: Response) => {
-    try {
-        const [areasRes, empresasRes, aniosRes] = await Promise.all([
-            supabase.from('areas_operacion').select('nombre').order('nombre'),
-            supabase.from('presupuestos').select('empresa'),
-            supabase.from('presupuestos').select('anio_vigencia'),
-        ]);
-        const unique = (arr: (string | null | undefined)[]) => [...new Set(arr.filter(Boolean))].sort() as string[];
-        res.json({
-            areas: unique((areasRes.data || []).map((a: any) => a.nombre)),
-            empresas: unique((empresasRes.data || []).map((p: any) => p.empresa)),
-            anios: unique((aniosRes.data || []).map((p: any) => String(p.anio_vigencia))),
-        });
-    } catch (e) { res.status(500).json({ error: 'Error al obtener filtros' }); }
-};
+            const { data, error } = await query;
 
-// ── CRUD PRESUPUESTOS ────────────────────────────────────────────────────────
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
 
-export const getPresupuestos = async (req: AuthRequest, res: Response) => {
-    try {
-        const { page = 1, limit = 20, ...filters } = req.query as any;
-        const from = (Number(page) - 1) * Number(limit);
-        const to = from + Number(limit) - 1;
-
-        let query = supabase.from('presupuestos').select('*', { count: 'exact' });
-        if (filters.area) query = query.eq('area_operacion', filters.area);
-        if (filters.empresa) query = query.eq('empresa', filters.empresa);
-        if (filters.anio) query = query.eq('anio_vigencia', filters.anio);
-        query = query.order('created_at', { ascending: false }).range(from, to);
-
-        const { data, error, count } = await query;
-        if (error) return res.status(500).json({ error: error.message });
-        res.json({ data, pagination: { page: Number(page), limit: Number(limit), total: count || 0, totalPages: Math.ceil((count || 0) / Number(limit)) } });
-    } catch (e) { res.status(500).json({ error: 'Error al obtener presupuestos' }); }
-};
-
-export const getPresupuestoById = async (req: AuthRequest, res: Response) => {
-    try {
-        const { id } = req.params;
-        const { data, error } = await supabase.from('presupuestos').select('*, presupuesto_items(*)').eq('id', id).single();
-        if (error) return res.status(404).json({ error: error.message });
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Error al obtener presupuesto' }); }
-};
-
-export const createPresupuesto = async (req: AuthRequest, res: Response) => {
-    try {
-        const { items, ...body } = req.body;
-        const { data, error } = await supabase.from('presupuestos').insert([body]).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        if (items?.length) {
-            const itemsWithId = items.map((item: any) => ({ ...item, presupuesto_id: (data as any).id }));
-            await supabase.from('presupuesto_items').insert(itemsWithId);
+            res.json(data);
+        } catch (error) {
+            console.error('Error en getRubros:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
         }
-        res.status(201).json(data);
-    } catch (e) { res.status(500).json({ error: 'Error al crear presupuesto' }); }
-};
+    },
 
-export const updatePresupuesto = async (req: AuthRequest, res: Response) => {
-    try {
-        const { id } = req.params;
-        const { data, error } = await supabase.from('presupuestos').update(req.body).eq('id', id).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Error al actualizar presupuesto' }); }
-};
+    // Obtener tipos de presupuesto
+    async getTipos(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const { padre_id } = req.query;
+            let query = supabase
+                .from('tipos_presupuesto')
+                .select('*')
+                .eq('activo', true)
+                .order('nombre');
 
-export const deletePresupuesto = async (req: AuthRequest, res: Response) => {
-    try {
-        const { id } = req.params;
-        const { error } = await supabase.from('presupuestos').delete().eq('id', id);
-        if (error) return res.status(500).json({ error: error.message });
-        res.json({ message: 'Presupuesto eliminado' });
-    } catch (e) { res.status(500).json({ error: 'Error al eliminar presupuesto' }); }
-};
+            if (padre_id) {
+                query = query.eq('padre', Number(padre_id));
+            }
 
-// ── ITEMS ────────────────────────────────────────────────────────────────────
+            const { data, error } = await query;
 
-export const addPresupuestoItem = async (req: AuthRequest, res: Response) => {
-    try {
-        const { presupuestoId } = req.params;
-        const { data, error } = await supabase.from('presupuesto_items').insert([{ ...req.body, presupuesto_id: presupuestoId }]).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        res.status(201).json(data);
-    } catch (e) { res.status(500).json({ error: 'Error al agregar ítem' }); }
-};
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
 
-export const updatePresupuestoItem = async (req: AuthRequest, res: Response) => {
-    try {
-        const { itemId } = req.params;
-        const { data, error } = await supabase.from('presupuesto_items').update(req.body).eq('id', itemId).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Error al actualizar ítem' }); }
-};
+            res.json(data);
+        } catch (error) {
+            console.error('Error en getTipos:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
 
-export const deletePresupuestoItem = async (req: AuthRequest, res: Response) => {
-    try {
-        const { itemId } = req.params;
-        const { error } = await supabase.from('presupuesto_items').delete().eq('id', itemId);
-        if (error) return res.status(500).json({ error: error.message });
-        res.json({ message: 'Ítem eliminado' });
-    } catch (e) { res.status(500).json({ error: 'Error al eliminar ítem' }); }
+    // Obtener conceptos por tipo
+    async getConceptos(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const tipo_id = req.query.tipo_id as string;
+
+            let query = supabase
+                .from('conceptos_presupuesto')
+                .select('*')
+                .eq('activo', true)
+                .order('nombre');
+
+            if (tipo_id) query = query.eq('tipo_presupuesto_id', parseInt(tipo_id));
+
+            const { data, error } = await query;
+
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.json(data);
+        } catch (error) {
+            console.error('Error en getConceptos:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // ==================== PRESUPUESTOS ====================
+
+    // Listar presupuestos con paginación
+    async getAll(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const dbClient = req.supabase || supabase;
+            const {
+                page = 1,
+                limit = 20,
+                empresa,
+                vehiculo_id,
+                placa,
+                area_operacion,
+                anio,
+                grupo_rubro,
+                sub_rubro,
+                sort_by = 'id',
+                sort_order = 'desc'
+            } = req.query;
+
+            const pageNum = Number(page);
+            const limitNum = Number(limit);
+            const offset = (pageNum - 1) * limitNum;
+
+            // Resolve area_operacion name to ID if provided
+            let areaId: number | null = null;
+            if (area_operacion && area_operacion !== 'undefined' && area_operacion !== '') {
+                const { data: areaData } = await dbClient
+                    .from('areas_operacion')
+                    .select('id')
+                    .eq('nombre', area_operacion as string)
+                    .maybeSingle();
+                areaId = areaData?.id || null;
+            }
+
+            // Resolve empresa name to ID if provided
+            let empresaId: number | null = null;
+            if (empresa && empresa !== 'undefined' && empresa !== '') {
+                const { data: empresaData } = await dbClient
+                    .from('empresas')
+                    .select('id')
+                    .eq('empresa', empresa as string)
+                    .maybeSingle();
+                empresaId = empresaData?.id || null;
+            }
+
+
+            // Resolve grupo_rubro name to ID if provided
+            let grupoRubroId: number | null = null;
+            if (grupo_rubro && grupo_rubro !== 'undefined' && grupo_rubro !== '') {
+                const { data: grupoData } = await dbClient
+                    .from('maestro_rubros')
+                    .select('id')
+                    .eq('nombre', grupo_rubro as string)
+                    .is('rubro_padre_id', null)
+                    .maybeSingle();
+                grupoRubroId = grupoData?.id || null;
+            }
+
+            // Resolve sub_rubro name to ID if provided
+            let subRubroId: number | null = null;
+            if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') {
+                const { data: rubroData } = await dbClient
+                    .from('maestro_rubros')
+                    .select('id')
+                    .eq('nombre', sub_rubro as string)
+                    .not('rubro_padre_id', 'is', null)
+                    .maybeSingle();
+                subRubroId = rubroData?.id || null;
+            }
+
+            // Resolve placa to vehiculo ID
+            let vehiculoIdFromPlaca: number | null = null;
+            if (placa && placa !== 'undefined' && placa !== '') {
+                // Find placa_id first
+                const { data: placaData } = await dbClient
+                    .from('areas_placas')
+                    .select('id')
+                    .eq('placa', placa as string)
+                    .maybeSingle();
+
+                if (placaData) {
+                    // Find vehiculo_id from control_flota using placa_id
+                    const { data: vData } = await dbClient
+                        .from('control_flota')
+                        .select('id')
+                        .eq('placa_id', placaData.id)
+                        .maybeSingle();
+
+                    vehiculoIdFromPlaca = vData?.id || null;
+                }
+            }
+
+            // 1. Consulta principal para la tabla (paginada)
+            let query = dbClient
+                .from('presupuestos')
+                .select(`
+                    *,
+                    control_flota(
+                        id, 
+                        placa_id,
+                        clase_vehiculo,
+                        areas_placas(id, placa)
+                    ),
+                    areas_operacion(id, nombre),
+                    empresas(id, empresa),
+                    grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(id, codigo, nombre),
+                    rubro:maestro_rubros!presupuestos_rubro_id_fkey(id, codigo, nombre)
+                `, { count: 'exact' });
+
+            // Filtros directos por ID
+            if (vehiculo_id) query = query.eq('vehiculo_id', Number(vehiculo_id));
+            if (anio && anio !== 'undefined' && anio !== '') query = query.eq('anio', Number(anio));
+
+            // Filtros por ID resuelto
+            if (areaId !== null) {
+                query = query.eq('area_operacion_id', areaId);
+            }
+            if (empresaId !== null) {
+                query = query.eq('empresa_id', empresaId);
+            }
+            if (grupoRubroId !== null) {
+                query = query.eq('grupo_rubro_id', grupoRubroId);
+            }
+            if (subRubroId !== null) {
+                query = query.eq('rubro_id', subRubroId);
+            }
+            if (vehiculoIdFromPlaca !== null) {
+                query = query.eq('vehiculo_id', vehiculoIdFromPlaca);
+            }
+
+            const ascending = sort_order === 'asc';
+            query = query.order(sort_by as string, { ascending });
+            query = query.range(offset, offset + limitNum - 1);
+
+            const { data, error, count } = await query;
+
+            if (error) {
+                console.error('❌ Error de Supabase en getAll Presupuestos:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            // 2. Cálculo de estadísticas reales (sin paginación, pero con los mismos filtros base)
+            // Note: Summary needs to filter by IDs, so we need to look up IDs if filtering by name
+            // For simplicity, we'll just filter by anio and estado for summary (the main filters)
+            let summaryQuery = dbClient
+                .from('presupuestos')
+                .select('id, estado, rubro_id');
+
+            if (vehiculo_id) summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
+            if (vehiculoIdFromPlaca !== null) summaryQuery = summaryQuery.eq('vehiculo_id', vehiculoIdFromPlaca);
+            if (anio && anio !== 'undefined' && anio !== '') summaryQuery = summaryQuery.eq('anio', Number(anio));
+
+            const { data: allMatching } = await summaryQuery;
+
+            let totalAprobado = 0;
+            let totalBorrador = 0;
+            const rubrosIds = new Set<number>();
+
+            if (allMatching && allMatching.length > 0) {
+                const budgetsIds = allMatching.map(p => p.id);
+                allMatching.forEach(p => rubrosIds.add(p.rubro_id));
+
+                // Obtener los totales desde presupuesto_items para estos IDs
+                const { data: itemTotals } = await dbClient
+                    .from('presupuesto_items')
+                    .select('presupuesto_id, valor_total')
+                    .in('presupuesto_id', budgetsIds);
+
+                if (itemTotals) {
+                    const budgetToTotalMap = itemTotals.reduce((acc: any, item) => {
+                        acc[item.presupuesto_id] = (acc[item.presupuesto_id] || 0) + item.valor_total;
+                        return acc;
+                    }, {});
+
+                    allMatching.forEach(p => {
+                        const total = budgetToTotalMap[p.id] || 0;
+                        if (p.estado === 'APROBADO') totalAprobado += total;
+                        else totalBorrador += total;
+                    });
+                }
+            }
+
+            res.json({
+                data: data || [],
+                pagination: {
+                    page: pageNum,
+                    limit: limitNum,
+                    total: count || 0,
+                    totalPages: Math.ceil((count || 0) / limitNum)
+                },
+                summary: {
+                    totalAprobado,
+                    totalBorrador,
+                    rubrosUtilizados: rubrosIds.size,
+                    anioVigencia: anio || new Date().getFullYear()
+                }
+            });
+        } catch (error) {
+            console.error('❌ Error fatal en getAll presupuestos:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Obtener presupuesto por ID con items
+    async getById(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const dbClient = req.supabase || supabase;
+
+            // Obtener cabecera con relaciones completas (igual que getAll + rubro_padre_id)
+            const { data: presupuesto, error: presupuestoError } = await dbClient
+                .from('presupuestos')
+                .select(`
+                    *,
+                    vehiculo:control_flota(
+                        id, 
+                        placa_id,
+                        clase_vehiculo,
+                        areas_placas(placa)
+                    ),
+                    area:areas_operacion(id, nombre),
+                    grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre, rubro_padre_id),
+                    rubro:maestro_rubros!rubro_id(id, codigo, nombre)
+                `)
+                .eq('id', id)
+                .single();
+
+            if (presupuestoError) {
+                console.error('Error fetching presupuesto detail:', presupuestoError);
+                res.status(404).json({ error: 'Presupuesto no encontrado' });
+                return;
+            }
+
+            // Obtener items
+            const { data: items, error: itemsError } = await dbClient
+                .from('presupuesto_items')
+                .select('*, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre, unidad)')
+                .eq('presupuesto_id', id)
+                .order('id');
+
+            if (itemsError) {
+                res.status(400).json({ error: itemsError.message });
+                return;
+            }
+
+            res.json({
+                ...presupuesto,
+                items: items || []
+            });
+        } catch (error) {
+            console.error('Error en getById presupuesto:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Crear presupuesto con items
+    async create(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const dbClient = req.supabase || supabase;
+            const { items, ...presupuestoData } = req.body as Presupuesto & { items?: PresupuestoItem[] };
+
+            // Crear cabecera
+            const { data: presupuesto, error: presupuestoError } = await dbClient
+                .from('presupuestos')
+                .insert({
+                    empresa_id: presupuestoData.empresa_id,
+                    vehiculo_id: presupuestoData.vehiculo_id,
+                    area_operacion_id: presupuestoData.area_operacion_id,
+                    grupo_rubro_id: presupuestoData.grupo_rubro_id,
+                    rubro_id: presupuestoData.rubro_id,
+                    anio: presupuestoData.anio,
+                    estado: presupuestoData.estado || 'BORRADOR'
+                })
+                .select()
+                .single();
+
+            if (presupuestoError) {
+                res.status(400).json({ error: presupuestoError.message });
+                return;
+            }
+
+            // Crear items si existen
+            if (items && items.length > 0) {
+                const itemsToInsert = items.map(item => ({
+                    presupuesto_id: presupuesto.id,
+                    tipo_presupuesto_id: item.tipo_presupuesto_id,
+                    concepto_presupuesto_id: item.concepto_presupuesto_id,
+                    frecuencia_mes: item.frecuencia_mes,
+                    meses_aplicables: item.meses_aplicables,
+                    valor_unitario: item.valor_unitario,
+                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length
+                }));
+
+                const { error: itemsError } = await dbClient
+                    .from('presupuesto_items')
+                    .insert(itemsToInsert);
+
+                if (itemsError) {
+                    // Rollback: eliminar presupuesto creado
+                    await dbClient.from('presupuestos').delete().eq('id', presupuesto.id);
+                    res.status(400).json({ error: itemsError.message });
+                    return;
+                }
+            }
+
+            res.status(201).json(presupuesto);
+        } catch (error) {
+            console.error('Error en create presupuesto:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Actualizar presupuesto
+    async update(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const { items, ...updateData } = req.body;
+
+            const { data, error } = await supabase
+                .from('presupuestos')
+                .update(updateData)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.json(data);
+        } catch (error) {
+            console.error('Error en update presupuesto:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Eliminar presupuesto
+    async delete(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+
+            // Primero eliminar items
+            await supabase.from('presupuesto_items').delete().eq('presupuesto_id', id);
+
+            // Luego eliminar cabecera
+            const { error } = await supabase
+                .from('presupuestos')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.status(204).send();
+        } catch (error) {
+            console.error('Error en delete presupuesto:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // ==================== ITEMS ====================
+
+    // Agregar item a presupuesto
+    async addItem(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const itemData = req.body as PresupuestoItem;
+
+            const valor_total = itemData.valor_unitario * itemData.frecuencia_mes * itemData.meses_aplicables.length;
+
+            const { data, error } = await supabase
+                .from('presupuesto_items')
+                .insert({
+                    presupuesto_id: parseInt(id),
+                    tipo_presupuesto_id: itemData.tipo_presupuesto_id,
+                    concepto_presupuesto_id: itemData.concepto_presupuesto_id,
+                    frecuencia_mes: itemData.frecuencia_mes,
+                    meses_aplicables: itemData.meses_aplicables,
+                    valor_unitario: itemData.valor_unitario,
+                    valor_total
+                })
+                .select()
+                .single();
+
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.status(201).json(data);
+        } catch (error) {
+            console.error('Error en addItem:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Actualizar item
+    async updateItem(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const { itemId } = req.params;
+            const itemData = req.body as Partial<PresupuestoItem>;
+
+            // Recalcular total si hay cambios en valores
+            let updateData: any = { ...itemData };
+            if (itemData.valor_unitario !== undefined || itemData.frecuencia_mes !== undefined || itemData.meses_aplicables !== undefined) {
+                // Obtener item actual para valores faltantes
+                const { data: current } = await supabase
+                    .from('presupuesto_items')
+                    .select('*')
+                    .eq('id', itemId)
+                    .single();
+
+                if (current) {
+                    const valor_unitario = itemData.valor_unitario ?? current.valor_unitario;
+                    const frecuencia_mes = itemData.frecuencia_mes ?? current.frecuencia_mes;
+                    const meses_aplicables = itemData.meses_aplicables ?? current.meses_aplicables;
+                    updateData.valor_total = valor_unitario * frecuencia_mes * meses_aplicables.length;
+                }
+            }
+
+            const { data, error } = await supabase
+                .from('presupuesto_items')
+                .update(updateData)
+                .eq('id', itemId)
+                .select()
+                .single();
+
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.json(data);
+        } catch (error) {
+            console.error('Error en updateItem:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Eliminar item
+    async deleteItem(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const { itemId } = req.params;
+
+            const { error } = await supabase
+                .from('presupuesto_items')
+                .delete()
+                .eq('id', itemId);
+
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.status(204).send();
+        } catch (error) {
+            console.error('Error en deleteItem:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Obtener opciones de filtro
+    async getFilterOptions(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const dbClient = req.supabase || supabase;
+
+            // Años disponibles
+            const { data: aniosData } = await dbClient
+                .from('presupuestos')
+                .select('anio')
+                .order('anio', { ascending: false });
+
+            const anios = [...new Set(aniosData?.map(p => p.anio))];
+
+            // Áreas - fetch with error handling
+            const { data: areasData, error: areasError } = await dbClient
+                .from('areas_operacion')
+                .select('id, nombre')
+                .order('nombre');
+
+            if (areasError) {
+                console.error('Error fetching areas:', areasError);
+            }
+            console.log('Areas fetched:', areasData?.length || 0, 'records');
+
+            // Empresas
+            const { data: empresasData } = await dbClient
+                .from('empresas')
+                .select('id, empresa')
+                .order('empresa');
+
+            // Vehículos con su placa real y área asociada
+            // Use select(*) to work around accented column name issues
+            const { data: vehiculosData, error: vehiculosError } = await dbClient
+                .from('control_flota')
+                .select('*, areas_placas(id, placa)')
+                .order('placa_id');
+
+            if (vehiculosError) {
+                console.error('Error fetching vehiculos:', vehiculosError);
+            }
+
+            // Formatear vehículos para el frontend
+            // Use bracket notation for accented column operación_id
+            const vehiculos = (vehiculosData || []).map((v: any) => ({
+                id: v.id,
+                placa_id: v.placa_id,
+                operación_id: v.operación_id,
+                area_id: v.operación_id,
+                clase_vehiculo: v.clase_vehiculo,
+                placa: v.areas_placas?.placa
+            }));
+
+            // Grupos de rubro (rubros sin padre = nivel superior)
+            const { data: gruposRubroData } = await dbClient
+                .from('maestro_rubros')
+                .select('id, nombre')
+                .is('rubro_padre_id', null)
+                .eq('activo', true)
+                .order('nombre');
+
+            // Sub rubros (rubros con padre = nivel inferior)
+            const { data: subRubrosData } = await dbClient
+                .from('maestro_rubros')
+                .select('id, nombre')
+                .not('rubro_padre_id', 'is', null)
+                .eq('activo', true)
+                .order('nombre');
+
+            res.json({
+                anios,
+                areas: areasData || [],
+                empresas: empresasData || [],
+                vehiculos,
+                grupos_rubro: gruposRubroData || [],
+                sub_rubros: subRubrosData || []
+            });
+        } catch (error) {
+            console.error('Error en getFilterOptions:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    }
 };

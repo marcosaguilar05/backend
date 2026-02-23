@@ -1,0 +1,74 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.authController = void 0;
+const supabase_1 = require("../config/supabase");
+exports.authController = {
+    async login(req, res) {
+        try {
+            const { email, password } = req.body;
+            if (!email || !password) {
+                res.status(400).json({ error: 'Email y contraseña son requeridos' });
+                return;
+            }
+            // Autenticar con Supabase Auth
+            const { data: authData, error: authError } = await supabase_1.supabase.auth.signInWithPassword({
+                email,
+                password
+            });
+            if (authError) {
+                res.status(400).json({ error: authError.message });
+                return;
+            }
+            // Obtener información del usuario desde la tabla usuarios
+            const { data: userData, error: userError } = await supabase_1.supabase
+                .from('usuarios')
+                .select('*')
+                .eq('id', authData.user.id)
+                .single();
+            if (userError || !userData) {
+                res.status(404).json({ error: 'Usuario no encontrado en la base de datos' });
+                return;
+            }
+            const response = {
+                user: {
+                    id: authData.user.id,
+                    email: userData.email,
+                    nombre: userData.nombre,
+                    rol: userData.rol
+                },
+                access_token: authData.session.access_token,
+                refresh_token: authData.session.refresh_token,
+                expires_at: authData.session.expires_at || 0,
+                expires_in: authData.session.expires_in || 3600
+            };
+            res.json(response);
+        }
+        catch (error) {
+            console.error('Error en login:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+    async logout(req, res) {
+        try {
+            const { error } = await supabase_1.supabase.auth.signOut();
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            res.json({ message: 'Sesión cerrada exitosamente' });
+        }
+        catch (error) {
+            console.error('Error en logout:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+    async getUser(req, res) {
+        try {
+            res.json({ user: req.user });
+        }
+        catch (error) {
+            console.error('Error obteniendo usuario:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    }
+};
