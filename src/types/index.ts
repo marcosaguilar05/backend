@@ -229,7 +229,7 @@ export interface ConceptoPresupuesto {
 export interface Presupuesto {
     id?: number;
     empresa_id: number;
-    vehiculo_id: number;
+    vehiculo_id: number | null;
     area_operacion_id: number;
     grupo_rubro_id: number;
     rubro_id: number;

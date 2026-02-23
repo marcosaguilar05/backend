@@ -443,7 +443,7 @@ export const presupuestosController = {
                 .from('presupuestos')
                 .insert({
                     empresa_id: presupuestoData.empresa_id,
-                    vehiculo_id: presupuestoData.vehiculo_id,
+                    vehiculo_id: presupuestoData.vehiculo_id || null,
                     area_operacion_id: presupuestoData.area_operacion_id,
                     grupo_rubro_id: presupuestoData.grupo_rubro_id,
                     rubro_id: presupuestoData.rubro_id,
