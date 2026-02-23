@@ -60,12 +60,10 @@ app.use((req: Request, res: Response) => {
     res.status(404).json({ error: 'Ruta no encontrada' });
 });
 
-// Solo escuchar si no estamos en entorno serverless (Vercel)
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-    app.listen(PORT, () => {
-        console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-        console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-    });
-}
+// Escuchar siempre (Railway provee PORT via env var)
+app.listen(PORT, () => {
+    console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+});
 
 export default app;
