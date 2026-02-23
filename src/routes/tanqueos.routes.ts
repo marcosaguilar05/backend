@@ -9,6 +9,7 @@ import {
     getPlacas,
     getBombas,
     getAreasOperacion,
+    getFilterOptions,
 } from '../controllers/tanqueos.controller';
 import { authenticateToken } from '../middleware/auth';
 
@@ -17,7 +18,8 @@ const router = Router();
 // Todas las rutas requieren autenticación
 router.use(authenticateToken);
 
-// Rutas de catálogos (deben ir ANTES de /:id)
+// Rutas específicas ANTES de /:id
+router.get('/filter-options', getFilterOptions);
 router.get('/catalogos/conductores', getConductores);
 router.get('/catalogos/placas', getPlacas);
 router.get('/catalogos/bombas', getBombas);

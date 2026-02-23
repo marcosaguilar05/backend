@@ -2,6 +2,39 @@ import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/auth';
 
+export const getFilterOptions = async (req: AuthRequest, res: Response) => {
+    try {
+        const [conductoresRes, placasRes, bombasRes, areasRes, tanqueosRes] = await Promise.all([
+            supabase.from('areas_conductores').select('conductor').order('conductor'),
+            supabase.from('areas_placas').select('placa').eq('estado', 'ACTIVADA').order('placa'),
+            supabase.from('areas_bombas').select('bomba').eq('estado', 'ACTIVADA').order('bomba'),
+            supabase.from('areas_operacion').select('nombre').order('nombre'),
+            supabase.from('tanqueo_relaciones').select('tipo_combustible, concepto, tipo_operacion'),
+        ]);
+
+        if (conductoresRes.error || placasRes.error || bombasRes.error || areasRes.error) {
+            return res.status(500).json({ error: 'Error al obtener opciones de filtro' });
+        }
+
+        const tanqueos = tanqueosRes.data || [];
+
+        const unique = (arr: (string | null | undefined)[]) =>
+            [...new Set(arr.filter(Boolean))].sort() as string[];
+
+        res.json({
+            conductores: unique(conductoresRes.data?.map((c: any) => c.conductor)),
+            placas: unique(placasRes.data?.map((p: any) => p.placa)),
+            bombas: unique(bombasRes.data?.map((b: any) => b.bomba)),
+            areas_operacion: unique(areasRes.data?.map((a: any) => a.nombre)),
+            tipos_combustible: unique(tanqueos.map((t: any) => t.tipo_combustible)),
+            conceptos: unique(tanqueos.map((t: any) => t.concepto)),
+            tipos_operacion: unique(tanqueos.map((t: any) => t.tipo_operacion)),
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener opciones de filtro' });
+    }
+};
+
 export const getTanqueos = async (req: AuthRequest, res: Response) => {
     try {
         const { data, error } = await supabase
