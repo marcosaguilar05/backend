@@ -10,7 +10,9 @@ router.use(authMiddleware);
 // Catálogos
 router.get('/rubros', presupuestosController.getRubros);
 router.get('/tipos', presupuestosController.getTipos);
+router.post('/tipos', presupuestosController.createTipo);
 router.get('/conceptos', presupuestosController.getConceptos);
+router.post('/conceptos', presupuestosController.createConcepto);
 router.get('/filters', presupuestosController.getFilterOptions);
 
 // CRUD Presupuestos

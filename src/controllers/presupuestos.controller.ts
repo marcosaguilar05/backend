@@ -91,6 +91,88 @@ export const presupuestosController = {
         }
     },
 
+    // Crear nuevo tipo de presupuesto (Solo ADMIN)
+    async createTipo(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const dbClient = req.supabase || supabase;
+
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+
+            const { nombre, descripcion, padre_id } = req.body;
+
+            if (!nombre || !padre_id) {
+                res.status(400).json({ error: 'Nombre y rubro padre son requeridos' });
+                return;
+            }
+
+            const { data, error } = await dbClient
+                .from('tipos_presupuesto')
+                .insert({
+                    nombre,
+                    descripcion,
+                    padre: padre_id,
+                    activo: true
+                })
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Error de Supabase en createTipo:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.status(201).json(data);
+        } catch (error) {
+            console.error('Error en createTipo:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Crear nuevo concepto de presupuesto (Solo ADMIN)
+    async createConcepto(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const dbClient = req.supabase || supabase;
+
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+
+            const { nombre, unidad, tipo_presupuesto_id } = req.body;
+
+            if (!nombre || !tipo_presupuesto_id) {
+                res.status(400).json({ error: 'Nombre y tipo de presupuesto son requeridos' });
+                return;
+            }
+
+            const { data, error } = await dbClient
+                .from('conceptos_presupuesto')
+                .insert({
+                    nombre,
+                    unidad,
+                    tipo_presupuesto_id,
+                    activo: true
+                })
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Error de Supabase en createConcepto:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.status(201).json(data);
+        } catch (error) {
+            console.error('Error en createConcepto:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
     // ==================== PRESUPUESTOS ====================
 
     // Listar presupuestos con paginación
