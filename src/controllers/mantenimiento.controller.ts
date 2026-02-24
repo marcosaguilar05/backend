@@ -28,7 +28,7 @@ export const getEventos = async (req: AuthRequest, res: Response, next: NextFunc
                 costo,
                 plan_id,
                 plan_mantenimiento:plan_id ( id, nombre ),
-                talleres:taller_id ( id, nombre ),
+                talleres:taller_id ( id, nombre:nombre_taller ),
                 vehiculo:vehiculo_id (
                     id,
                     areas_placas ( id, placa )
@@ -67,19 +67,8 @@ export const getEventos = async (req: AuthRequest, res: Response, next: NextFunc
 
         // Map to ensure clean response
         const mappedData = data.map((item: any) => ({
-            id: item.id,
-            fecha: item.fecha,
-            km_evento: item.km_evento,
-            hr_evento: item.hr_evento,
-            descripcion: item.descripcion,
-            observaciones: item.observaciones,
-            taller_id: item.taller_id,
-            talleres: item.talleres,
-            costo: item.costo,
-            plan_id: item.plan_id,
-            plan_mantenimiento: item.plan_mantenimiento,
-            vehiculo_id: item.vehiculo_id,
-            vehiculo: item.vehiculo
+            ...item,
+            talleres: item.talleres ? { ...item.talleres, nombre: item.talleres.nombre } : null
         }));
 
         res.json(mappedData);
