@@ -135,6 +135,10 @@ export const getPlanes = async (req: AuthRequest, res: Response, next: NextFunct
         const { vehiculo_id, activo } = req.query;
         const db = req.supabase!;
 
+        if (!db) return res.status(500).json({ error: 'Supabase client missing' });
+
+        console.log('Fetching planes for vehiculo_id:', vehiculo_id);
+
         let query = db
             .from('plan_mantenimiento')
             .select(`
@@ -150,11 +154,15 @@ export const getPlanes = async (req: AuthRequest, res: Response, next: NextFunct
         if (activo !== undefined) query = query.eq('activo', activo === 'true');
 
         const { data, error } = await query;
-        if (error) throw error;
+        if (error) {
+            console.error('Supabase error in getPlanes:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message, details: error });
+        }
 
-        res.json(data);
+        res.json(data || []);
     } catch (error) {
-        next(error);
+        console.error('Unexpected error in getPlanes:', error);
+        res.status(500).json({ error: 'Internal Server Error', details: error instanceof Error ? error.message : String(error) });
     }
 };
 
@@ -251,21 +259,43 @@ export const createPlan = async (req: AuthRequest, res: Response, next: NextFunc
 export const getTiposMantenimiento = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const db = req.supabase!;
+        if (!db) return res.status(500).json({ error: 'Supabase client missing' });
+
         const { data, error } = await db.from('tipo_mantenimiento').select('*');
-        if (error) throw error;
-        res.json(data);
+        if (error) {
+            console.error('Error fetching tipos_mantenimiento:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.json(data || []);
     } catch (error) {
-        next(error);
+        console.error('Unexpected error in getTiposMantenimiento:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 };
 
 export const getTalleres = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const db = req.supabase!;
-        const { data, error } = await db.from('talleres').select('id, nombre, ciudad');
-        if (error) throw error;
-        res.json(data);
+        if (!db) return res.status(500).json({ error: 'Supabase client missing' });
+
+        console.log('Fetching talleres...');
+        // Try selecting all first to see if ciudad exists, or defensive selection
+        const { data, error } = await db.from('talleres').select('*');
+
+        if (error) {
+            console.error('Error fetching talleres:', error);
+            return res.status(500).json({
+                error: 'Database error',
+                message: error.message,
+                details: error
+            });
+        }
+        res.json(data || []);
     } catch (error) {
-        next(error);
+        console.error('Unexpected error in getTalleres:', error);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            details: error instanceof Error ? error.message : String(error)
+        });
     }
 };
