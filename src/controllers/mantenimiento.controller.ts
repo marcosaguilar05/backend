@@ -288,6 +288,38 @@ export const getTiposCondicion = async (req: AuthRequest, res: Response, next: N
     }
 };
 
+export const getProximosMantenimientos = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const db = req.supabase!;
+        if (!db) return res.status(500).json({ error: 'Supabase client missing' });
+
+        // Join with vehiculo and areas_placas to show the plate in the list
+        const { data, error } = await db
+            .from('v_proximo_mantenimiento')
+            .select(`
+                *,
+                vehiculo:vehiculo_id (
+                    id,
+                    areas_placas ( placa )
+                )
+            `)
+            .order('fecha_proximo', { ascending: true, nullsFirst: false });
+
+        if (error) {
+            console.error('Error fetching v_proximo_mantenimiento:', error);
+            return res.status(500).json({
+                error: 'Database error',
+                message: error.message,
+                details: error
+            });
+        }
+        res.json(data || []);
+    } catch (error) {
+        console.error('Unexpected error in getProximosMantenimientos:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
 export const getTalleres = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const db = req.supabase!;
