@@ -80,6 +80,76 @@ exports.presupuestosController = {
             res.status(500).json({ error: 'Error en el servidor' });
         }
     },
+    // Crear nuevo tipo de presupuesto (Solo ADMIN)
+    async createTipo(req, res) {
+        try {
+            const dbClient = req.supabase || supabase_1.supabase;
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+            const { nombre, descripcion, padre_id } = req.body;
+            if (!nombre || !padre_id) {
+                res.status(400).json({ error: 'Nombre y rubro padre son requeridos' });
+                return;
+            }
+            const { data, error } = await dbClient
+                .from('tipos_presupuesto')
+                .insert({
+                nombre,
+                descripcion,
+                padre: padre_id,
+                activo: true
+            })
+                .select()
+                .single();
+            if (error) {
+                console.error('Error de Supabase en createTipo:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            res.status(201).json(data);
+        }
+        catch (error) {
+            console.error('Error en createTipo:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+    // Crear nuevo concepto de presupuesto (Solo ADMIN)
+    async createConcepto(req, res) {
+        try {
+            const dbClient = req.supabase || supabase_1.supabase;
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+            const { nombre, unidad, tipo_presupuesto_id } = req.body;
+            if (!nombre || !tipo_presupuesto_id) {
+                res.status(400).json({ error: 'Nombre y tipo de presupuesto son requeridos' });
+                return;
+            }
+            const { data, error } = await dbClient
+                .from('conceptos_presupuesto')
+                .insert({
+                nombre,
+                unidad,
+                tipo_presupuesto_id,
+                activo: true
+            })
+                .select()
+                .single();
+            if (error) {
+                console.error('Error de Supabase en createConcepto:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            res.status(201).json(data);
+        }
+        catch (error) {
+            console.error('Error en createConcepto:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
     // ==================== PRESUPUESTOS ====================
     // Listar presupuestos con paginación
     async getAll(req, res) {
@@ -164,7 +234,8 @@ exports.presupuestosController = {
                     areas_operacion(id, nombre),
                     empresas(id, empresa),
                     grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(id, codigo, nombre),
-                    rubro:maestro_rubros!presupuestos_rubro_id_fkey(id, codigo, nombre)
+                    rubro:maestro_rubros!presupuestos_rubro_id_fkey(id, codigo, nombre),
+                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo)
                 `, { count: 'exact' });
             // Filtros directos por ID
             if (vehiculo_id)
@@ -273,7 +344,8 @@ exports.presupuestosController = {
                     ),
                     area:areas_operacion(id, nombre),
                     grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre, rubro_padre_id),
-                    rubro:maestro_rubros!rubro_id(id, codigo, nombre)
+                    rubro:maestro_rubros!rubro_id(id, codigo, nombre),
+                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo)
                 `)
                 .eq('id', id)
                 .single();
@@ -312,12 +384,13 @@ exports.presupuestosController = {
                 .from('presupuestos')
                 .insert({
                 empresa_id: presupuestoData.empresa_id,
-                vehiculo_id: presupuestoData.vehiculo_id,
+                vehiculo_id: presupuestoData.vehiculo_id || null,
                 area_operacion_id: presupuestoData.area_operacion_id,
                 grupo_rubro_id: presupuestoData.grupo_rubro_id,
                 rubro_id: presupuestoData.rubro_id,
                 anio: presupuestoData.anio,
-                estado: presupuestoData.estado || 'BORRADOR'
+                estado: presupuestoData.estado || 'BORRADOR',
+                empleado_id: presupuestoData.empleado_id || null
             })
                 .select()
                 .single();
@@ -542,13 +615,19 @@ exports.presupuestosController = {
                 .not('rubro_padre_id', 'is', null)
                 .eq('activo', true)
                 .order('nombre');
+            // Personal (tipos de empleado)
+            const { data: personalData } = await dbClient
+                .from('Personal')
+                .select('id, tipo')
+                .order('tipo');
             res.json({
                 anios,
                 areas: areasData || [],
                 empresas: empresasData || [],
                 vehiculos,
                 grupos_rubro: gruposRubroData || [],
-                sub_rubros: subRubrosData || []
+                sub_rubros: subRubrosData || [],
+                personal: personalData || []
             });
         }
         catch (error) {

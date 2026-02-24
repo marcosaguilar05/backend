@@ -104,13 +104,22 @@ export const createEvento = async (req: AuthRequest, res: Response, next: NextFu
             .select(`
                 *,
                 plan_mantenimiento ( id, nombre ),
-                talleres ( id, nombre )
+                talleres ( id, nombre:nombre_taller )
             `)
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error('Error in createEvento Supabase:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
 
-        res.status(201).json(data);
+        // Map if necessary
+        const mappedData = {
+            ...data,
+            talleres: data.talleres ? { ...data.talleres, nombre: data.talleres.nombre } : null
+        };
+
+        res.status(201).json(mappedData);
     } catch (error) {
         console.error('Error in createEvento:', error);
         next(error);

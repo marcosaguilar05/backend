@@ -9,7 +9,9 @@ router.use(auth_middleware_1.authMiddleware);
 // Catálogos
 router.get('/rubros', presupuestos_controller_1.presupuestosController.getRubros);
 router.get('/tipos', presupuestos_controller_1.presupuestosController.getTipos);
+router.post('/tipos', presupuestos_controller_1.presupuestosController.createTipo);
 router.get('/conceptos', presupuestos_controller_1.presupuestosController.getConceptos);
+router.post('/conceptos', presupuestos_controller_1.presupuestosController.createConcepto);
 router.get('/filters', presupuestos_controller_1.presupuestosController.getFilterOptions);
 // CRUD Presupuestos
 router.get('/', presupuestos_controller_1.presupuestosController.getAll);

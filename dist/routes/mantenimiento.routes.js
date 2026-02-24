@@ -11,5 +11,6 @@ router.get('/planes', mantenimiento_controller_1.getPlanes);
 router.post('/planes', mantenimiento_controller_1.createPlan);
 router.put('/planes/:id', mantenimiento_controller_1.updatePlan);
 router.get('/tipos', mantenimiento_controller_1.getTiposMantenimiento);
+router.get('/condiciones', mantenimiento_controller_1.getTiposCondicion);
 router.get('/talleres', mantenimiento_controller_1.getTalleres);
 exports.default = router;

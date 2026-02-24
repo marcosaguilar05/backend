@@ -1,68 +1,75 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getTalleres = exports.getTiposMantenimiento = exports.createPlan = exports.updatePlan = exports.getPlanes = exports.createEvento = exports.getEventos = void 0;
+exports.getTalleres = exports.getTiposCondicion = exports.getTiposMantenimiento = exports.createPlan = exports.updatePlan = exports.getPlanes = exports.createEvento = exports.getEventos = void 0;
 // ==================== EVENTOS ====================
 const getEventos = async (req, res, next) => {
     try {
-        const { vehiculo_id, fecha_inicio, fecha_fin, tipo } = req.query;
+        const { vehiculo_id, fecha_inicio, fecha_fin } = req.query;
         const db = req.supabase;
+        if (!db) {
+            console.error('Supabase client is missing in request');
+            return res.status(500).json({ error: 'Internal Server Error', details: 'Supabase client not initialized' });
+        }
+        console.log('Fetching eventos for vehiculo_id:', vehiculo_id);
         let query = db
-            .from('mantenimiento')
+            .from('mantenimiento_evento')
             .select(`
                 id,
-                fecha_entrada,
-                km,
-                hr,
-                actividad,
-                nota,
+                fecha,
+                km_evento,
+                hr_evento,
+                descripcion,
+                observaciones,
                 taller_id,
-                areas_placas!mantenimiento_placa_id_fkey (
+                costo,
+                plan_id,
+                plan_mantenimiento:plan_id ( id, nombre ),
+                talleres:taller_id ( id, nombre:nombre_taller ),
+                vehiculo:vehiculo_id (
                     id,
-                    placa
-                ),
-                talleres!mantenimiento_taller_id_fkey ( nombre )
+                    areas_placas ( id, placa )
+                )
             `)
-            .order('fecha_entrada', { ascending: false });
+            .order('fecha', { ascending: false });
         if (vehiculo_id) {
-            // Get placa_id from vehiculo table first
-            const { data: vehiculo, error: vError } = await db
-                .from('vehiculo')
-                .select('placa_id')
-                .eq('id', vehiculo_id)
-                .single();
-            if (vError)
-                throw vError;
-            if (vehiculo) {
-                query = query.eq('placa_id', vehiculo.placa_id);
-            }
+            query = query.eq('vehiculo_id', vehiculo_id);
         }
         if (fecha_inicio)
-            query = query.gte('fecha_entrada', fecha_inicio);
+            query = query.gte('fecha', fecha_inicio);
         if (fecha_fin)
-            query = query.lte('fecha_entrada', fecha_fin);
+            query = query.lte('fecha', fecha_fin);
         const { data, error } = await query;
-        if (error)
-            throw error;
-        // Map to frontend expectation
-        const mappedData = data.map((item) => ({
-            id: item.id,
-            fecha: item.fecha_entrada,
-            km_evento: item.km,
-            hr_evento: item.hr,
-            descripcion: item.actividad,
-            observaciones: item.nota,
-            taller_id: item.taller_id,
-            talleres: item.talleres,
-            costo: 0, // Not in schema
-            plan_mantenimiento: null, // Not in schema
-            vehiculo: {
-                areas_placas: item.areas_placas
+        if (error) {
+            console.error('Supabase error in getEventos:', error);
+            // If the table doesn't exist, try the old one as fallback and log it
+            if (error.code === '42P01') {
+                console.warn('mantenimiento_evento table not found, attempting fallback to mantenimiento table');
+                // (Optional fallback logic or just exit with clear error)
             }
+            return res.status(500).json({
+                error: 'Database error',
+                message: error.message,
+                hint: error.hint,
+                details: error.details,
+                code: error.code
+            });
+        }
+        if (!data) {
+            return res.json([]);
+        }
+        // Map to ensure clean response
+        const mappedData = data.map((item) => ({
+            ...item,
+            talleres: item.talleres ? { ...item.talleres, nombre: item.talleres.nombre } : null
         }));
         res.json(mappedData);
     }
     catch (error) {
-        next(error);
+        console.error('Unexpected error in getEventos:', error);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            details: error instanceof Error ? error.message : String(error)
+        });
     }
 };
 exports.getEventos = getEventos;
@@ -70,48 +77,39 @@ const createEvento = async (req, res, next) => {
     try {
         const db = req.supabase;
         const { vehiculo_id, fecha, km_evento, hr_evento, descripcion, observaciones, taller_id, plan_id, costo } = req.body;
-        // Get placa_id from vehiculo
-        const { data: vehiculo, error: vError } = await db
-            .from('vehiculo')
-            .select('placa_id')
-            .eq('id', vehiculo_id)
-            .single();
-        if (vError)
-            throw vError;
-        if (!vehiculo)
-            throw new Error('Vehículo no encontrado');
         const insertData = {
-            placa_id: vehiculo.placa_id,
-            fecha_entrada: fecha,
-            km: km_evento,
-            hr: hr_evento,
-            actividad: descripcion,
-            nota: observaciones,
-            taller_id: taller_id || null
-            // costo AND plan_id are ignored as they don't exist in mantenimiento table
+            vehiculo_id,
+            fecha,
+            km_evento,
+            hr_evento,
+            descripcion,
+            observaciones,
+            taller_id: taller_id || null,
+            plan_id: plan_id || null,
+            costo: costo || 0
         };
         const { data, error } = await db
-            .from('mantenimiento')
+            .from('mantenimiento_evento')
             .insert(insertData)
-            .select()
+            .select(`
+                *,
+                plan_mantenimiento ( id, nombre ),
+                talleres ( id, nombre:nombre_taller )
+            `)
             .single();
-        if (error)
-            throw error;
-        // Map response back
-        const responseData = {
-            id: data.id,
-            fecha: data.fecha_entrada,
-            km_evento: data.km,
-            hr_evento: data.hr,
-            descripcion: data.actividad,
-            observaciones: data.nota,
-            taller_id: data.taller_id,
-            costo: 0,
-            plan_mantenimiento: null
+        if (error) {
+            console.error('Error in createEvento Supabase:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        // Map if necessary
+        const mappedData = {
+            ...data,
+            talleres: data.talleres ? { ...data.talleres, nombre: data.talleres.nombre } : null
         };
-        res.status(201).json(responseData);
+        res.status(201).json(mappedData);
     }
     catch (error) {
+        console.error('Error in createEvento:', error);
         next(error);
     }
 };
@@ -121,6 +119,9 @@ const getPlanes = async (req, res, next) => {
     try {
         const { vehiculo_id, activo } = req.query;
         const db = req.supabase;
+        if (!db)
+            return res.status(500).json({ error: 'Supabase client missing' });
+        console.log('Fetching planes for vehiculo_id:', vehiculo_id);
         let query = db
             .from('plan_mantenimiento')
             .select(`
@@ -136,12 +137,15 @@ const getPlanes = async (req, res, next) => {
         if (activo !== undefined)
             query = query.eq('activo', activo === 'true');
         const { data, error } = await query;
-        if (error)
-            throw error;
-        res.json(data);
+        if (error) {
+            console.error('Supabase error in getPlanes:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message, details: error });
+        }
+        res.json(data || []);
     }
     catch (error) {
-        next(error);
+        console.error('Unexpected error in getPlanes:', error);
+        res.status(500).json({ error: 'Internal Server Error', details: error instanceof Error ? error.message : String(error) });
     }
 };
 exports.getPlanes = getPlanes;
@@ -231,26 +235,63 @@ exports.createPlan = createPlan;
 const getTiposMantenimiento = async (req, res, next) => {
     try {
         const db = req.supabase;
+        if (!db)
+            return res.status(500).json({ error: 'Supabase client missing' });
         const { data, error } = await db.from('tipo_mantenimiento').select('*');
-        if (error)
-            throw error;
-        res.json(data);
+        if (error) {
+            console.error('Error fetching tipos_mantenimiento:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.json(data || []);
     }
     catch (error) {
-        next(error);
+        console.error('Unexpected error in getTiposMantenimiento:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 };
 exports.getTiposMantenimiento = getTiposMantenimiento;
+const getTiposCondicion = async (req, res, next) => {
+    try {
+        const db = req.supabase;
+        if (!db)
+            return res.status(500).json({ error: 'Supabase client missing' });
+        const { data, error } = await db.from('tipo_condicion').select('*');
+        if (error) {
+            console.error('Error fetching tipos_condicion:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.json(data || []);
+    }
+    catch (error) {
+        console.error('Unexpected error in getTiposCondicion:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+exports.getTiposCondicion = getTiposCondicion;
 const getTalleres = async (req, res, next) => {
     try {
         const db = req.supabase;
-        const { data, error } = await db.from('talleres').select('id, nombre, ciudad');
-        if (error)
-            throw error;
-        res.json(data);
+        if (!db)
+            return res.status(500).json({ error: 'Supabase client missing' });
+        console.log('Fetching talleres...');
+        // Try selecting all first to see if ciudad exists, or defensive selection
+        const { data, error } = await db.from('talleres').select('*');
+        if (error) {
+            console.error('Error fetching talleres:', error);
+            return res.status(500).json({
+                error: 'Database error',
+                message: error.message,
+                details: error
+            });
+        }
+        res.json(data || []);
     }
     catch (error) {
-        next(error);
+        console.error('Unexpected error in getTalleres:', error);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            details: error instanceof Error ? error.message : String(error)
+        });
     }
 };
 exports.getTalleres = getTalleres;
