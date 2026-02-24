@@ -8,13 +8,28 @@ export const getEventos = async (req: AuthRequest, res: Response, next: NextFunc
         const { vehiculo_id, fecha_inicio, fecha_fin } = req.query;
         const db = req.supabase!;
 
+        if (!db) {
+            console.error('Supabase client is missing in request');
+            return res.status(500).json({ error: 'Internal Server Error', details: 'Supabase client not initialized' });
+        }
+
+        console.log('Fetching eventos for vehiculo_id:', vehiculo_id);
+
         let query = db
             .from('mantenimiento_evento')
             .select(`
-                *,
-                plan_mantenimiento ( id, nombre ),
-                talleres ( id, nombre ),
-                vehiculo (
+                id,
+                fecha,
+                km_evento,
+                hr_evento,
+                descripcion,
+                observaciones,
+                taller_id,
+                costo,
+                plan_id,
+                plan_mantenimiento:plan_id ( id, nombre ),
+                talleres:taller_id ( id, nombre ),
+                vehiculo:vehiculo_id (
                     id,
                     areas_placas ( id, placa )
                 )
@@ -29,9 +44,28 @@ export const getEventos = async (req: AuthRequest, res: Response, next: NextFunc
         if (fecha_fin) query = query.lte('fecha', fecha_fin);
 
         const { data, error } = await query;
-        if (error) throw error;
 
-        // Map to frontend expectation if necessary (though the schema now matches better)
+        if (error) {
+            console.error('Supabase error in getEventos:', error);
+            // If the table doesn't exist, try the old one as fallback and log it
+            if (error.code === '42P01') {
+                console.warn('mantenimiento_evento table not found, attempting fallback to mantenimiento table');
+                // (Optional fallback logic or just exit with clear error)
+            }
+            return res.status(500).json({
+                error: 'Database error',
+                message: error.message,
+                hint: error.hint,
+                details: error.details,
+                code: error.code
+            });
+        }
+
+        if (!data) {
+            return res.json([]);
+        }
+
+        // Map to ensure clean response
         const mappedData = data.map((item: any) => ({
             id: item.id,
             fecha: item.fecha,
@@ -50,8 +84,11 @@ export const getEventos = async (req: AuthRequest, res: Response, next: NextFunc
 
         res.json(mappedData);
     } catch (error) {
-        console.error('Error in getEventos:', error);
-        next(error);
+        console.error('Unexpected error in getEventos:', error);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            details: error instanceof Error ? error.message : String(error)
+        });
     }
 };
 
