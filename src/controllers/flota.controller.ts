@@ -16,24 +16,24 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
         console.log('Supabase client initialized');
 
         // Standard query
-        let query = db
-            .from('vehiculo')
-            .select(`
-                id,
-                placa_id,
-                empresa_id,
-                operacion_id,
-                areas_placas ( placa ),
-                empresas ( empresa ),
-                areas_operacion ( nombre ),
-                vehiculo_caracteristicas (
-                    clase_vehiculo_id,
-                    cat_clase_vehiculo ( nombre ),
-                    marca_id,
-                    cat_marca:cat_marca!vehiculo_caracteristicas_marca_id_fkey ( nombre ),
-                    anio:año
-                )
-            `);
+        let selectStr = `
+            id,
+            placa_id,
+            empresa_id,
+            operacion_id,
+            areas_placas${placa ? '!inner' : ''} ( placa ),
+            empresas ( empresa ),
+            areas_operacion ( nombre ),
+            vehiculo_caracteristicas (
+                clase_vehiculo_id,
+                cat_clase_vehiculo ( nombre ),
+                marca_id,
+                cat_marca:cat_marca!vehiculo_caracteristicas_marca_id_fkey ( nombre ),
+                anio:año
+            )
+        `;
+
+        let query = db.from('vehiculo').select(selectStr);
 
         if (empresa_id) query = query.eq('empresa_id', empresa_id);
         if (operacion_id) query = query.eq('operacion_id', operacion_id);
