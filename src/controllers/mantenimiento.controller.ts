@@ -262,6 +262,23 @@ export const getTiposMantenimiento = async (req: AuthRequest, res: Response, nex
     }
 };
 
+export const getTiposCondicion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const db = req.supabase!;
+        if (!db) return res.status(500).json({ error: 'Supabase client missing' });
+
+        const { data, error } = await db.from('tipo_condicion').select('*');
+        if (error) {
+            console.error('Error fetching tipos_condicion:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.json(data || []);
+    } catch (error) {
+        console.error('Unexpected error in getTiposCondicion:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
 export const getTalleres = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const db = req.supabase!;
