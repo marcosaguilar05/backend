@@ -126,6 +126,74 @@ export const createEvento = async (req: AuthRequest, res: Response, next: NextFu
     }
 };
 
+export const updateEvento = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const db = req.supabase!;
+        const { vehiculo_id, fecha, km_evento, hr_evento, descripcion, observaciones, taller_id, plan_id, costo } = req.body;
+
+        const updateData = {
+            vehiculo_id,
+            fecha,
+            km_evento,
+            hr_evento,
+            descripcion,
+            observaciones,
+            taller_id: taller_id || null,
+            plan_id: plan_id || null,
+            costo: costo || 0
+        };
+
+        const { data, error } = await db
+            .from('mantenimiento_evento')
+            .update(updateData)
+            .eq('id', id)
+            .select(`
+                *,
+                plan_mantenimiento ( id, nombre ),
+                talleres ( id, nombre:nombre_taller )
+            `)
+            .single();
+
+        if (error) {
+            console.error('Error in updateEvento Supabase:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+
+        const mappedData = {
+            ...data,
+            talleres: data.talleres ? { ...data.talleres, nombre: data.talleres.nombre } : null
+        };
+
+        res.json(mappedData);
+    } catch (error) {
+        console.error('Error in updateEvento:', error);
+        next(error);
+    }
+};
+
+export const deleteEvento = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const db = req.supabase!;
+
+        const { error } = await db
+            .from('mantenimiento_evento')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error in deleteEvento Supabase:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+
+        res.status(204).send();
+    } catch (error) {
+        console.error('Error in deleteEvento:', error);
+        next(error);
+    }
+};
+
 // ==================== PLANES ====================
 
 export const getPlanes = async (req: AuthRequest, res: Response, next: NextFunction) => {
