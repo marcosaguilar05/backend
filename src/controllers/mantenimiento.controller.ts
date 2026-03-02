@@ -339,6 +339,34 @@ export const getTiposMantenimiento = async (req: AuthRequest, res: Response, nex
     }
 };
 
+export const createTipoMantenimiento = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const db = req.supabase!;
+        if (!db) return res.status(500).json({ error: 'Supabase client missing' });
+
+        const { tipo, descripcion } = req.body;
+
+        if (!tipo) {
+            return res.status(400).json({ error: 'Validation error', message: 'El campo tipo es requerido' });
+        }
+
+        const { data, error } = await db
+            .from('tipo_mantenimiento')
+            .insert({ tipo, descripcion })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error creating tipo_mantenimiento:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.status(201).json(data);
+    } catch (error) {
+        console.error('Unexpected error in createTipoMantenimiento:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
 export const getTiposCondicion = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const db = req.supabase!;
