@@ -178,6 +178,9 @@ exports.tanqueosDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const tipo_combustible = req.query.tipo_combustible;
+            const conductor = req.query.conductor;
+            const placa = req.query.placa;
+            const bomba = req.query.bomba;
             let query = supabase_1.supabase.from('tanqueo_relaciones').select('fecha, tipo_combustible, cantidad_galones, valor_tanqueo');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
@@ -187,6 +190,12 @@ exports.tanqueosDashboardController = {
                 query = query.ilike('area_operacion', `%${area_operacion}%`);
             if (tipo_combustible)
                 query = query.eq('tipo_combustible', tipo_combustible);
+            if (conductor)
+                query = query.ilike('conductor', `%${conductor}%`);
+            if (placa)
+                query = query.ilike('placa', `%${placa}%`);
+            if (bomba)
+                query = query.ilike('bomba', `%${bomba}%`);
             query = query.eq('tipo_operacion', 'TANQUEO').order('fecha');
             const { data, error } = await query;
             if (error) {
@@ -359,6 +368,11 @@ exports.tanqueosDashboardController = {
         try {
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
+            const area_operacion = req.query.area_operacion;
+            const tipo_combustible = req.query.tipo_combustible;
+            const conductor = req.query.conductor;
+            const placa = req.query.placa;
+            const bomba = req.query.bomba;
             // Obtener solo últimos 2 meses si no hay filtro
             let query = supabase_1.supabase.from('tanqueo_relaciones').select('placa, area_operacion, conductor, tipo_combustible, cantidad_galones, valor_tanqueo, fecha');
             if (fecha_inicio) {
@@ -372,6 +386,16 @@ exports.tanqueosDashboardController = {
             }
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
+            if (area_operacion)
+                query = query.ilike('area_operacion', `%${area_operacion}%`);
+            if (tipo_combustible)
+                query = query.eq('tipo_combustible', tipo_combustible);
+            if (conductor)
+                query = query.ilike('conductor', `%${conductor}%`);
+            if (placa)
+                query = query.ilike('placa', `%${placa}%`);
+            if (bomba)
+                query = query.ilike('bomba', `%${bomba}%`);
             query = query.eq('tipo_operacion', 'TANQUEO').order('fecha', { ascending: false });
             const { data, error } = await query;
             if (error) {
