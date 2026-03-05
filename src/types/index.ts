@@ -248,6 +248,7 @@ export interface PresupuestoItem {
     meses_aplicables: number[];
     valor_unitario: number;
     valor_total: number;
+    nota?: string;
 }
 
 export interface PresupuestoConItems extends Presupuesto {
