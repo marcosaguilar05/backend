@@ -468,7 +468,8 @@ export const presupuestosController = {
                     frecuencia_mes: item.frecuencia_mes,
                     meses_aplicables: item.meses_aplicables,
                     valor_unitario: item.valor_unitario,
-                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length
+                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length,
+                    nota: item.nota
                 }));
 
                 const { error: itemsError } = await dbClient
@@ -560,7 +561,8 @@ export const presupuestosController = {
                     frecuencia_mes: itemData.frecuencia_mes,
                     meses_aplicables: itemData.meses_aplicables,
                     valor_unitario: itemData.valor_unitario,
-                    valor_total
+                    valor_total,
+                    nota: itemData.nota
                 })
                 .select()
                 .single();
