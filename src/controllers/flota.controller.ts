@@ -7,6 +7,11 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
         const empresa_id = req.query.empresa_id as string;
         const operacion_id = req.query.operacion_id as string;
         const placa = req.query.placa as string;
+        
+        // Pagination setup
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const offset = (page - 1) * limit;
 
         if (!req.supabase) {
             console.error('req.supabase is undefined in getVehiculos');
@@ -33,24 +38,36 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
             )
         `;
 
-        let query = db.from('vehiculo').select(selectStr);
+        let query = db.from('vehiculo').select(selectStr, { count: 'exact' });
 
         if (empresa_id) query = query.eq('empresa_id', empresa_id);
         if (operacion_id) query = query.eq('operacion_id', operacion_id);
         if (placa) {
+            // Because areas_placas is marked as !inner if placa is present, this ilike filter works.
             query = query.ilike('areas_placas.placa', `%${placa}%`);
         }
 
         console.log('Executing query...');
-        const { data, error } = await query;
+        const { data, count, error } = await query
+            .range(offset, offset + limit - 1)
+            .order('id', { ascending: false });
 
         if (error) {
             console.error('Supabase Query Error:', error);
             throw error;
         }
 
-        console.log(`Query successful. Returning ${data?.length} records.`);
-        res.json(data);
+        console.log(`Query successful. Returning ${data?.length} records of ${count} total.`);
+        
+        res.json({
+            data,
+            pagination: {
+                total: count || 0,
+                page,
+                limit,
+                totalPages: count ? Math.ceil(count / limit) : 0
+            }
+        });
     } catch (error) {
         console.error('Error fetching vehiculos:', error);
         // Send explicit error to client for debugging
