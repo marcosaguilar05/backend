@@ -50,6 +50,8 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
         console.log('Executing query...');
         const { data, count, error } = await query
             .range(offset, offset + limit - 1)
+            .order('empresa_id', { ascending: false, nullsFirst: false })
+            .order('operacion_id', { ascending: false, nullsFirst: false })
             .order('id', { ascending: false });
 
         if (error) {
