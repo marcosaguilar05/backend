@@ -35,9 +35,8 @@ export const authController = {
                 return;
             }
 
-            // Verificar si es auditor usando maybeSingle en lugar de single, con el cliente autenticado
-            const authClient = createAuthClient(authData.session.access_token);
-            const { data: auditorData } = await authClient
+            // Verificar si es auditor usando maybeSingle en lugar de single, con el cliente global (seguro para roles admin)
+            const { data: auditorData } = await supabase
                 .from('Auditores')
                 .select('id')
                 .eq('id_usuario', authData.user.id)
@@ -82,8 +81,7 @@ export const authController = {
 
     async getUser(req: AuthRequest, res: Response): Promise<void> {
         try {
-            const authClient = req.supabase || createAuthClient(req.headers.authorization?.split(' ')[1] || '');
-            const { data: auditorData } = await authClient
+            const { data: auditorData } = await supabase
                 .from('Auditores')
                 .select('id')
                 .eq('id_usuario', req.user?.id)
