@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { supabase } from '../config/supabase';
+import { supabase, createAuthClient } from '../config/supabase';
 import { AuthRequest, LoginRequest, LoginResponse, Usuario } from '../types';
 
 export const authController = {
@@ -35,12 +35,13 @@ export const authController = {
                 return;
             }
 
-            // Verificar si es auditor
-            const { data: auditorData } = await supabase
+            // Verificar si es auditor usando maybeSingle en lugar de single, con el cliente autenticado
+            const authClient = createAuthClient(authData.session.access_token);
+            const { data: auditorData } = await authClient
                 .from('Auditores')
                 .select('id')
                 .eq('id_usuario', authData.user.id)
-                .single();
+                .maybeSingle();
 
             const response: LoginResponse = {
                 user: {
@@ -81,11 +82,12 @@ export const authController = {
 
     async getUser(req: AuthRequest, res: Response): Promise<void> {
         try {
-            const { data: auditorData } = await supabase
+            const authClient = req.supabase || createAuthClient(req.headers.authorization?.split(' ')[1] || '');
+            const { data: auditorData } = await authClient
                 .from('Auditores')
                 .select('id')
                 .eq('id_usuario', req.user?.id)
-                .single();
+                .maybeSingle();
 
             res.json({ user: { ...req.user, isAuditor: !!auditorData } });
         } catch (error) {
