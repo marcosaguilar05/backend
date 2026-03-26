@@ -35,6 +35,7 @@ router.post('/import', tanqueosController.importBatch);
 // Crear nuevo tanqueo
 router.post('/', tanqueosController.create);
 router.put('/:id', tanqueosController.update);
+router.post('/batch-delete', tanqueosController.deleteBatch);
 router.delete('/:id', tanqueosController.delete);
 
 export default router;

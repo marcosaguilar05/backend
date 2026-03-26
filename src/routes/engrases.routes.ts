@@ -28,6 +28,7 @@ router.get('/dashboard-link', engrasesController.getDashboardLink);
 router.get('/:id', engrasesController.getById);
 router.post('/', engrasesController.create);
 router.put('/:id', engrasesController.update);
+router.post('/batch-delete', engrasesController.deleteBatch);
 router.delete('/:id', engrasesController.delete);
 
 export default router;

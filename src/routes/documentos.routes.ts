@@ -15,6 +15,7 @@ router.get('/filters', documentosController.getFilterOptions);
 router.get('/:id', documentosController.getById);
 router.post('/', documentosController.create);
 router.put('/:id', documentosController.update);
+router.post('/batch-delete', documentosController.deleteBatch);
 router.delete('/:id', documentosController.delete);
 
 export default router;

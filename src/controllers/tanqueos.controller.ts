@@ -354,6 +354,32 @@ export const tanqueosController = {
         }
     },
 
+    async deleteBatch(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const { ids } = req.body;
+            if (!Array.isArray(ids) || ids.length === 0) {
+                res.status(400).json({ error: 'No se enviaron IDs válidos para eliminar' });
+                return;
+            }
+
+            const { error } = await supabase
+                .from('tanqueo')
+                .delete()
+                .in('id', ids);
+
+            if (error) {
+                console.error('Error en deleteBatch:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.json({ message: `${ids.length} registros eliminados exitosamente` });
+        } catch (error) {
+            console.error('Error eliminando tanqueos en lote:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
     async getFinancialReport(req: AuthRequest, res: Response): Promise<void> {
         try {
             const fecha_inicio = req.query.fecha_inicio as string;

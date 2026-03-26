@@ -158,5 +158,26 @@ export const documentosController = {
             console.error('Error deleting documento:', error);
             res.status(500).json({ error: error.message });
         }
+    },
+
+    async deleteBatch(req: Request, res: Response) {
+        try {
+            const { ids } = req.body;
+            if (!Array.isArray(ids) || ids.length === 0) {
+                return res.status(400).json({ error: 'No se enviaron IDs válidos para eliminar' });
+            }
+
+            const { error } = await supabase
+                .from('documentos_vehiculos')
+                .delete()
+                .in('id', ids);
+
+            if (error) throw error;
+
+            res.json({ message: `${ids.length} registros eliminados exitosamente` });
+        } catch (error: any) {
+            console.error('Error deleting batch documentos:', error);
+            res.status(500).json({ error: error.message });
+        }
     }
 };
