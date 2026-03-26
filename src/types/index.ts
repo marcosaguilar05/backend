@@ -7,6 +7,7 @@ export interface Usuario {
     nombre: string;
     rol: string;
     creado_en?: string;
+    isAuditor?: boolean;
 }
 
 export interface AuthRequest extends Request {

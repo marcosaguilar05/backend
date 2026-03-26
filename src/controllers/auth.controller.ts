@@ -35,12 +35,20 @@ export const authController = {
                 return;
             }
 
+            // Verificar si es auditor
+            const { data: auditorData } = await supabase
+                .from('Auditores')
+                .select('id')
+                .eq('id_usuario', authData.user.id)
+                .single();
+
             const response: LoginResponse = {
                 user: {
                     id: authData.user.id,
                     email: userData.email,
                     nombre: userData.nombre,
-                    rol: userData.rol
+                    rol: userData.rol,
+                    isAuditor: !!auditorData
                 },
                 access_token: authData.session.access_token,
                 refresh_token: authData.session.refresh_token,
@@ -73,7 +81,13 @@ export const authController = {
 
     async getUser(req: AuthRequest, res: Response): Promise<void> {
         try {
-            res.json({ user: req.user });
+            const { data: auditorData } = await supabase
+                .from('Auditores')
+                .select('id')
+                .eq('id_usuario', req.user?.id)
+                .single();
+
+            res.json({ user: { ...req.user, isAuditor: !!auditorData } });
         } catch (error) {
             console.error('Error obteniendo usuario:', error);
             res.status(500).json({ error: 'Error en el servidor' });

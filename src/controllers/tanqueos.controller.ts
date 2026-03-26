@@ -187,6 +187,29 @@ export const tanqueosController = {
                 return;
             }
 
+            if (data) {
+                // OBTENER DATOS DE AUDITORÍA
+                const { data: auditData } = await supabase
+                    .from('tanqueo')
+                    .select(`
+                        creado_en,
+                        actualizado_en,
+                        creador:usuarios!tanqueo_creado_por_fkey(nombre),
+                        actualizador:usuarios!tanqueo_actualizado_por_fkey(nombre)
+                    `)
+                    .eq('id', id)
+                    .single();
+
+                if (auditData) {
+                    (data as any).creado_en = auditData.creado_en;
+                    (data as any).actualizado_en = auditData.actualizado_en;
+                    const creador: any = Array.isArray(auditData.creador) ? auditData.creador[0] : auditData.creador;
+                    const actualizador: any = Array.isArray(auditData.actualizador) ? auditData.actualizador[0] : auditData.actualizador;
+                    (data as any).creado_por_nombre = creador?.nombre || null;
+                    (data as any).actualizado_por_nombre = actualizador?.nombre || null;
+                }
+            }
+
             res.json(data as TanqueoRelacion);
         } catch (error) {
             console.error('Error obteniendo tanqueo:', error);
