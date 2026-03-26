@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { supabase } from '../config/supabase';
+import { supabase, createAuthClient } from '../config/supabase';
 import { AuthRequest, Tanqueo, TanqueoRelacion } from '../types';
 
 // Caché simple en memoria para filter options (5 minutos)
@@ -198,7 +198,7 @@ export const tanqueosController = {
                         actualizador:usuarios!tanqueo_actualizado_por_fkey(nombre)
                     `)
                     .eq('id', id)
-                    .single();
+                    .maybeSingle();
 
                 if (auditData) {
                     (data as any).creado_en = auditData.creado_en;
