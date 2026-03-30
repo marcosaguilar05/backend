@@ -23,6 +23,7 @@ router.get('/dashboard/by-driver', tanqueosDashboardController.getByDriver);
 router.get('/dashboard/by-pump', tanqueosDashboardController.getByPump);
 router.get('/dashboard/alerts', tanqueosDashboardController.getAlerts);
 router.get('/dashboard/alerts/:alertType/records', tanqueosDashboardController.getAlertRecords);
+router.get('/dashboard/vehicle-performance', tanqueosDashboardController.getVehiclePerformance);
 router.get('/dashboard/detailed-table', tanqueosDashboardController.getDetailedTable);
 
 router.get('/reportes/financiero', tanqueosController.getFinancialReport);

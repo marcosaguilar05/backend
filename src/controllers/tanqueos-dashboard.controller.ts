@@ -816,5 +816,31 @@ export const tanqueosDashboardController = {
             console.error('Error en getAlertRecords:', error);
             res.status(500).json({ error: 'Error en el servidor' });
         }
+    },
+
+    // Rendimiento mensual de vehículos (usando vista preexistente)
+    async getVehiclePerformance(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const dbClient = req.supabase || supabase;
+            const { mes, vehiculo, area_operacion } = req.query;
+
+            let query = dbClient.from('rendimiento_mensual_vehiculo').select('*');
+
+            if (mes) query = query.eq('mes', mes);
+            if (vehiculo) query = query.ilike('vehiculo', `%${vehiculo}%`);
+            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
+
+            const { data, error } = await query.order('mes', { ascending: false }).order('vehiculo');
+
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.json(data);
+        } catch (error) {
+            console.error('Error en getVehiclePerformance:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
     }
 };
