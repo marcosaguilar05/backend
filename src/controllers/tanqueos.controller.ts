@@ -26,7 +26,7 @@ export const tanqueosController = {
             const fecha_fin = req.query.fecha_fin as string;
 
             // Query base
-            let query = supabase
+            let query = (req.supabase || supabase)
                 .from('tanqueo_relaciones')
                 .select('*', { count: 'exact' });
 
@@ -83,7 +83,7 @@ export const tanqueosController = {
             }
 
             // Calcular totales de todos los registros que coinciden con los filtros (no solo la página actual)
-            let summaryQuery = req.supabase?.from('tanqueo_relaciones').select('cantidad_galones, valor_tanqueo') || supabase.from('tanqueo_relaciones').select('cantidad_galones, valor_tanqueo');
+            let summaryQuery = (req.supabase || supabase).from('tanqueo_relaciones').select('cantidad_galones, valor_tanqueo');
 
             // Aplicar los mismos filtros para los totales
             if (conductor) summaryQuery = summaryQuery.ilike('conductor', `%${conductor}%`);
@@ -176,7 +176,7 @@ export const tanqueosController = {
         try {
             const { id } = req.params;
 
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('tanqueo_relaciones')
                 .select('*')
                 .eq('id', id)
@@ -227,7 +227,7 @@ export const tanqueosController = {
                 }
             }
 
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('tanqueo')
                 .insert([tanqueoData])
                 .select();
@@ -285,7 +285,7 @@ export const tanqueosController = {
                 }
             }
 
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('tanqueo')
                 .update(updateData)
                 .eq('id', id)
@@ -313,7 +313,7 @@ export const tanqueosController = {
         try {
             const { id } = req.params;
 
-            const { error } = await supabase
+            const { error } = await (req.supabase || supabase)
                 .from('tanqueo')
                 .delete()
                 .eq('id', id);
@@ -339,7 +339,7 @@ export const tanqueosController = {
                 return;
             }
 
-            const { error } = await supabase
+            const { error } = await (req.supabase || supabase)
                 .from('tanqueo')
                 .delete()
                 .in('id', ids);
@@ -369,7 +369,7 @@ export const tanqueosController = {
             const tipo_combustible = req.query.tipo_combustible as string; // Asumiendo Sub-Rubro
             const concepto = req.query.concepto as string;
 
-            let query = supabase.from('tanqueo_financiero').select('*');
+            let query = (req.supabase || supabase).from('tanqueo_financiero').select('*');
 
             // Filtros de fecha
             if (fecha_inicio) query = query.gte('Fecha de Creacion', fecha_inicio);
@@ -412,7 +412,7 @@ export const tanqueosController = {
             const fecha_inicio = req.query.fecha_inicio as string;
             const fecha_fin = req.query.fecha_fin as string;
 
-            let query = supabase.from('tanqueo_relaciones').select('*');
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*');
 
             if (conductor) query = query.ilike('conductor', `%${conductor}%`);
             if (placa) query = query.ilike('placa', `%${placa}%`);
@@ -466,7 +466,7 @@ export const tanqueosController = {
             // Si el requerimiento dice "segun el area de operacion asignada al usuario", necesito saber esa area.
             // Voy a suponer que hay una tabla 'usuarios' donde id = user.id.
 
-            const { data: userData, error: userError } = await supabase
+            const { data: userData, error: userError } = await (req.supabase || supabase)
                 .from('usuarios') // Ajustar nombre de tabla si es diferente
                 .select('area_operacion_id')
                 .eq('id', userId)
@@ -476,7 +476,7 @@ export const tanqueosController = {
             const userAreaId = userData?.area_operacion_id || null;
 
             // 2. Buscar en tableros
-            let query = supabase
+            let query = (req.supabase || supabase)
                 .from('tableros')
                 .select('link')
                 .limit(1);
@@ -487,7 +487,7 @@ export const tanqueosController = {
                 // Pero qué pasa si tiene área pero NO hay tablero para esa área? Probablemente fallback al general.
 
                 // Primero intentamos match exacto
-                const { data: specificBoard } = await supabase
+                const { data: specificBoard } = await (req.supabase || supabase)
                     .from('tableros')
                     .select('link')
                     .eq('area_operacion_id', userAreaId)
@@ -500,7 +500,7 @@ export const tanqueosController = {
             }
 
             // Fallback: Default board
-            const { data: defaultBoard } = await supabase
+            const { data: defaultBoard } = await (req.supabase || supabase)
                 .from('tableros')
                 .select('link')
                 .is('area_operacion_id', null)
@@ -523,8 +523,8 @@ export const tanqueosController = {
 
             // 1. Fetch catalogs
             // Corrected: Look into 'areas_placas' for plates and 'areas_conductores' for drivers
-            const { data: allPlacas } = await supabase.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').limit(10000);
-            const { data: allConductores } = await supabase.from('areas_conductores').select('id, conductor').limit(10000);
+            const { data: allPlacas } = await (req.supabase || supabase).from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').limit(10000);
+            const { data: allConductores } = await (req.supabase || supabase).from('areas_conductores').select('id, conductor').limit(10000);
 
             // Maps for lookup (Robust: Clean keys by removing non-alphanumeric)
             const cleanKey = (str: string) => str ? str.toString().replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase() : '';
@@ -630,7 +630,7 @@ export const tanqueosController = {
 
             // 3. Insert
             if (recordsToInsert.length > 0) {
-                const { error: insertError } = await supabase.from('tanqueo').insert(recordsToInsert);
+                const { error: insertError } = await (req.supabase || supabase).from('tanqueo').insert(recordsToInsert);
                 if (insertError) throw insertError;
                 importedCount = recordsToInsert.length;
             }

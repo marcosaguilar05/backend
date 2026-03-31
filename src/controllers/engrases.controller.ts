@@ -22,7 +22,7 @@ export const engrasesController = {
             const fecha_fin = req.query.fecha_fin as string;
 
             // Query base
-            let query = supabase
+            let query = (req.supabase || supabase)
                 .from('engrases_relaciones')
                 .select('*', { count: 'exact' });
 
@@ -118,7 +118,7 @@ export const engrasesController = {
         try {
             const { id } = req.params;
 
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('engrases_relaciones')
                 .select('*')
                 .eq('id', id)
@@ -151,7 +151,7 @@ export const engrasesController = {
                 suma: (parseFloat(req.body.lavado) || 0) + (parseFloat(req.body.engrase) || 0) + (parseFloat(req.body.otros) || 0)
             };
 
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('engrase')
                 .insert([engraseData])
                 .select();
@@ -188,7 +188,7 @@ export const engrasesController = {
 
             updateData.suma = (updateData.lavado || 0) + (updateData.engrase || 0) + (updateData.otros || 0);
 
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('engrase')
                 .update(updateData)
                 .eq('id', id)
@@ -216,7 +216,7 @@ export const engrasesController = {
         try {
             const { id } = req.params;
 
-            const { error } = await supabase
+            const { error } = await (req.supabase || supabase)
                 .from('engrase')
                 .delete()
                 .eq('id', id);
@@ -242,7 +242,7 @@ export const engrasesController = {
                 return;
             }
 
-            const { error } = await supabase
+            const { error } = await (req.supabase || supabase)
                 .from('engrase')
                 .delete()
                 .in('id', ids);
@@ -269,7 +269,7 @@ export const engrasesController = {
             const placa = req.query.placa as string;
             const area_operacion = req.query.area_operacion as string;
 
-            let query = supabase.from('engrase_financiero').select('*');
+            let query = (req.supabase || supabase).from('engrase_financiero').select('*');
 
             // Filtros de fecha ("Fecha de Creacion" segun estructura dada)
             if (fecha_inicio) query = query.gte('Fecha de Creacion', fecha_inicio);
@@ -305,7 +305,7 @@ export const engrasesController = {
             const fecha_inicio = req.query.fecha_inicio as string;
             const fecha_fin = req.query.fecha_fin as string;
 
-            let query = supabase.from('engrases_relaciones').select('*');
+            let query = (req.supabase || supabase).from('engrases_relaciones').select('*');
 
             if (conductor) query = query.ilike('conductor', `%${conductor}%`);
             if (placa) query = query.ilike('placa', `%${placa}%`);
@@ -335,7 +335,7 @@ export const engrasesController = {
                 return;
             }
 
-            const { data: userData } = await supabase
+            const { data: userData } = await (req.supabase || supabase)
                 .from('usuarios')
                 .select('area_operacion_id')
                 .eq('id', userId)
@@ -352,10 +352,10 @@ export const engrasesController = {
             // "link":"https://...", "link_engrase":"https://..."
             // It strongly suggests I should use 'link_engrase' for this module.
 
-            let query = supabase.from('tableros').select('link_engrase').limit(1);
+            let query = (req.supabase || supabase).from('tableros').select('link_engrase').limit(1);
 
             if (userAreaId) {
-                const { data: specificBoard } = await supabase
+                const { data: specificBoard } = await (req.supabase || supabase)
                     .from('tableros')
                     .select('link_engrase')
                     .eq('area_operacion_id', userAreaId)
@@ -368,7 +368,7 @@ export const engrasesController = {
             }
 
             // Fallback
-            const { data: defaultBoard, error: defaultError } = await supabase
+            const { data: defaultBoard, error: defaultError } = await (req.supabase || supabase)
                 .from('tableros')
                 .select('link_engrase')
                 .is('area_operacion_id', null)

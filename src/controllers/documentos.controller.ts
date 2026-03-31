@@ -1,8 +1,9 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { supabase } from '../config/supabase';
+import { AuthRequest } from '../types';
 
 export const documentosController = {
-    async getAll(req: Request, res: Response) {
+    async getAll(req: AuthRequest, res: Response) {
         try {
             const {
                 page = 1,
@@ -18,7 +19,7 @@ export const documentosController = {
             const offset = (pageNum - 1) * limitNum;
 
             // Build query
-            let query = supabase
+            let query = (req.supabase || supabase)
                 .from('documentos_vehiculos_relaciones')
                 .select('*', { count: 'exact' });
 
@@ -56,10 +57,10 @@ export const documentosController = {
         }
     },
 
-    async getById(req: Request, res: Response) {
+    async getById(req: AuthRequest, res: Response) {
         try {
             const { id } = req.params;
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('documentos_vehiculos_relaciones')
                 .select('*')
                 .eq('id', id)
@@ -77,10 +78,10 @@ export const documentosController = {
         }
     },
 
-    async getFilterOptions(req: Request, res: Response) {
+    async getFilterOptions(req: AuthRequest, res: Response) {
         try {
             // Fetch unique placas
-            const { data: placasData } = await supabase
+            const { data: placasData } = await (req.supabase || supabase)
                 .from('documentos_vehiculos_relaciones')
                 .select('placa')
                 .order('placa');
@@ -88,7 +89,7 @@ export const documentosController = {
             const placas = [...new Set(placasData?.map(p => p.placa).filter(Boolean))];
 
             // Fetch unique areas
-            const { data: areasData } = await supabase
+            const { data: areasData } = await (req.supabase || supabase)
                 .from('documentos_vehiculos_relaciones')
                 .select('area_operacion')
                 .order('area_operacion');
@@ -102,11 +103,11 @@ export const documentosController = {
         }
     },
 
-    async create(req: Request, res: Response) {
+    async create(req: AuthRequest, res: Response) {
         try {
             const documentoData = req.body;
 
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('documentos_vehiculos')
                 .insert(documentoData)
                 .select()
@@ -121,12 +122,12 @@ export const documentosController = {
         }
     },
 
-    async update(req: Request, res: Response) {
+    async update(req: AuthRequest, res: Response) {
         try {
             const { id } = req.params;
             const updateData = req.body;
 
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('documentos_vehiculos')
                 .update(updateData)
                 .eq('id', id)
@@ -142,11 +143,11 @@ export const documentosController = {
         }
     },
 
-    async delete(req: Request, res: Response) {
+    async delete(req: AuthRequest, res: Response) {
         try {
             const { id } = req.params;
 
-            const { error } = await supabase
+            const { error } = await (req.supabase || supabase)
                 .from('documentos_vehiculos')
                 .delete()
                 .eq('id', id);
@@ -160,14 +161,14 @@ export const documentosController = {
         }
     },
 
-    async deleteBatch(req: Request, res: Response) {
+    async deleteBatch(req: AuthRequest, res: Response) {
         try {
             const { ids } = req.body;
             if (!Array.isArray(ids) || ids.length === 0) {
                 return res.status(400).json({ error: 'No se enviaron IDs válidos para eliminar' });
             }
 
-            const { error } = await supabase
+            const { error } = await (req.supabase || supabase)
                 .from('documentos_vehiculos')
                 .delete()
                 .in('id', ids);

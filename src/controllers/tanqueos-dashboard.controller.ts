@@ -24,7 +24,7 @@ export const tanqueosDashboardController = {
             const tipo_combustible = req.query.tipo_combustible as string;
 
             // Query base con filtros
-            let query = supabase.from('tanqueo_relaciones').select('*');
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -197,7 +197,7 @@ export const tanqueosDashboardController = {
             const placa = req.query.placa as string;
             const bomba = req.query.bomba as string;
 
-            let query = supabase.from('tanqueo_relaciones').select('fecha, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('fecha, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -246,7 +246,7 @@ export const tanqueosDashboardController = {
             const fecha_fin = req.query.fecha_fin as string;
             const area_operacion = req.query.area_operacion as string;
 
-            let query = supabase.from('tanqueo_relaciones').select('tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -302,7 +302,7 @@ export const tanqueosDashboardController = {
             const fecha_fin = req.query.fecha_fin as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = supabase.from('tanqueo_relaciones').select('area_operacion, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('area_operacion, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -348,7 +348,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = supabase.from('tanqueo_relaciones').select('placa, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('placa, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -404,7 +404,7 @@ export const tanqueosDashboardController = {
             const bomba = req.query.bomba as string;
 
             // Obtener solo últimos 2 meses si no hay filtro
-            let query = supabase.from('tanqueo_relaciones').select('placa, area_operacion, conductor, tipo_combustible, cantidad_galones, valor_tanqueo, fecha');
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('placa, area_operacion, conductor, tipo_combustible, cantidad_galones, valor_tanqueo, fecha');
 
             if (fecha_inicio) {
                 query = query.gte('fecha', fecha_inicio);
@@ -508,7 +508,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = supabase.from('tanqueo_relaciones').select('conductor, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('conductor, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -561,7 +561,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = supabase.from('tanqueo_relaciones').select('bomba, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('bomba, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -606,7 +606,7 @@ export const tanqueosDashboardController = {
             const fecha_inicio = req.query.fecha_inicio as string;
             const fecha_fin = req.query.fecha_fin as string;
 
-            let query = supabase.from('tanqueo_relaciones').select('*');
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -702,7 +702,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = supabase.from('tanqueo_relaciones').select('*', { count: 'exact' });
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*', { count: 'exact' });
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -762,7 +762,7 @@ export const tanqueosDashboardController = {
             const fecha_inicio = req.query.fecha_inicio as string;
             const fecha_fin = req.query.fecha_fin as string;
 
-            let query = supabase.from('tanqueo_relaciones').select('*');
+            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);

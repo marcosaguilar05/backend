@@ -12,7 +12,7 @@ export const presupuestosController = {
             const nivel = req.query.nivel as string;
             const padre_id = req.query.padre_id as string;
 
-            let query = supabase
+            let query = (req.supabase || supabase)
                 .from('maestro_rubros')
                 .select('*')
                 .eq('activo', true)
@@ -40,7 +40,7 @@ export const presupuestosController = {
     async getTipos(req: AuthRequest, res: Response): Promise<void> {
         try {
             const { padre_id } = req.query;
-            let query = supabase
+            let query = (req.supabase || supabase)
                 .from('tipos_presupuesto')
                 .select('*')
                 .eq('activo', true)
@@ -69,7 +69,7 @@ export const presupuestosController = {
         try {
             const tipo_id = req.query.tipo_id as string;
 
-            let query = supabase
+            let query = (req.supabase || supabase)
                 .from('conceptos_presupuesto')
                 .select('*')
                 .eq('activo', true)
@@ -497,7 +497,7 @@ export const presupuestosController = {
             const { id } = req.params;
             const { items, ...updateData } = req.body;
 
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('presupuestos')
                 .update(updateData)
                 .eq('id', id)
@@ -522,10 +522,10 @@ export const presupuestosController = {
             const { id } = req.params;
 
             // Primero eliminar items
-            await supabase.from('presupuesto_items').delete().eq('presupuesto_id', id);
+            await (req.supabase || supabase).from('presupuesto_items').delete().eq('presupuesto_id', id);
 
             // Luego eliminar cabecera
-            const { error } = await supabase
+            const { error } = await (req.supabase || supabase)
                 .from('presupuestos')
                 .delete()
                 .eq('id', id);
@@ -552,7 +552,7 @@ export const presupuestosController = {
 
             const valor_total = itemData.valor_unitario * itemData.frecuencia_mes * itemData.meses_aplicables.length;
 
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('presupuesto_items')
                 .insert({
                     presupuesto_id: parseInt(id),
@@ -589,7 +589,7 @@ export const presupuestosController = {
             let updateData: any = { ...itemData };
             if (itemData.valor_unitario !== undefined || itemData.frecuencia_mes !== undefined || itemData.meses_aplicables !== undefined) {
                 // Obtener item actual para valores faltantes
-                const { data: current } = await supabase
+                const { data: current } = await (req.supabase || supabase)
                     .from('presupuesto_items')
                     .select('*')
                     .eq('id', itemId)
@@ -603,7 +603,7 @@ export const presupuestosController = {
                 }
             }
 
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('presupuesto_items')
                 .update(updateData)
                 .eq('id', itemId)
@@ -627,7 +627,7 @@ export const presupuestosController = {
         try {
             const { itemId } = req.params;
 
-            const { error } = await supabase
+            const { error } = await (req.supabase || supabase)
                 .from('presupuesto_items')
                 .delete()
                 .eq('id', itemId);

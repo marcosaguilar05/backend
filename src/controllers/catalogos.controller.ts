@@ -1,9 +1,10 @@
-import { Response, Request } from 'express';
+import { Response } from 'express';
 import { supabase } from '../config/supabase';
+import { AuthRequest } from '../types';
 
 export const catalogosController = {
-    async getBombas(req: Request, res: Response) {
-        const { data, error } = await supabase
+    async getBombas(req: AuthRequest, res: Response) {
+        const { data, error } = await (req.supabase || supabase)
             .from('areas_bombas')
             .select('id, bomba')
             .eq('estado', 'ACTIVADA') // Asumiendo filtro de estado activo
@@ -13,8 +14,8 @@ export const catalogosController = {
         res.json(data);
     },
 
-    async getConductores(req: Request, res: Response) {
-        const { data, error } = await supabase
+    async getConductores(req: AuthRequest, res: Response) {
+        const { data, error } = await (req.supabase || supabase)
             .from('areas_conductores')
             .select('id, conductor')
             .order('conductor');
@@ -23,8 +24,8 @@ export const catalogosController = {
         res.json(data);
     },
 
-    async getPlacas(req: Request, res: Response) {
-        const { data, error } = await supabase
+    async getPlacas(req: AuthRequest, res: Response) {
+        const { data, error } = await (req.supabase || supabase)
             .from('areas_placas')
             .select('id, placa')
             .eq('estado', 'ACTIVADA')
@@ -34,8 +35,8 @@ export const catalogosController = {
         res.json(data);
     },
 
-    async getAreas(req: Request, res: Response) {
-        const { data, error } = await supabase
+    async getAreas(req: AuthRequest, res: Response) {
+        const { data, error } = await (req.supabase || supabase)
             .from('areas_operacion')
             .select('id, nombre')
             .order('nombre');
@@ -44,7 +45,7 @@ export const catalogosController = {
         res.json(data);
     },
 
-    async getSaldoBomba(req: Request, res: Response) {
+    async getSaldoBomba(req: AuthRequest, res: Response) {
         try {
             const { bombaId, fecha } = req.query;
 
@@ -55,7 +56,7 @@ export const catalogosController = {
 
             // Buscar el último registro para esa bomba en fecha <= fecha dada
             // Usamos tanqueo_relaciones para asegurar consistencia
-            const { data, error } = await supabase
+            const { data, error } = await (req.supabase || supabase)
                 .from('tanqueo_relaciones')
                 .select('saldo_disponible')
                 .eq('bomba_id', parseInt(bombaId as string))
