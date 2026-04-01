@@ -295,8 +295,8 @@ export const presupuestosController = {
                     ),
                     areas_operacion(id, nombre),
                     empresas(id, empresa),
-                    grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(id, codigo, nombre),
-                    rubro:maestro_rubros!presupuestos_rubro_id_fkey(id, codigo, nombre),
+                    grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre),
+                    rubro:maestro_rubros!rubro_id(id, codigo, nombre),
                     personal:Personal!presupuestos_empleado_id_fkey(id, tipo)
                 `, { count: 'exact' });
 
