@@ -198,118 +198,99 @@ export const presupuestosController = {
             const limitNum = Number(limit);
             const offset = (pageNum - 1) * limitNum;
 
-            // Resolve area_operacion name to ID if provided
-            let areaId: number | null = null;
+            // Resolve area_operacion names to IDs
+            let areaIds: number[] = [];
             if (area_operacion && area_operacion !== 'undefined' && area_operacion !== '') {
                 const { data: areaData, error: areaError } = await dbClient
                     .from('areas_operacion')
                     .select('id')
-                    .ilike('nombre', (area_operacion as string).trim())
-                    .limit(1)
-                    .maybeSingle();
+                    .ilike('nombre', (area_operacion as string).trim());
                 
                 if (areaError) console.error('Error resolving area_operacion:', areaError);
-                areaId = areaData?.id || null;
-                console.log(`[Presupuestos Filter] Area: "${area_operacion}" -> ${areaId}`);
-                if (!areaId && area_operacion) console.warn(`Could not resolve area_operacion: ${area_operacion}`);
+                areaIds = areaData?.map(a => a.id) || [];
+                console.log(`[Presupuestos Filter] Area: "${area_operacion}" -> ${areaIds}`);
             }
 
-            // Resolve empresa name to ID if provided
-            let empresaId: number | null = null;
+            // Resolve empresa names to IDs
+            let empresaIds: number[] = [];
             if (empresa && empresa !== 'undefined' && empresa !== '') {
                 const { data: empresaData, error: empresaError } = await dbClient
                     .from('empresas')
                     .select('id')
-                    .ilike('empresa', (empresa as string).trim())
-                    .limit(1)
-                    .maybeSingle();
+                    .ilike('empresa', (empresa as string).trim());
                 
                 if (empresaError) console.error('Error resolving empresa:', empresaError);
-                empresaId = empresaData?.id || null;
-                console.log(`[Presupuestos Filter] Empresa: "${empresa}" -> ${empresaId}`);
-                if (!empresaId && empresa) console.warn(`Could not resolve empresa: ${empresa}`);
+                empresaIds = empresaData?.map(e => e.id) || [];
+                console.log(`[Presupuestos Filter] Empresa: "${empresa}" -> ${empresaIds}`);
             }
 
-
-            // Resolve grupo_rubro name to ID if provided
-            let grupoRubroId: number | null = null;
+            // Resolve grupo_rubro names to IDs
+            let grupoRubroIds: number[] = [];
             if (grupo_rubro && grupo_rubro !== 'undefined' && grupo_rubro !== '') {
                 const { data: grupoData, error: grupoError } = await dbClient
                     .from('maestro_rubros')
                     .select('id')
-                    .ilike('nombre', (grupo_rubro as string).trim())
-                    .is('rubro_padre_id', null)
-                    .limit(1)
-                    .maybeSingle();
+                    .ilike('nombre', (grupo_rubro as string).trim());
                 
                 if (grupoError) console.error('Error resolving grupo_rubro:', grupoError);
-                grupoRubroId = grupoData?.id || null;
-                console.log(`[Presupuestos Filter] Grupo (L1): "${grupo_rubro}" -> ${grupoRubroId}`);
-                if (!grupoRubroId && grupo_rubro) console.warn(`Could not resolve grupo_rubro: ${grupo_rubro}`);
+                grupoRubroIds = grupoData?.map(g => g.id) || [];
+                console.log(`[Presupuestos Filter] Grupo (L1): "${grupo_rubro}" -> ${grupoRubroIds}`);
             }
 
-            // Resolve rubro name (intermediate level) to ID if provided
-            let rubroId: number | null = null;
+            // Resolve rubro names to IDs
+            let rubroIds: number[] = [];
             if (rubro && rubro !== 'undefined' && rubro !== '') {
                 const { data: rData, error: rError } = await dbClient
                     .from('maestro_rubros')
                     .select('id')
-                    .ilike('nombre', (rubro as string).trim())
-                    .not('rubro_padre_id', 'is', null)
-                    .limit(1)
-                    .maybeSingle();
+                    .ilike('nombre', (rubro as string).trim());
                 
                 if (rError) console.error('Error resolving rubro:', rError);
-                rubroId = rData?.id || null;
-                console.log(`[Presupuestos Filter] Rubro (L2): "${rubro}" -> ${rubroId}`);
-                if (!rubroId && rubro) console.warn(`Could not resolve rubro: ${rubro}`);
+                rubroIds = rData?.map(r => r.id) || [];
+                console.log(`[Presupuestos Filter] Rubro (L2): "${rubro}" -> ${rubroIds}`);
             }
 
-            // Resolve sub_rubro name to ID if provided
-            let subRubroId: number | null = null;
-            let budgetIdsFromTipo: number[] | null = null;
+            // Resolve sub_rubro names to IDs
+            let subRubroIds: number[] = [];
+            let budgetIdsFromTipo: number[] = [];
 
             if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') {
                 const subRubroName = (sub_rubro as string).trim();
 
-                // 1. Resolve from maestro_rubros (header level)
+                // 1. Resolve all from maestro_rubros
                 const { data: rubroData, error: rubroError } = await dbClient
                     .from('maestro_rubros')
                     .select('id')
-                    .ilike('nombre', subRubroName)
-                    .not('rubro_padre_id', 'is', null)
-                    .limit(1)
-                    .maybeSingle();
+                    .ilike('nombre', subRubroName);
                 
                 if (rubroError) console.error('Error resolving sub_rubro from maestro_rubros:', rubroError);
-                subRubroId = rubroData?.id || null;
+                subRubroIds = rubroData?.map(r => r.id) || [];
 
-                // 2. Resolve from tipos_presupuesto (item level)
+                // 2. Resolve all from tipos_presupuesto (item level)
                 const { data: tipoData, error: tipoError } = await dbClient
                     .from('tipos_presupuesto')
                     .select('id')
-                    .ilike('nombre', subRubroName)
-                    .limit(1)
-                    .maybeSingle();
+                    .ilike('nombre', subRubroName);
 
                 if (tipoError) console.error('Error resolving sub_rubro from tipos_presupuesto:', tipoError);
 
-                if (tipoData) {
+                if (tipoData && tipoData.length > 0) {
+                    const tipoIds = tipoData.map(t => t.id);
                     // Match found in items table!
                     const { data: itemData, error: itemError } = await dbClient
                         .from('presupuesto_items')
                         .select('presupuesto_id')
-                        .eq('tipo_presupuesto_id', tipoData.id);
+                        .in('tipo_presupuesto_id', tipoIds);
                     
                     if (itemError) console.error('Error finding budgets for tipo_presupuesto:', itemError);
                     if (itemData && itemData.length > 0) {
-                        budgetIdsFromTipo = itemData.map(d => Number(d.presupuesto_id));
+                        budgetIdsFromTipo = [...new Set(itemData.map(d => Number(d.presupuesto_id)))];
                     }
                 }
 
-                console.log(`[Presupuestos Filter] Sub Rubro (L3-NameMatch): "${sub_rubro}" -> RubroID: ${subRubroId}, BudgetIDsWithTipoCount: ${budgetIdsFromTipo?.length || 0}`);
+                console.log(`[Presupuestos Filter] Sub Rubro (L3): "${sub_rubro}" -> RubroIDs: ${subRubroIds}, BudgetIDsWithTipoCount: ${budgetIdsFromTipo.length}`);
 
-                if (!subRubroId && (!budgetIdsFromTipo || budgetIdsFromTipo.length === 0)) {
+                if (subRubroIds.length === 0 && budgetIdsFromTipo.length === 0) {
                     console.warn(`Could not resolve sub_rubro: ${sub_rubro} in rubros or item types`);
                 }
             }
@@ -360,31 +341,35 @@ export const presupuestosController = {
             if (anio && anio !== 'undefined' && anio !== '') query = query.eq('anio', Number(anio));
 
             // Filtros por ID resuelto
-            // Filtros por ID resuelto (si se proporcionó un nombre pero no se encontró un ID, forzamos -1 para 0 resultados)
+            // Filtros por IDs resueltos (si se proporcionó un nombre pero no se encontró un ID, forzamos -1 para 0 resultados)
             if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
-                query = query.eq('area_operacion_id', areaId || -1);
+                if (areaIds.length > 0) query = query.in('area_operacion_id', areaIds);
+                else query = query.eq('area_operacion_id', -1);
             }
             if (empresa && empresa !== '' && empresa !== 'undefined') {
-                query = query.eq('empresa_id', empresaId || -1);
+                if (empresaIds.length > 0) query = query.in('empresa_id', empresaIds);
+                else query = query.eq('empresa_id', -1);
             }
             if (grupo_rubro && grupo_rubro !== '' && grupo_rubro !== 'undefined') {
-                query = query.eq('grupo_rubro_id', grupoRubroId || -1);
+                if (grupoRubroIds.length > 0) query = query.in('grupo_rubro_id', grupoRubroIds);
+                else query = query.eq('grupo_rubro_id', -1);
             }
             if (rubro && rubro !== '' && rubro !== 'undefined') {
-                query = query.eq('rubro_id', rubroId || -1);
+                if (rubroIds.length > 0) query = query.in('rubro_id', rubroIds);
+                else query = query.eq('rubro_id', -1);
             }
             if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
-                if (subRubroId !== null || (budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0)) {
-                    if (subRubroId !== null && budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0) {
-                        // Union of header rubro match and item type match
-                        query = query.or(`rubro_id.eq.${subRubroId},id.in.(${budgetIdsFromTipo.join(',')})`);
-                    } else if (subRubroId !== null) {
-                        query = query.eq('rubro_id', subRubroId);
-                    } else if (budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0) {
-                        query = query.in('id', budgetIdsFromTipo);
-                    }
+                const hasRubros = subRubroIds.length > 0;
+                const hasTypes = budgetIdsFromTipo.length > 0;
+
+                if (hasRubros && hasTypes) {
+                    // Union of header rubro match and item type match
+                    query = query.or(`rubro_id.in.(${subRubroIds.join(',')}),id.in.(${budgetIdsFromTipo.join(',')})`);
+                } else if (hasRubros) {
+                    query = query.in('rubro_id', subRubroIds);
+                } else if (hasTypes) {
+                    query = query.in('id', budgetIdsFromTipo);
                 } else {
-                    // Nothing found for the provided sub_rubro name
                     query = query.eq('id', -1);
                 }
             }
@@ -791,17 +776,29 @@ export const presupuestosController = {
             const usedGroupIds = [...new Set(usedCategories?.map(p => p.grupo_rubro_id).filter(id => id !== null))];
             const usedRubroIds = [...new Set(usedCategories?.map(p => p.rubro_id).filter(id => id !== null))];
 
-            const { data: finalGrupos } = await dbClient
+            const { data: groupsRaw } = await dbClient
                 .from('maestro_rubros')
                 .select('id, nombre')
                 .in('id', usedGroupIds)
                 .order('nombre');
 
-            const { data: finalSubRubros } = await dbClient
+            const { data: rubrosRaw } = await dbClient
                 .from('maestro_rubros')
                 .select('id, nombre')
                 .in('id', usedRubroIds)
                 .order('nombre');
+
+            // Help keep names unique in dropdown to avoid user confusion
+            const uniqueNamedFilter = (arr: any[]) => {
+                const map = new Map();
+                arr.forEach(item => {
+                    if (!map.has(item.nombre)) map.set(item.nombre, item);
+                });
+                return Array.from(map.values());
+            };
+
+            const finalGrupos = uniqueNamedFilter(groupsRaw || []);
+            const finalSubRubros = uniqueNamedFilter(rubrosRaw || []);
 
             // Personal (tipos de empleado)
             const { data: personalData } = await dbClient
