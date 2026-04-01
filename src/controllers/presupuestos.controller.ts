@@ -188,6 +188,7 @@ export const presupuestosController = {
                 area_operacion,
                 anio,
                 grupo_rubro,
+                rubro,
                 sub_rubro,
                 sort_by = 'id',
                 sort_order = 'desc'
@@ -242,6 +243,22 @@ export const presupuestosController = {
                 if (grupoError) console.error('Error resolving grupo_rubro:', grupoError);
                 grupoRubroId = grupoData?.id || null;
                 if (!grupoRubroId) console.warn(`Could not resolve grupo_rubro: ${grupo_rubro}`);
+            }
+
+            // Resolve rubro name (intermediate level) to ID if provided
+            let rubroId: number | null = null;
+            if (rubro && rubro !== 'undefined' && rubro !== '') {
+                const { data: rData, error: rError } = await dbClient
+                    .from('maestro_rubros')
+                    .select('id')
+                    .ilike('nombre', (rubro as string).trim())
+                    .not('rubro_padre_id', 'is', null)
+                    .limit(1)
+                    .maybeSingle();
+                
+                if (rError) console.error('Error resolving rubro:', rError);
+                rubroId = rData?.id || null;
+                if (!rubroId) console.warn(`Could not resolve rubro: ${rubro}`);
             }
 
             // Resolve sub_rubro name to ID if provided
@@ -328,7 +345,8 @@ export const presupuestosController = {
                     empresas(id, empresa),
                     grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(id, codigo, nombre),
                     rubro:maestro_rubros!presupuestos_rubro_id_fkey(id, codigo, nombre),
-                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo)
+                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
+                    presupuesto_items(id, tipo:tipos_presupuesto(id, nombre))
                 `, { count: 'exact' });
 
             // Filtros directos por ID
@@ -344,6 +362,9 @@ export const presupuestosController = {
             }
             if (grupoRubroId !== null) {
                 query = query.eq('grupo_rubro_id', grupoRubroId);
+            }
+            if (rubroId !== null) {
+                query = query.eq('rubro_id', rubroId);
             }
             if (subRubroId !== null || (budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0)) {
                 if (subRubroId !== null && budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0) {
@@ -772,6 +793,13 @@ export const presupuestosController = {
                 .select('id, tipo')
                 .order('tipo');
 
+            // Tipos de presupuesto (Item level names like "LLANTAS NUEVAS")
+            const { data: tiposPresupuestoData } = await dbClient
+                .from('tipos_presupuesto')
+                .select('id, nombre')
+                .eq('activo', true)
+                .order('nombre');
+
             res.json({
                 anios,
                 areas: areasData || [],
@@ -779,6 +807,7 @@ export const presupuestosController = {
                 vehiculos,
                 grupos_rubro: gruposRubroData || [],
                 sub_rubros: subRubrosData || [],
+                tipos_presupuesto: tiposPresupuestoData || [],
                 personal: personalData || []
             });
         } catch (error) {
