@@ -210,7 +210,8 @@ export const presupuestosController = {
                 
                 if (areaError) console.error('Error resolving area_operacion:', areaError);
                 areaId = areaData?.id || null;
-                if (!areaId) console.warn(`Could not resolve area_operacion: ${area_operacion}`);
+                console.log(`[Presupuestos Filter] Area: "${area_operacion}" -> ${areaId}`);
+                if (!areaId && area_operacion) console.warn(`Could not resolve area_operacion: ${area_operacion}`);
             }
 
             // Resolve empresa name to ID if provided
@@ -225,7 +226,8 @@ export const presupuestosController = {
                 
                 if (empresaError) console.error('Error resolving empresa:', empresaError);
                 empresaId = empresaData?.id || null;
-                if (!empresaId) console.warn(`Could not resolve empresa: ${empresa}`);
+                console.log(`[Presupuestos Filter] Empresa: "${empresa}" -> ${empresaId}`);
+                if (!empresaId && empresa) console.warn(`Could not resolve empresa: ${empresa}`);
             }
 
 
@@ -242,7 +244,8 @@ export const presupuestosController = {
                 
                 if (grupoError) console.error('Error resolving grupo_rubro:', grupoError);
                 grupoRubroId = grupoData?.id || null;
-                if (!grupoRubroId) console.warn(`Could not resolve grupo_rubro: ${grupo_rubro}`);
+                console.log(`[Presupuestos Filter] Grupo (L1): "${grupo_rubro}" -> ${grupoRubroId}`);
+                if (!grupoRubroId && grupo_rubro) console.warn(`Could not resolve grupo_rubro: ${grupo_rubro}`);
             }
 
             // Resolve rubro name (intermediate level) to ID if provided
@@ -258,7 +261,8 @@ export const presupuestosController = {
                 
                 if (rError) console.error('Error resolving rubro:', rError);
                 rubroId = rData?.id || null;
-                if (!rubroId) console.warn(`Could not resolve rubro: ${rubro}`);
+                console.log(`[Presupuestos Filter] Rubro (L2): "${rubro}" -> ${rubroId}`);
+                if (!rubroId && rubro) console.warn(`Could not resolve rubro: ${rubro}`);
             }
 
             // Resolve sub_rubro name to ID if provided
@@ -303,6 +307,8 @@ export const presupuestosController = {
                     }
                 }
 
+                console.log(`[Presupuestos Filter] Sub Rubro (L3-NameMatch): "${sub_rubro}" -> RubroID: ${subRubroId}, BudgetIDsWithTipoCount: ${budgetIdsFromTipo?.length || 0}`);
+
                 if (!subRubroId && (!budgetIdsFromTipo || budgetIdsFromTipo.length === 0)) {
                     console.warn(`Could not resolve sub_rubro: ${sub_rubro} in rubros or item types`);
                 }
@@ -343,8 +349,8 @@ export const presupuestosController = {
                     ),
                     areas_operacion(id, nombre),
                     empresas(id, empresa),
-                    grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(id, codigo, nombre),
-                    rubro:maestro_rubros!presupuestos_rubro_id_fkey(id, codigo, nombre),
+                    grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre),
+                    rubro:maestro_rubros!rubro_id(id, codigo, nombre),
                     personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
                     presupuesto_items(id, tipo:tipos_presupuesto(id, nombre))
                 `, { count: 'exact' });
