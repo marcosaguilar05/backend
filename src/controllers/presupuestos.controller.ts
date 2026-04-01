@@ -360,26 +360,32 @@ export const presupuestosController = {
             if (anio && anio !== 'undefined' && anio !== '') query = query.eq('anio', Number(anio));
 
             // Filtros por ID resuelto
-            if (areaId !== null) {
-                query = query.eq('area_operacion_id', areaId);
+            // Filtros por ID resuelto (si se proporcionó un nombre pero no se encontró un ID, forzamos -1 para 0 resultados)
+            if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
+                query = query.eq('area_operacion_id', areaId || -1);
             }
-            if (empresaId !== null) {
-                query = query.eq('empresa_id', empresaId);
+            if (empresa && empresa !== '' && empresa !== 'undefined') {
+                query = query.eq('empresa_id', empresaId || -1);
             }
-            if (grupoRubroId !== null) {
-                query = query.eq('grupo_rubro_id', grupoRubroId);
+            if (grupo_rubro && grupo_rubro !== '' && grupo_rubro !== 'undefined') {
+                query = query.eq('grupo_rubro_id', grupoRubroId || -1);
             }
-            if (rubroId !== null) {
-                query = query.eq('rubro_id', rubroId);
+            if (rubro && rubro !== '' && rubro !== 'undefined') {
+                query = query.eq('rubro_id', rubroId || -1);
             }
-            if (subRubroId !== null || (budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0)) {
-                if (subRubroId !== null && budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0) {
-                    // Union of header rubro match and item type match
-                    query = query.or(`rubro_id.eq.${subRubroId},id.in.(${budgetIdsFromTipo.join(',')})`);
-                } else if (subRubroId !== null) {
-                    query = query.eq('rubro_id', subRubroId);
-                } else if (budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0) {
-                    query = query.in('id', budgetIdsFromTipo);
+            if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
+                if (subRubroId !== null || (budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0)) {
+                    if (subRubroId !== null && budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0) {
+                        // Union of header rubro match and item type match
+                        query = query.or(`rubro_id.eq.${subRubroId},id.in.(${budgetIdsFromTipo.join(',')})`);
+                    } else if (subRubroId !== null) {
+                        query = query.eq('rubro_id', subRubroId);
+                    } else if (budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0) {
+                        query = query.in('id', budgetIdsFromTipo);
+                    }
+                } else {
+                    // Nothing found for the provided sub_rubro name
+                    query = query.eq('id', -1);
                 }
             }
             if (vehiculoIdFromPlaca !== null) {
@@ -777,21 +783,20 @@ export const presupuestosController = {
                 placa: v.areas_placas?.placa
             }));
 
-            // Grupos de rubro (rubros sin padre = nivel superior)
-            const { data: gruposRubroData } = await dbClient
+            // Rubros (Grupos y Sub-rubros)
+            // Fetch everything that is active and decide based on padding if hierarchy fails
+            const { data: allRubrosData } = await dbClient
                 .from('maestro_rubros')
-                .select('id, nombre')
-                .is('rubro_padre_id', null)
+                .select('id, nombre, rubro_padre_id')
                 .eq('activo', true)
                 .order('nombre');
 
-            // Sub rubros (rubros con padre = nivel inferior)
-            const { data: subRubrosData } = await dbClient
-                .from('maestro_rubros')
-                .select('id, nombre')
-                .not('rubro_padre_id', 'is', null)
-                .eq('activo', true)
-                .order('nombre');
+            const gruposRubroData = (allRubrosData || []).filter(r => !r.rubro_padre_id);
+            const subRubrosData = (allRubrosData || []).filter(r => r.rubro_padre_id !== null);
+
+            // If grupos is empty, show all as grupos just in case hierarchical data is missing
+            const finalGrupos = gruposRubroData.length > 0 ? gruposRubroData : (allRubrosData || []);
+            const finalSubRubros = subRubrosData.length > 0 ? subRubrosData : (allRubrosData || []);
 
             // Personal (tipos de empleado)
             const { data: personalData } = await dbClient
@@ -811,8 +816,8 @@ export const presupuestosController = {
                 areas: areasData || [],
                 empresas: empresasData || [],
                 vehiculos,
-                grupos_rubro: gruposRubroData || [],
-                sub_rubros: subRubrosData || [],
+                grupos_rubro: finalGrupos,
+                sub_rubros: finalSubRubros,
                 tipos_presupuesto: tiposPresupuestoData || [],
                 personal: personalData || []
             });
