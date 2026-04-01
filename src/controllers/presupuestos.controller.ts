@@ -783,20 +783,25 @@ export const presupuestosController = {
                 placa: v.areas_placas?.placa
             }));
 
-            // Rubros (Grupos y Sub-rubros)
-            // Fetch everything that is active and decide based on padding if hierarchy fails
-            const { data: allRubrosData } = await dbClient
+            // Grupos y Rubros: fetch what's actually in use in the budgets table
+            const { data: usedCategories } = await dbClient
+                .from('presupuestos')
+                .select('grupo_rubro_id, rubro_id');
+            
+            const usedGroupIds = [...new Set(usedCategories?.map(p => p.grupo_rubro_id).filter(id => id !== null))];
+            const usedRubroIds = [...new Set(usedCategories?.map(p => p.rubro_id).filter(id => id !== null))];
+
+            const { data: finalGrupos } = await dbClient
                 .from('maestro_rubros')
-                .select('id, nombre, rubro_padre_id')
-                .eq('activo', true)
+                .select('id, nombre')
+                .in('id', usedGroupIds)
                 .order('nombre');
 
-            const gruposRubroData = (allRubrosData || []).filter(r => !r.rubro_padre_id);
-            const subRubrosData = (allRubrosData || []).filter(r => r.rubro_padre_id !== null);
-
-            // If grupos is empty, show all as grupos just in case hierarchical data is missing
-            const finalGrupos = gruposRubroData.length > 0 ? gruposRubroData : (allRubrosData || []);
-            const finalSubRubros = subRubrosData.length > 0 ? subRubrosData : (allRubrosData || []);
+            const { data: finalSubRubros } = await dbClient
+                .from('maestro_rubros')
+                .select('id, nombre')
+                .in('id', usedRubroIds)
+                .order('nombre');
 
             // Personal (tipos de empleado)
             const { data: personalData } = await dbClient
