@@ -250,23 +250,12 @@ export const presupuestosController = {
                 console.log(`[Presupuestos Filter] Rubro (L2): "${rubro}" -> ${rubroIds}`);
             }
 
-            // Resolve sub_rubro names to IDs
-            let subRubroIds: number[] = [];
+            // Resolve sub_rubro names STRICTLY to item types (Level 3) to avoid collision with Rubro (Level 2)
             let budgetIdsFromTipo: number[] = [];
-
             if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') {
                 const subRubroName = (sub_rubro as string).trim();
 
-                // 1. Resolve all from maestro_rubros
-                const { data: rubroData, error: rubroError } = await dbClient
-                    .from('maestro_rubros')
-                    .select('id')
-                    .ilike('nombre', subRubroName);
-                
-                if (rubroError) console.error('Error resolving sub_rubro from maestro_rubros:', rubroError);
-                subRubroIds = rubroData?.map(r => r.id) || [];
-
-                // 2. Resolve all from tipos_presupuesto (item level)
+                // Resolve all matches from tipos_presupuesto (the item-level definition)
                 const { data: tipoData, error: tipoError } = await dbClient
                     .from('tipos_presupuesto')
                     .select('id')
@@ -288,10 +277,10 @@ export const presupuestosController = {
                     }
                 }
 
-                console.log(`[Presupuestos Filter] Sub Rubro (L3): "${sub_rubro}" -> RubroIDs: ${subRubroIds}, BudgetIDsWithTipoCount: ${budgetIdsFromTipo.length}`);
+                console.log(`[Presupuestos Filter] Sub Rubro (L3): "${sub_rubro}" -> BudgetIDsWithTipoCount: ${budgetIdsFromTipo.length}`);
 
-                if (subRubroIds.length === 0 && budgetIdsFromTipo.length === 0) {
-                    console.warn(`Could not resolve sub_rubro: ${sub_rubro} in rubros or item types`);
+                if (budgetIdsFromTipo.length === 0) {
+                    console.warn(`Could not resolve sub_rubro (L3): ${sub_rubro} in item types`);
                 }
             }
 
@@ -359,15 +348,7 @@ export const presupuestosController = {
                 else query = query.eq('rubro_id', -1);
             }
             if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
-                const hasRubros = subRubroIds.length > 0;
-                const hasTypes = budgetIdsFromTipo.length > 0;
-
-                if (hasRubros && hasTypes) {
-                    // Union of header rubro match and item type match
-                    query = query.or(`rubro_id.in.(${subRubroIds.join(',')}),id.in.(${budgetIdsFromTipo.join(',')})`);
-                } else if (hasRubros) {
-                    query = query.in('rubro_id', subRubroIds);
-                } else if (hasTypes) {
+                if (budgetIdsFromTipo.length > 0) {
                     query = query.in('id', budgetIdsFromTipo);
                 } else {
                     query = query.eq('id', -1);
@@ -789,16 +770,14 @@ export const presupuestosController = {
                 .order('nombre');
 
             // Help keep names unique in dropdown to avoid user confusion
-            const uniqueNamedFilter = (arr: any[]) => {
+            const uniqueNamedFilter = (arr: any[], keyName: string = 'nombre') => {
                 const map = new Map();
                 arr.forEach(item => {
-                    if (!map.has(item.nombre)) map.set(item.nombre, item);
+                    const val = item[keyName];
+                    if (val && !map.has(val)) map.set(val, item);
                 });
                 return Array.from(map.values());
             };
-
-            const finalGrupos = uniqueNamedFilter(groupsRaw || []);
-            const finalSubRubros = uniqueNamedFilter(rubrosRaw || []);
 
             // Personal (tipos de empleado)
             const { data: personalData } = await dbClient
@@ -813,14 +792,20 @@ export const presupuestosController = {
                 .eq('activo', true)
                 .order('nombre');
 
+            const finalAreas = uniqueNamedFilter(areasData || [], 'nombre');
+            const finalEmpresas = uniqueNamedFilter(empresasData || [], 'empresa');
+            const finalGrupos = uniqueNamedFilter(groupsRaw || [], 'nombre');
+            const finalSubRubros = uniqueNamedFilter(rubrosRaw || [], 'nombre');
+            const finalTipos = uniqueNamedFilter(tiposPresupuestoData || [], 'nombre');
+
             res.json({
                 anios,
-                areas: areasData || [],
-                empresas: empresasData || [],
+                areas: finalAreas,
+                empresas: finalEmpresas,
                 vehiculos,
                 grupos_rubro: finalGrupos,
                 sub_rubros: finalSubRubros,
-                tipos_presupuesto: tiposPresupuestoData || [],
+                tipos_presupuesto: finalTipos,
                 personal: personalData || []
             });
         } catch (error) {
