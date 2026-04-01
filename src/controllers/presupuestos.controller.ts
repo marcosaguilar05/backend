@@ -375,11 +375,33 @@ export const presupuestosController = {
             // For simplicity, we'll just filter by anio and estado for summary (the main filters)
             let summaryQuery = dbClient
                 .from('presupuestos')
-                .select('id, estado, rubro_id');
+                .select('id, estado, rubro_id, "Total"'); // Explicitly fetch the Total column
 
             if (vehiculo_id) summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
             if (vehiculoIdFromPlaca !== null) summaryQuery = summaryQuery.eq('vehiculo_id', vehiculoIdFromPlaca);
             if (anio && anio !== 'undefined' && anio !== '') summaryQuery = summaryQuery.eq('anio', Number(anio));
+
+            // Sync filters with the table results
+            if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
+                if (areaIds.length > 0) summaryQuery = summaryQuery.in('area_operacion_id', areaIds);
+                else summaryQuery = summaryQuery.eq('area_operacion_id', -1);
+            }
+            if (empresa && empresa !== '' && empresa !== 'undefined') {
+                if (empresaIds.length > 0) summaryQuery = summaryQuery.in('empresa_id', empresaIds);
+                else summaryQuery = summaryQuery.eq('empresa_id', -1);
+            }
+            if (grupo_rubro && grupo_rubro !== '' && grupo_rubro !== 'undefined') {
+                if (grupoRubroIds.length > 0) summaryQuery = summaryQuery.in('grupo_rubro_id', grupoRubroIds);
+                else summaryQuery = summaryQuery.eq('grupo_rubro_id', -1);
+            }
+            if (rubro && rubro !== '' && rubro !== 'undefined') {
+                if (rubroIds.length > 0) summaryQuery = summaryQuery.in('rubro_id', rubroIds);
+                else summaryQuery = summaryQuery.eq('rubro_id', -1);
+            }
+            if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
+                if (budgetIdsFromTipo.length > 0) summaryQuery = summaryQuery.in('id', budgetIdsFromTipo);
+                else summaryQuery = summaryQuery.eq('id', -1);
+            }
 
             const { data: allMatching } = await summaryQuery;
 
@@ -388,27 +410,12 @@ export const presupuestosController = {
             const rubrosIds = new Set<number>();
 
             if (allMatching && allMatching.length > 0) {
-                const budgetsIds = allMatching.map(p => p.id);
-                allMatching.forEach(p => rubrosIds.add(p.rubro_id));
-
-                // Obtener los totales desde presupuesto_items para estos IDs
-                const { data: itemTotals } = await dbClient
-                    .from('presupuesto_items')
-                    .select('presupuesto_id, valor_total')
-                    .in('presupuesto_id', budgetsIds);
-
-                if (itemTotals) {
-                    const budgetToTotalMap = itemTotals.reduce((acc: any, item) => {
-                        acc[item.presupuesto_id] = (acc[item.presupuesto_id] || 0) + item.valor_total;
-                        return acc;
-                    }, {});
-
-                    allMatching.forEach(p => {
-                        const total = budgetToTotalMap[p.id] || 0;
-                        if (p.estado === 'APROBADO') totalAprobado += total;
-                        else totalBorrador += total;
-                    });
-                }
+                allMatching.forEach(p => {
+                    const total = (p as any).Total || 0; // Use the direct Total column from the header
+                    rubrosIds.add(p.rubro_id);
+                    if (p.estado === 'APROBADO') totalAprobado += total;
+                    else totalBorrador += total;
+                });
             }
 
             res.json({
