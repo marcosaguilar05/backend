@@ -200,48 +200,64 @@ export const presupuestosController = {
             // Resolve area_operacion name to ID if provided
             let areaId: number | null = null;
             if (area_operacion && area_operacion !== 'undefined' && area_operacion !== '') {
-                const { data: areaData } = await dbClient
+                const { data: areaData, error: areaError } = await dbClient
                     .from('areas_operacion')
                     .select('id')
-                    .eq('nombre', area_operacion as string)
+                    .ilike('nombre', (area_operacion as string).trim())
+                    .limit(1)
                     .maybeSingle();
+                
+                if (areaError) console.error('Error resolving area_operacion:', areaError);
                 areaId = areaData?.id || null;
+                if (!areaId) console.warn(`Could not resolve area_operacion: ${area_operacion}`);
             }
 
             // Resolve empresa name to ID if provided
             let empresaId: number | null = null;
             if (empresa && empresa !== 'undefined' && empresa !== '') {
-                const { data: empresaData } = await dbClient
+                const { data: empresaData, error: empresaError } = await dbClient
                     .from('empresas')
                     .select('id')
-                    .eq('empresa', empresa as string)
+                    .ilike('empresa', (empresa as string).trim())
+                    .limit(1)
                     .maybeSingle();
+                
+                if (empresaError) console.error('Error resolving empresa:', empresaError);
                 empresaId = empresaData?.id || null;
+                if (!empresaId) console.warn(`Could not resolve empresa: ${empresa}`);
             }
 
 
             // Resolve grupo_rubro name to ID if provided
             let grupoRubroId: number | null = null;
             if (grupo_rubro && grupo_rubro !== 'undefined' && grupo_rubro !== '') {
-                const { data: grupoData } = await dbClient
+                const { data: grupoData, error: grupoError } = await dbClient
                     .from('maestro_rubros')
                     .select('id')
-                    .eq('nombre', grupo_rubro as string)
+                    .ilike('nombre', (grupo_rubro as string).trim())
                     .is('rubro_padre_id', null)
+                    .limit(1)
                     .maybeSingle();
+                
+                if (grupoError) console.error('Error resolving grupo_rubro:', grupoError);
                 grupoRubroId = grupoData?.id || null;
+                if (!grupoRubroId) console.warn(`Could not resolve grupo_rubro: ${grupo_rubro}`);
             }
 
             // Resolve sub_rubro name to ID if provided
             let subRubroId: number | null = null;
             if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') {
-                const { data: rubroData } = await dbClient
+                const { data: rubroData, error: rubroError } = await dbClient
                     .from('maestro_rubros')
                     .select('id')
-                    .eq('nombre', sub_rubro as string)
+                    .ilike('nombre', (sub_rubro as string).trim())
                     .not('rubro_padre_id', 'is', null)
+                    .limit(1)
                     .maybeSingle();
+                
+                if (rubroError) console.error('Error resolving sub_rubro:', rubroError);
                 subRubroId = rubroData?.id || null;
+                if (!subRubroId) console.warn(`Could not resolve sub_rubro: ${sub_rubro}`);
             }
 
             // Resolve placa to vehiculo ID
