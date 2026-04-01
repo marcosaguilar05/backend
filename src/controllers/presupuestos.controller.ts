@@ -246,18 +246,49 @@ export const presupuestosController = {
 
             // Resolve sub_rubro name to ID if provided
             let subRubroId: number | null = null;
+            let budgetIdsFromTipo: number[] | null = null;
+
             if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') {
+                const subRubroName = (sub_rubro as string).trim();
+
+                // 1. Resolve from maestro_rubros (header level)
                 const { data: rubroData, error: rubroError } = await dbClient
                     .from('maestro_rubros')
                     .select('id')
-                    .ilike('nombre', (sub_rubro as string).trim())
+                    .ilike('nombre', subRubroName)
                     .not('rubro_padre_id', 'is', null)
                     .limit(1)
                     .maybeSingle();
                 
-                if (rubroError) console.error('Error resolving sub_rubro:', rubroError);
+                if (rubroError) console.error('Error resolving sub_rubro from maestro_rubros:', rubroError);
                 subRubroId = rubroData?.id || null;
-                if (!subRubroId) console.warn(`Could not resolve sub_rubro: ${sub_rubro}`);
+
+                // 2. Resolve from tipos_presupuesto (item level)
+                const { data: tipoData, error: tipoError } = await dbClient
+                    .from('tipos_presupuesto')
+                    .select('id')
+                    .ilike('nombre', subRubroName)
+                    .limit(1)
+                    .maybeSingle();
+
+                if (tipoError) console.error('Error resolving sub_rubro from tipos_presupuesto:', tipoError);
+
+                if (tipoData) {
+                    // Match found in items table!
+                    const { data: itemData, error: itemError } = await dbClient
+                        .from('presupuesto_items')
+                        .select('presupuesto_id')
+                        .eq('tipo_presupuesto_id', tipoData.id);
+                    
+                    if (itemError) console.error('Error finding budgets for tipo_presupuesto:', itemError);
+                    if (itemData && itemData.length > 0) {
+                        budgetIdsFromTipo = itemData.map(d => Number(d.presupuesto_id));
+                    }
+                }
+
+                if (!subRubroId && (!budgetIdsFromTipo || budgetIdsFromTipo.length === 0)) {
+                    console.warn(`Could not resolve sub_rubro: ${sub_rubro} in rubros or item types`);
+                }
             }
 
             // Resolve placa to vehiculo ID
@@ -295,8 +326,8 @@ export const presupuestosController = {
                     ),
                     areas_operacion(id, nombre),
                     empresas(id, empresa),
-                    grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre),
-                    rubro:maestro_rubros!rubro_id(id, codigo, nombre),
+                    grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(id, codigo, nombre),
+                    rubro:maestro_rubros!presupuestos_rubro_id_fkey(id, codigo, nombre),
                     personal:Personal!presupuestos_empleado_id_fkey(id, tipo)
                 `, { count: 'exact' });
 
@@ -314,8 +345,15 @@ export const presupuestosController = {
             if (grupoRubroId !== null) {
                 query = query.eq('grupo_rubro_id', grupoRubroId);
             }
-            if (subRubroId !== null) {
-                query = query.eq('rubro_id', subRubroId);
+            if (subRubroId !== null || (budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0)) {
+                if (subRubroId !== null && budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0) {
+                    // Union of header rubro match and item type match
+                    query = query.or(`rubro_id.eq.${subRubroId},id.in.(${budgetIdsFromTipo.join(',')})`);
+                } else if (subRubroId !== null) {
+                    query = query.eq('rubro_id', subRubroId);
+                } else if (budgetIdsFromTipo !== null && budgetIdsFromTipo.length > 0) {
+                    query = query.in('id', budgetIdsFromTipo);
+                }
             }
             if (vehiculoIdFromPlaca !== null) {
                 query = query.eq('vehiculo_id', vehiculoIdFromPlaca);
