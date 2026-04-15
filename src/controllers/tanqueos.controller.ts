@@ -631,7 +631,17 @@ export const tanqueosController = {
             // 3. Insert
             if (recordsToInsert.length > 0) {
                 const { error: insertError } = await (req.supabase || supabase).from('tanqueo').insert(recordsToInsert);
-                if (insertError) throw insertError;
+                if (insertError) {
+                    console.error('Error Supabase al insertar tanqueos:', JSON.stringify(insertError, null, 2));
+                    console.error('Primer registro que se intentó insertar:', JSON.stringify(recordsToInsert[0], null, 2));
+                    res.status(500).json({
+                        error: 'Error al insertar registros en la base de datos',
+                        detail: insertError.message,
+                        code: insertError.code,
+                        hint: insertError.hint
+                    });
+                    return;
+                }
                 importedCount = recordsToInsert.length;
             }
 
@@ -641,9 +651,12 @@ export const tanqueosController = {
                 totalProcessed: records.length
             });
 
-        } catch (error) {
-            console.error('Error en importación:', error);
-            res.status(500).json({ error: 'Error procesando el archivo' });
+        } catch (error: any) {
+            console.error('Error inesperado en importación:', error);
+            res.status(500).json({
+                error: 'Error procesando el archivo',
+                detail: error?.message || String(error)
+            });
         }
     }
 };
