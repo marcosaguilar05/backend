@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { supabase, createAuthClient } from '../config/supabase';
+import { supabase, adminSupabase, createAuthClient } from '../config/supabase';
 import { AuthRequest, Tanqueo, TanqueoRelacion } from '../types';
 
 // Caché simple en memoria para filter options (5 minutos)
@@ -523,8 +523,8 @@ export const tanqueosController = {
 
             // 1. Fetch catalogs en paralelo con cliente admin (sin RLS para mayor velocidad)
             const [placasRes, conductoresRes] = await Promise.all([
-                supabase.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA'),
-                supabase.from('areas_conductores').select('id, conductor')
+                (req.supabase || supabase).from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA'),
+                (req.supabase || supabase).from('areas_conductores').select('id, conductor')
             ]);
             const allPlacas = placasRes.data;
             const allConductores = conductoresRes.data;
@@ -631,12 +631,12 @@ export const tanqueosController = {
                 }
             }
 
-            // 3. Insert en chunks usando cliente admin (sin RLS) para evitar timeout
+            // 3. Insert en chunks usando adminSupabase (bypasea RLS) para evitar timeout
             const CHUNK_SIZE = 100;
             if (recordsToInsert.length > 0) {
                 for (let i = 0; i < recordsToInsert.length; i += CHUNK_SIZE) {
                     const chunk = recordsToInsert.slice(i, i + CHUNK_SIZE);
-                    const { error: insertError } = await supabase.from('tanqueo').insert(chunk);
+                    const { error: insertError } = await adminSupabase.from('tanqueo').insert(chunk);
                     if (insertError) {
                         console.error(`Error Supabase al insertar chunk ${Math.floor(i / CHUNK_SIZE) + 1}:`, JSON.stringify(insertError, null, 2));
                         res.status(500).json({
