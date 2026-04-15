@@ -628,19 +628,24 @@ export const tanqueosController = {
                 }
             }
 
-            // 3. Insert
+            // 3. Insert en chunks para evitar statement timeout
+            const CHUNK_SIZE = 50;
             if (recordsToInsert.length > 0) {
-                const { error: insertError } = await (req.supabase || supabase).from('tanqueo').insert(recordsToInsert);
-                if (insertError) {
-                    console.error('Error Supabase al insertar tanqueos:', JSON.stringify(insertError, null, 2));
-                    console.error('Primer registro que se intentó insertar:', JSON.stringify(recordsToInsert[0], null, 2));
-                    res.status(500).json({
-                        error: 'Error al insertar registros en la base de datos',
-                        detail: insertError.message,
-                        code: insertError.code,
-                        hint: insertError.hint
-                    });
-                    return;
+                for (let i = 0; i < recordsToInsert.length; i += CHUNK_SIZE) {
+                    const chunk = recordsToInsert.slice(i, i + CHUNK_SIZE);
+                    const { error: insertError } = await (req.supabase || supabase).from('tanqueo').insert(chunk);
+                    if (insertError) {
+                        console.error(`Error Supabase al insertar chunk ${i / CHUNK_SIZE + 1}:`, JSON.stringify(insertError, null, 2));
+                        console.error('Primer registro del chunk fallido:', JSON.stringify(chunk[0], null, 2));
+                        res.status(500).json({
+                            error: 'Error al insertar registros en la base de datos',
+                            detail: insertError.message,
+                            code: insertError.code,
+                            hint: insertError.hint,
+                            imported_before_error: i
+                        });
+                        return;
+                    }
                 }
                 importedCount = recordsToInsert.length;
             }
