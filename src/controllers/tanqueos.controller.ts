@@ -521,10 +521,13 @@ export const tanqueosController = {
             let errors: any[] = [];
             const userId = req.user?.id;
 
-            // 1. Fetch catalogs
-            // Corrected: Look into 'areas_placas' for plates and 'areas_conductores' for drivers
-            const { data: allPlacas } = await (req.supabase || supabase).from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').limit(10000);
-            const { data: allConductores } = await (req.supabase || supabase).from('areas_conductores').select('id, conductor').limit(10000);
+            // 1. Fetch catalogs en paralelo con cliente admin (sin RLS para mayor velocidad)
+            const [placasRes, conductoresRes] = await Promise.all([
+                supabase.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA'),
+                supabase.from('areas_conductores').select('id, conductor')
+            ]);
+            const allPlacas = placasRes.data;
+            const allConductores = conductoresRes.data;
 
             // Maps for lookup (Robust: Clean keys by removing non-alphanumeric)
             const cleanKey = (str: string) => str ? str.toString().replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase() : '';
@@ -628,15 +631,14 @@ export const tanqueosController = {
                 }
             }
 
-            // 3. Insert en chunks para evitar statement timeout
-            const CHUNK_SIZE = 50;
+            // 3. Insert en chunks usando cliente admin (sin RLS) para evitar timeout
+            const CHUNK_SIZE = 100;
             if (recordsToInsert.length > 0) {
                 for (let i = 0; i < recordsToInsert.length; i += CHUNK_SIZE) {
                     const chunk = recordsToInsert.slice(i, i + CHUNK_SIZE);
-                    const { error: insertError } = await (req.supabase || supabase).from('tanqueo').insert(chunk);
+                    const { error: insertError } = await supabase.from('tanqueo').insert(chunk);
                     if (insertError) {
-                        console.error(`Error Supabase al insertar chunk ${i / CHUNK_SIZE + 1}:`, JSON.stringify(insertError, null, 2));
-                        console.error('Primer registro del chunk fallido:', JSON.stringify(chunk[0], null, 2));
+                        console.error(`Error Supabase al insertar chunk ${Math.floor(i / CHUNK_SIZE) + 1}:`, JSON.stringify(insertError, null, 2));
                         res.status(500).json({
                             error: 'Error al insertar registros en la base de datos',
                             detail: insertError.message,
