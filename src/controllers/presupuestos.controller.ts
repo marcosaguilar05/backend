@@ -459,7 +459,8 @@ export const presupuestosController = {
                     area:areas_operacion(id, nombre),
                     grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre, rubro_padre_id),
                     rubro:maestro_rubros!rubro_id(id, codigo, nombre),
-                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo)
+                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
+                    empresas(id, empresa)
                 `)
                 .eq('id', id)
                 .single();

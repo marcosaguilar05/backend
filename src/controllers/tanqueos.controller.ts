@@ -73,19 +73,13 @@ export const tanqueosController = {
                 query = query.order('fecha', { ascending: false }).order('id', { ascending: false });
             }
 
-            const { data, error, count } = await query
-                .range(offset, offset + limit - 1);
+            // Definir consulta para los totales (Summary)
+            // IMPORTANTE: Seleccionamos solo columnas mínimas necesarias
+            let summaryQuery = (req.supabase || supabase)
+                .from('tanqueo_relaciones')
+                .select('cantidad_galones, valor_tanqueo');
 
-            if (error) {
-                console.error('Error en getAll:', error);
-                res.status(400).json({ error: error.message });
-                return;
-            }
-
-            // Calcular totales de todos los registros que coinciden con los filtros (no solo la página actual)
-            let summaryQuery = (req.supabase || supabase).from('tanqueo_relaciones').select('cantidad_galones, valor_tanqueo');
-
-            // Aplicar los mismos filtros para los totales
+            // Aplicar los mismos filtros al summary
             if (conductor) summaryQuery = summaryQuery.ilike('conductor', `%${conductor}%`);
             if (placa) summaryQuery = summaryQuery.ilike('placa', `%${placa}%`);
             if (bomba) summaryQuery = summaryQuery.ilike('bomba', `%${bomba}%`);
@@ -96,11 +90,31 @@ export const tanqueosController = {
             if (fecha_inicio) summaryQuery = summaryQuery.gte('fecha', fecha_inicio);
             if (fecha_fin) summaryQuery = summaryQuery.lte('fecha', fecha_fin);
 
-            const { data: summaryData } = await summaryQuery;
+            // Ejecutar ambas consultas en paralelo para reducir el tiempo de espera a la mitad
+            const [pageRes, summaryRes] = await Promise.all([
+                query.range(offset, offset + limit - 1),
+                summaryQuery
+            ]);
 
-            // Calcular totales
-            const totalGalones = summaryData?.reduce((sum, item) => sum + (item.cantidad_galones || 0), 0) || 0;
-            const totalValor = summaryData?.reduce((sum, item) => sum + (item.valor_tanqueo || 0), 0) || 0;
+            const { data, error, count } = pageRes;
+            const summaryData = summaryRes.data;
+
+            if (error) {
+                console.error('Error en getAll:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            // Calcular totales de forma eficiente
+            let totalGalones = 0;
+            let totalValor = 0;
+            
+            if (summaryData && summaryData.length > 0) {
+                for (let i = 0; i < summaryData.length; i++) {
+                    totalGalones += (summaryData[i].cantidad_galones || 0);
+                    totalValor += (summaryData[i].valor_tanqueo || 0);
+                }
+            }
 
             res.json({
                 data: data as TanqueoRelacion[],
@@ -128,36 +142,28 @@ export const tanqueosController = {
             const dbClient = req.supabase || supabase;
 
             // Ejecutar queries en paralelo para mejorar rendimiento
-            // Consultar directamente las tablas maestras para obtener valores disponibles según RLS
+            // Usamos las tablas maestras para los filtros principales, lo cual es MUCHO más rápido
             const [
                 conductoresRes,
                 placasRes,
                 bombasRes,
-                areasRes,
-                tiposCombustibleRes,
-                tiposOperacionRes
+                areasRes
             ] = await Promise.all([
                 dbClient.from('areas_conductores').select('conductor').order('conductor'),
                 dbClient.from('areas_placas').select('placa').eq('estado', 'ACTIVADA').order('placa'),
                 dbClient.from('areas_bombas').select('bomba').eq('estado', 'ACTIVADA').order('bomba'),
-                dbClient.from('areas_operacion').select('nombre').order('nombre'),
-                dbClient.from('tanqueo_relaciones').select('tipo_combustible').not('tipo_combustible', 'is', null),
-                dbClient.from('tanqueo_relaciones').select('tipo_operacion').not('tipo_operacion', 'is', null)
+                dbClient.from('areas_operacion').select('nombre').order('nombre')
             ]);
 
-            // Extraer valores únicos
-            const conductores = [...new Set(conductoresRes.data?.map(t => t.conductor))].filter(Boolean).sort();
-            const placas = [...new Set(placasRes.data?.map(t => t.placa))].filter(Boolean).sort();
-            const bombas = [...new Set(bombasRes.data?.map(t => t.bomba))].filter(Boolean).sort();
-            const areas = [...new Set(areasRes.data?.map(t => t.nombre))].filter(Boolean).sort();
-            const tipos_combustible = [...new Set(tiposCombustibleRes.data?.map(t => t.tipo_combustible))].filter(Boolean).sort();
-            const tipos_operacion = [...new Set(tiposOperacionRes.data?.map(t => t.tipo_operacion))].filter(Boolean).sort();
+            // Tipos de combustible y operación se definen como constantes para evitar consultas masivas innecesarias
+            const tipos_combustible = ['ACPM', 'GASOLINA', 'EXTRA', 'GAS'];
+            const tipos_operacion = ['TANQUEO', 'ANTICIPO'];
 
             const responseData = {
-                conductores,
-                placas,
-                bombas,
-                areas_operacion: areas,
+                conductores: [...new Set(conductoresRes.data?.map(t => t.conductor))].filter(Boolean).sort(),
+                placas: [...new Set(placasRes.data?.map(t => t.placa))].filter(Boolean).sort(),
+                bombas: [...new Set(bombasRes.data?.map(t => t.bomba))].filter(Boolean).sort(),
+                areas_operacion: [...new Set(areasRes.data?.map(t => t.nombre))].filter(Boolean).sort(),
                 tipos_combustible,
                 conceptos: ['OPERATIVO', 'ADMINISTRATIVO'],
                 tipos_operacion
