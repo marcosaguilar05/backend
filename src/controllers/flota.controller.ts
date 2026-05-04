@@ -196,3 +196,47 @@ export const syncVehiculos = async (req: AuthRequest, res: Response, next: NextF
         next(error);
     }
 };
+
+export const updateVehiculoCaracteristicas = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const db = req.supabase!;
+        const body = req.body as Partial<VehiculoCaracteristicas>;
+
+        // Build the row to upsert — always include vehiculo_id as it is the PK
+        const row: Record<string, any> = { vehiculo_id: Number(id) };
+
+        const allowedFields = [
+            'marca_id', 'tipo_vehiculo_id', 'clase_vehiculo_id',
+            'combustible_id', 'marca_compactadora_id',
+            'nro_ejes', 'nro_llantas', 'año', 'linea', 'nro_serie'
+        ];
+
+        for (const field of allowedFields) {
+            if (field in body) {
+                row[field] = (body as any)[field];
+            }
+        }
+
+        const { data, error } = await db
+            .from('vehiculo_caracteristicas')
+            .upsert(row, { onConflict: 'vehiculo_id' })
+            .select(`
+                *,
+                anio:año,
+                cat_marca:cat_marca!vehiculo_caracteristicas_marca_id_fkey ( nombre ),
+                cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
+                cat_clase_vehiculo:cat_clase_vehiculo!vehiculo_caracteristicas_clase_vehiculo_id_fkey ( nombre ),
+                cat_combustible:cat_combustible!vehiculo_caracteristicas_combustible_id_fkey ( nombre ),
+                cat_marca_compactadora:cat_marca!vehiculo_caracteristicas_marca_compactadora_id_fkey ( nombre )
+            `)
+            .single();
+
+        if (error) throw error;
+
+        res.json(data);
+    } catch (error) {
+        console.error('Error updating vehiculo caracteristicas:', error);
+        next(error);
+    }
+};
