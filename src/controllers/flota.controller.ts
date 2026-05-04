@@ -99,7 +99,7 @@ export const getVehiculoDetalle = async (req: AuthRequest, res: Response, next: 
                     cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
                     cat_clase_vehiculo:cat_clase_vehiculo!vehiculo_caracteristicas_clase_vehiculo_id_fkey ( nombre ),
                     cat_combustible:cat_combustible!vehiculo_caracteristicas_combustible_id_fkey ( nombre ),
-                    cat_marca_compactadora:cat_marca!vehiculo_caracteristicas_marca_compactadora_id_fkey ( nombre )
+                    cat_marca_compactadora ( nombre )
                 )
             `)
             .eq('id', id)
@@ -228,7 +228,7 @@ export const updateVehiculoCaracteristicas = async (req: AuthRequest, res: Respo
                 cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
                 cat_clase_vehiculo:cat_clase_vehiculo!vehiculo_caracteristicas_clase_vehiculo_id_fkey ( nombre ),
                 cat_combustible:cat_combustible!vehiculo_caracteristicas_combustible_id_fkey ( nombre ),
-                cat_marca_compactadora:cat_marca!vehiculo_caracteristicas_marca_compactadora_id_fkey ( nombre )
+                cat_marca_compactadora ( nombre )
             `)
             .single();
 
