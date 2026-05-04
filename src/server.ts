@@ -15,6 +15,7 @@ import saldosBombasRoutes from './routes/saldosBombas.routes';
 import presupuestosRoutes from './routes/presupuestos.routes';
 import flotaRoutes from './routes/flota.routes';
 import mantenimientoRoutes from './routes/mantenimiento.routes';
+import horometroRoutes from './routes/horometro.routes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -45,6 +46,7 @@ app.use('/api/saldos-bombas', saldosBombasRoutes);
 app.use('/api/presupuestos', presupuestosRoutes);
 app.use('/api/flota', flotaRoutes);
 app.use('/api/mantenimiento', mantenimientoRoutes);
+app.use('/api/horometro', horometroRoutes);
 
 // Ruta de prueba
 app.get('/api/health', (req: Request, res: Response) => {
