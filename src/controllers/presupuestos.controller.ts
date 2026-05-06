@@ -375,7 +375,7 @@ export const presupuestosController = {
             // For simplicity, we'll just filter by anio and estado for summary (the main filters)
             let summaryQuery = dbClient
                 .from('presupuestos')
-                .select('id, estado, rubro_id, "Total"'); // Explicitly fetch the Total column
+                .select('id, rubro_id, presupuesto_items(estado, valor_total)');
 
             if (vehiculo_id) summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
             if (vehiculoIdFromPlaca !== null) summaryQuery = summaryQuery.eq('vehiculo_id', vehiculoIdFromPlaca);
@@ -410,11 +410,15 @@ export const presupuestosController = {
             const rubrosIds = new Set<number>();
 
             if (allMatching && allMatching.length > 0) {
-                allMatching.forEach(p => {
-                    const total = (p as any).Total || 0; // Use the direct Total column from the header
+                allMatching.forEach((p: any) => {
                     rubrosIds.add(p.rubro_id);
-                    if (p.estado === 'APROBADO') totalAprobado += total;
-                    else totalBorrador += total;
+                    if (p.presupuesto_items) {
+                        p.presupuesto_items.forEach((item: any) => {
+                            const total = item.valor_total || 0;
+                            if (item.estado === 'APROBADO') totalAprobado += total;
+                            else totalBorrador += total;
+                        });
+                    }
                 });
             }
 

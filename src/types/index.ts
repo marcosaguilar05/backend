@@ -249,6 +249,7 @@ export interface PresupuestoItem {
     meses_aplicables: number[];
     valor_unitario: number;
     valor_total: number;
+    estado?: 'BORRADOR' | 'APROBADO';
     nota?: string;
 }
 
