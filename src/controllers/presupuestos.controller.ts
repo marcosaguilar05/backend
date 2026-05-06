@@ -375,7 +375,7 @@ export const presupuestosController = {
             // For simplicity, we'll just filter by anio and estado for summary (the main filters)
             let summaryQuery = dbClient
                 .from('presupuestos')
-                .select('id, rubro_id, presupuesto_items(estado, valor_total)');
+                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado)');
 
             if (vehiculo_id) summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
             if (vehiculoIdFromPlaca !== null) summaryQuery = summaryQuery.eq('vehiculo_id', vehiculoIdFromPlaca);
@@ -407,6 +407,9 @@ export const presupuestosController = {
 
             let totalAprobado = 0;
             let totalBorrador = 0;
+            let totalEjecutado = 0;
+            let totalNoEjecutado = 0;
+            let totalPresupuesto = 0;
             const rubrosIds = new Set<number>();
 
             if (allMatching && allMatching.length > 0) {
@@ -415,8 +418,15 @@ export const presupuestosController = {
                     if (p.presupuesto_items) {
                         p.presupuesto_items.forEach((item: any) => {
                             const total = item.valor_total || 0;
+                            totalPresupuesto += total;
+
+                            // Aprobado vs Borrador
                             if (item.estado === 'APROBADO') totalAprobado += total;
                             else totalBorrador += total;
+
+                            // Ejecutado vs No Ejecutado
+                            if (item.ejecutado === 'SI') totalEjecutado += total;
+                            else totalNoEjecutado += total;
                         });
                     }
                 });
@@ -433,6 +443,9 @@ export const presupuestosController = {
                 summary: {
                     totalAprobado,
                     totalBorrador,
+                    totalEjecutado,
+                    totalNoEjecutado,
+                    totalPresupuesto,
                     rubrosUtilizados: rubrosIds.size,
                     anioVigencia: anio || new Date().getFullYear()
                 }
