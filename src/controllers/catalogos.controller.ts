@@ -45,6 +45,16 @@ export const catalogosController = {
         res.json(data);
     },
 
+    async getEmpresas(req: AuthRequest, res: Response) {
+        const { data, error } = await (req.supabase || supabase)
+            .from('empresas')
+            .select('id, empresa')
+            .order('empresa');
+
+        if (error) return res.status(400).json({ error: error.message });
+        res.json(data);
+    },
+
     async getSaldoBomba(req: AuthRequest, res: Response) {
         try {
             const { bombaId, fecha } = req.query;

@@ -381,3 +381,36 @@ export interface MantenimientoEvento {
     vehiculo?: Vehiculo;
     talleres?: { nombre: string }; // Assuming talleres table exists or created later
 }
+
+// ==================== ADMIN / AUDITORES ====================
+
+export interface AreaBomba {
+    id?: number;
+    bomba: string;
+    estado: string | null;
+    identificacion: string | null;
+    area_operacion_id: number | null;
+    area_operacion_id_secundario: number | null;
+    area_operacion_id_tecero: number | null;
+}
+
+export interface AreaConductor {
+    id?: number;
+    conductor: string;
+    identificacion: string | null;
+    area_principal: number | null;
+}
+
+export interface AreaOperacion {
+    id?: number;
+    nombre: string;
+    empresa_id: number | null;
+    nombre_financiero: string | null;
+}
+
+export interface AreaPlaca {
+    id?: number;
+    placa: string;
+    estado: string | null;
+    funcion: string | null;
+}

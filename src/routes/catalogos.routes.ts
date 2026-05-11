@@ -11,6 +11,7 @@ router.get('/bombas', catalogosController.getBombas);
 router.get('/conductores', catalogosController.getConductores);
 router.get('/placas', catalogosController.getPlacas);
 router.get('/areas', catalogosController.getAreas);
+router.get('/empresas', catalogosController.getEmpresas);
 router.get('/saldo-bomba', catalogosController.getSaldoBomba);
 
 export default router;
