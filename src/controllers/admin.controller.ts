@@ -1,11 +1,11 @@
 import { Response } from 'express';
-import { supabase } from '../config/supabase';
+import { supabase, adminSupabase } from '../config/supabase';
 import { AuthRequest } from '../types';
 
 export const adminController = {
     // ==================== AREAS BOMBAS ====================
     async getBombas(req: AuthRequest, res: Response) {
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_bombas')
             .select(`
                 *,
@@ -20,7 +20,7 @@ export const adminController = {
     },
 
     async createBomba(req: AuthRequest, res: Response) {
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_bombas')
             .insert(req.body)
             .select()
@@ -32,7 +32,7 @@ export const adminController = {
 
     async updateBomba(req: AuthRequest, res: Response) {
         const { id } = req.params;
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_bombas')
             .update(req.body)
             .eq('id', id)
@@ -45,7 +45,7 @@ export const adminController = {
 
     async deleteBomba(req: AuthRequest, res: Response) {
         const { id } = req.params;
-        const { error } = await (req.supabase || supabase)
+        const { error } = await adminSupabase
             .from('areas_bombas')
             .delete()
             .eq('id', id);
@@ -56,7 +56,7 @@ export const adminController = {
 
     // ==================== AREAS CONDUCTORES ====================
     async getConductores(req: AuthRequest, res: Response) {
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_conductores')
             .select(`
                 *,
@@ -69,7 +69,7 @@ export const adminController = {
     },
 
     async createConductor(req: AuthRequest, res: Response) {
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_conductores')
             .insert(req.body)
             .select()
@@ -81,7 +81,7 @@ export const adminController = {
 
     async updateConductor(req: AuthRequest, res: Response) {
         const { id } = req.params;
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_conductores')
             .update(req.body)
             .eq('id', id)
@@ -94,7 +94,7 @@ export const adminController = {
 
     async deleteConductor(req: AuthRequest, res: Response) {
         const { id } = req.params;
-        const { error } = await (req.supabase || supabase)
+        const { error } = await adminSupabase
             .from('areas_conductores')
             .delete()
             .eq('id', id);
@@ -105,7 +105,7 @@ export const adminController = {
 
     // ==================== AREAS OPERACION ====================
     async getAreas(req: AuthRequest, res: Response) {
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_operacion')
             .select(`
                 *,
@@ -118,7 +118,7 @@ export const adminController = {
     },
 
     async createArea(req: AuthRequest, res: Response) {
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_operacion')
             .insert(req.body)
             .select()
@@ -130,7 +130,7 @@ export const adminController = {
 
     async updateArea(req: AuthRequest, res: Response) {
         const { id } = req.params;
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_operacion')
             .update(req.body)
             .eq('id', id)
@@ -143,7 +143,7 @@ export const adminController = {
 
     async deleteArea(req: AuthRequest, res: Response) {
         const { id } = req.params;
-        const { error } = await (req.supabase || supabase)
+        const { error } = await adminSupabase
             .from('areas_operacion')
             .delete()
             .eq('id', id);
@@ -154,7 +154,7 @@ export const adminController = {
 
     // ==================== AREAS PLACAS ====================
     async getPlacas(req: AuthRequest, res: Response) {
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_placas')
             .select('*')
             .order('placa');
@@ -164,7 +164,7 @@ export const adminController = {
     },
 
     async createPlaca(req: AuthRequest, res: Response) {
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_placas')
             .insert(req.body)
             .select()
@@ -176,7 +176,7 @@ export const adminController = {
 
     async updatePlaca(req: AuthRequest, res: Response) {
         const { id } = req.params;
-        const { data, error } = await (req.supabase || supabase)
+        const { data, error } = await adminSupabase
             .from('areas_placas')
             .update(req.body)
             .eq('id', id)
@@ -189,7 +189,7 @@ export const adminController = {
 
     async deletePlaca(req: AuthRequest, res: Response) {
         const { id } = req.params;
-        const { error } = await (req.supabase || supabase)
+        const { error } = await adminSupabase
             .from('areas_placas')
             .delete()
             .eq('id', id);
