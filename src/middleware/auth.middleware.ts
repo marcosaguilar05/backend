@@ -34,11 +34,19 @@ export async function authMiddleware(
             return;
         }
 
+        // Verificar si el usuario es auditor
+        const { data: auditorData } = await supabase
+            .from('Auditores')
+            .select('id')
+            .eq('id_usuario', user.id)
+            .maybeSingle();
+
         req.user = {
             id: user.id,
             email: userData.email,
             nombre: userData.nombre,
-            rol: userData.rol
+            rol: userData.rol,
+            isAuditor: !!auditorData
         };
 
         // Guardar token y crear cliente autenticado para RLS
