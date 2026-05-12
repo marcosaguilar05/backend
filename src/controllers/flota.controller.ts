@@ -224,7 +224,8 @@ export const updateVehiculoCaracteristicas = async (req: AuthRequest, res: Respo
         const allowedFields = [
             'marca_id', 'tipo_vehiculo_id', 'clase_vehiculo_id',
             'combustible_id', 'marca_compactadora_id',
-            'nro_ejes', 'nro_llantas', 'año', 'linea', 'nro_serie'
+            'nro_ejes', 'nro_llantas', 'año', 'linea', 'nro_serie',
+            'estado', 'sub_estado'
         ];
 
         for (const field of allowedFields) {

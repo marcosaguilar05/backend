@@ -322,6 +322,8 @@ export interface VehiculoCaracteristicas {
     anio: string | null; // año en DB es text
     linea: string | null;
     nro_serie: string | null;
+    estado: string | null;
+    sub_estado: string | null;
     // Relations
     cat_marca?: CatMarca;
     cat_tipo_vehiculo?: CatTipoVehiculo;
