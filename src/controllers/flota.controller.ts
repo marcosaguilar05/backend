@@ -1,5 +1,5 @@
 import { Response, NextFunction } from 'express';
-import { AuthRequest, Vehiculo, VehiculoCaracteristicas } from '../types';
+import { AuthRequest, Vehiculo, VehiculoCaracteristicas, CatMarca, CatTipoVehiculo, CatClaseVehiculo, CatCombustible, CatMarcaCompactadora } from '../types';
 
 export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -118,20 +118,32 @@ export const getCatalogos = async (req: AuthRequest, res: Response, next: NextFu
     try {
         const db = req.supabase!;
 
-        const [marcas, tipos, clases, combustibles, marcasCompactadora] = await Promise.all([
+        const [marcas, tipos, clases, combustibles, marcasCompactadora, empresas, operaciones, placas] = await Promise.all([
             db.from('cat_marca').select('*'),
             db.from('cat_tipo_vehiculo').select('*'),
             db.from('cat_clase_vehiculo').select('*'),
             db.from('cat_combustible').select('*'),
-            db.from('cat_marca_compactadora').select('*')
+            db.from('cat_marca_compactadora').select('*'),
+            db.from('empresas').select('*').order('empresa'),
+            db.from('areas_operacion').select('*').order('nombre'),
+            db.from('areas_placas').select('*').order('placa')
         ]);
+
+        // Filter plates that are already in the vehiculo table
+        const { data: existingVehicles } = await db.from('vehiculo').select('placa_id');
+        const existingPlacaIds = new Set(existingVehicles?.map(v => v.placa_id));
+        const placasDisponibles = placas.data?.filter(p => !existingPlacaIds.has(p.id)) || [];
 
         res.json({
             marcas: marcas.data,
             tipos: tipos.data,
             clases: clases.data,
             combustibles: combustibles.data,
-            marcasCompactadora: marcasCompactadora.data
+            marcasCompactadora: marcasCompactadora.data,
+            empresas: empresas.data,
+            operaciones: operaciones.data,
+            placas: placas.data,
+            placasDisponibles: placasDisponibles
         });
     } catch (error) {
         console.error('Error fetching catalogs:', error);
@@ -237,6 +249,78 @@ export const updateVehiculoCaracteristicas = async (req: AuthRequest, res: Respo
         res.json(data);
     } catch (error) {
         console.error('Error updating vehiculo caracteristicas:', error);
+        next(error);
+    }
+};
+
+export const createVehiculo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const db = req.supabase!;
+        const { placa_id, empresa_id, operacion_id } = req.body;
+
+        if (!placa_id) {
+            return res.status(400).json({ error: 'La placa es obligatoria' });
+        }
+
+        // Check if already exists
+        const { data: existing } = await db
+            .from('vehiculo')
+            .select('id')
+            .eq('placa_id', placa_id)
+            .maybeSingle();
+
+        if (existing) {
+            return res.status(400).json({ error: 'Este vehículo (placa) ya está registrado en la flota' });
+        }
+
+        const { data, error } = await db
+            .from('vehiculo')
+            .insert({
+                placa_id,
+                empresa_id: empresa_id || null,
+                operacion_id: operacion_id || null
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Create initial characteristics record
+        await db.from('vehiculo_caracteristicas').insert({ vehiculo_id: data.id });
+
+        res.status(201).json(data);
+    } catch (error) {
+        console.error('Error creating vehiculo:', error);
+        next(error);
+    }
+};
+
+export const deleteVehiculo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const db = req.supabase!;
+
+        // Delete characteristics first (due to FK)
+        await db.from('vehiculo_caracteristicas').delete().eq('vehiculo_id', id);
+
+        // Delete vehicle
+        const { error } = await db
+            .from('vehiculo')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            if (error.code === '23503') {
+                return res.status(400).json({ 
+                    error: 'No se puede eliminar el vehículo porque tiene registros asociados (tanqueos, mantenimientos, etc.)' 
+                });
+            }
+            throw error;
+        }
+
+        res.json({ message: 'Vehículo eliminado correctamente' });
+    } catch (error) {
+        console.error('Error deleting vehiculo:', error);
         next(error);
     }
 };

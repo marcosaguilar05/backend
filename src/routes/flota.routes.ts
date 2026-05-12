@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getVehiculos, getVehiculoDetalle, getCatalogos, syncVehiculos, updateVehiculoCaracteristicas } from '../controllers/flota.controller';
+import { getVehiculos, getVehiculoDetalle, getCatalogos, syncVehiculos, updateVehiculoCaracteristicas, createVehiculo, deleteVehiculo } from '../controllers/flota.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -7,8 +7,10 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/vehiculos', getVehiculos);
+router.post('/vehiculos', createVehiculo);
 router.post('/sync', syncVehiculos);
 router.get('/vehiculos/:id', getVehiculoDetalle);
+router.delete('/vehiculos/:id', deleteVehiculo);
 router.put('/vehiculos/:id/caracteristicas', updateVehiculoCaracteristicas);
 router.get('/catalogos', getCatalogos);
 
