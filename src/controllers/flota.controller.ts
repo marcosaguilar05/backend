@@ -268,11 +268,38 @@ export const updateVehiculoCaracteristicas = async (req: AuthRequest, res: Respo
 
         res.json(data);
     } catch (error) {
-        console.error('Unexpected Error updating vehiculo caracteristicas:', error);
-        res.status(500).json({
-            error: 'Internal Server Error',
-            details: error instanceof Error ? error.message : String(error)
-        });
+        console.error('Unexpected error in updateVehiculoCaracteristicas:', error);
+        next(error);
+    }
+};
+
+export const updateVehiculo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const db = req.supabase!;
+        const { placa_id, empresa_id, operacion_id } = req.body;
+
+        const { data, error } = await db
+            .from('vehiculo')
+            .update({
+                placa_id,
+                empresa_id,
+                operacion_id
+            })
+            .eq('id', id)
+            .select(`
+                *,
+                areas_placas ( placa, estado ),
+                empresas ( empresa ),
+                areas_operacion ( nombre )
+            `)
+            .single();
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error('Error updating vehicle relations:', error);
+        next(error);
     }
 };
 
