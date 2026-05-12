@@ -234,6 +234,13 @@ export const updateVehiculoCaracteristicas = async (req: AuthRequest, res: Respo
             }
         }
 
+        // Handle anio/año synonym from frontend
+        if ('anio' in body && !('año' in body)) {
+            row['año'] = (body as any).anio;
+        }
+
+        console.log('Upserting vehicle characteristics for ID:', id, row);
+
         const { data, error } = await db
             .from('vehiculo_caracteristicas')
             .upsert(row, { onConflict: 'vehiculo_id' })
@@ -248,12 +255,23 @@ export const updateVehiculoCaracteristicas = async (req: AuthRequest, res: Respo
             `)
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error('Supabase Error in updateVehiculoCaracteristicas:', error);
+            return res.status(500).json({ 
+                error: 'Database error', 
+                message: error.message,
+                details: error.details,
+                hint: error.hint
+            });
+        }
 
         res.json(data);
     } catch (error) {
-        console.error('Error updating vehiculo caracteristicas:', error);
-        next(error);
+        console.error('Unexpected Error updating vehiculo caracteristicas:', error);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            details: error instanceof Error ? error.message : String(error)
+        });
     }
 };
 
