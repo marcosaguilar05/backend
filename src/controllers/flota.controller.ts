@@ -124,25 +124,28 @@ export const getCatalogos = async (req: AuthRequest, res: Response, next: NextFu
             db.from('cat_clase_vehiculo').select('*'),
             db.from('cat_combustible').select('*'),
             db.from('cat_marca_compactadora').select('*'),
-            db.from('empresas').select('*').order('empresa'),
-            db.from('areas_operacion').select('*').order('nombre'),
-            db.from('areas_placas').select('*').order('placa')
+            db.from('empresas').select('id, empresa').order('empresa'),
+            db.from('areas_operacion').select('id, nombre').order('nombre'),
+            db.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').order('placa')
         ]);
 
         // Filter plates that are already in the vehiculo table
         const { data: existingVehicles } = await db.from('vehiculo').select('placa_id');
         const existingPlacaIds = new Set(existingVehicles?.map(v => v.placa_id));
-        const placasDisponibles = placas.data?.filter(p => !existingPlacaIds.has(p.id)) || [];
+        
+        // Use all placas if you want, but available are those not in vehiculo
+        const placasData = placas.data || [];
+        const placasDisponibles = placasData.filter(p => !existingPlacaIds.has(p.id));
 
         res.json({
-            marcas: marcas.data,
-            tipos: tipos.data,
-            clases: clases.data,
-            combustibles: combustibles.data,
-            marcasCompactadora: marcasCompactadora.data,
-            empresas: empresas.data,
-            operaciones: operaciones.data,
-            placas: placas.data,
+            marcas: marcas.data || [],
+            tipos: tipos.data || [],
+            clases: clases.data || [],
+            combustibles: combustibles.data || [],
+            marcasCompactadora: marcasCompactadora.data || [],
+            empresas: empresas.data || [],
+            operaciones: operaciones.data || [],
+            placas: placasData,
             placasDisponibles: placasDisponibles
         });
     } catch (error) {
