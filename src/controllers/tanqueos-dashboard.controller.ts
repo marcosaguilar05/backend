@@ -674,16 +674,7 @@ export const tanqueosDashboardController = {
                 });
             }
 
-            // 3. Saldo negativo crítico
-            const saldosCriticos = data?.filter(t => (t.saldo_disponible || 0) < SALDO_CRITICO).length || 0;
-            if (saldosCriticos > 0) {
-                alerts.push({
-                    tipo_alerta: 'SALDO_CRITICO',
-                    mensaje: `${saldosCriticos} registro(s) con saldo negativo crítico (< ${SALDO_CRITICO.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })})`,
-                    cantidad: saldosCriticos,
-                    severidad: 'error'
-                });
-            }
+
 
             // 4. Consumo atípico (desviación > 2σ)
             const galones = data?.map(t => t.cantidad_galones || 0).filter(g => g > 0) || [];
@@ -758,8 +749,7 @@ export const tanqueosDashboardController = {
                         costo_anormal: threshold ? (
                             (t.costo_por_galon || 0) < threshold.min ||
                             (t.costo_por_galon || 0) > threshold.max
-                        ) : false,
-                        saldo_critico: (t.saldo_disponible || 0) < SALDO_CRITICO
+                        ) : false
                     }
                 };
             });
@@ -826,9 +816,7 @@ export const tanqueosDashboardController = {
                     }) || [];
                     break;
 
-                case 'SALDO_CRITICO':
-                    filteredRecords = data?.filter(t => (t.saldo_disponible || 0) < SALDO_CRITICO) || [];
-                    break;
+
 
                 case 'CONSUMO_ATIPICO':
                     const galones = data?.map(t => t.cantidad_galones || 0).filter(g => g > 0) || [];
@@ -1011,8 +999,7 @@ export const tanqueosDashboardController = {
             }).length;
             if (costsAnormales > 0) alerts.push({ tipo_alerta: 'COSTO_ANORMAL', mensaje: `${costsAnormales} tanqueo(s) con costo por galón fuera de rango`, cantidad: costsAnormales, severidad: 'error' });
 
-            const criticos = data.filter(t => (t.saldo_disponible || 0) < SALDO_CRITICO).length;
-            if (criticos > 0) alerts.push({ tipo_alerta: 'SALDO_CRITICO', mensaje: `${criticos} registro(s) con saldo crítico`, cantidad: criticos, severidad: 'error' });
+
 
             // Stats for pumps
             const totalSaldoBombas = bombas.reduce((sum, b) => sum + (b.saldo_disponible || 0), 0);
