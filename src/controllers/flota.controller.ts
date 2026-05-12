@@ -89,7 +89,7 @@ export const getVehiculoDetalle = async (req: AuthRequest, res: Response, next: 
             .from('vehiculo')
             .select(`
                 *,
-                areas_placas ( placa ),
+                areas_placas ( placa, estado ),
                 empresas ( empresa ),
                 areas_operacion ( nombre ),
                 vehiculo_caracteristicas (
@@ -99,7 +99,8 @@ export const getVehiculoDetalle = async (req: AuthRequest, res: Response, next: 
                     cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
                     cat_clase_vehiculo:cat_clase_vehiculo!vehiculo_caracteristicas_clase_vehiculo_id_fkey ( nombre ),
                     cat_combustible:cat_combustible!vehiculo_caracteristicas_combustible_id_fkey ( nombre ),
-                    cat_marca_compactadora ( nombre )
+                    cat_marca_compactadora ( nombre ),
+                    Estado
                 )
             `)
             .eq('id', id)
@@ -224,7 +225,7 @@ export const updateVehiculoCaracteristicas = async (req: AuthRequest, res: Respo
         const allowedFields = [
             'marca_id', 'tipo_vehiculo_id', 'clase_vehiculo_id',
             'combustible_id', 'marca_compactadora_id',
-            'nro_ejes', 'nro_llantas', 'año', 'linea', 'nro_serie'
+            'nro_ejes', 'nro_llantas', 'año', 'linea', 'nro_serie', 'Estado'
         ];
 
         for (const field of allowedFields) {
@@ -250,7 +251,8 @@ export const updateVehiculoCaracteristicas = async (req: AuthRequest, res: Respo
                 cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
                 cat_clase_vehiculo:cat_clase_vehiculo!vehiculo_caracteristicas_clase_vehiculo_id_fkey ( nombre ),
                 cat_combustible:cat_combustible!vehiculo_caracteristicas_combustible_id_fkey ( nombre ),
-                cat_marca_compactadora ( nombre )
+                cat_marca_compactadora ( nombre ),
+                Estado
             `)
             .single();
 
