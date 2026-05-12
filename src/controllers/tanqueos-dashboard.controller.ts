@@ -245,12 +245,18 @@ export const tanqueosDashboardController = {
             const fecha_inicio = req.query.fecha_inicio as string;
             const fecha_fin = req.query.fecha_fin as string;
             const area_operacion = req.query.area_operacion as string;
+            const conductor = req.query.conductor as string;
+            const placa = req.query.placa as string;
+            const bomba = req.query.bomba as string;
 
             let query = (req.supabase || supabase).from('tanqueo_relaciones').select('tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
             if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
+            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
+            if (placa) query = query.ilike('placa', `%${placa}%`);
+            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
@@ -301,12 +307,20 @@ export const tanqueosDashboardController = {
             const fecha_inicio = req.query.fecha_inicio as string;
             const fecha_fin = req.query.fecha_fin as string;
             const tipo_combustible = req.query.tipo_combustible as string;
+            const area_operacion = req.query.area_operacion as string;
+            const conductor = req.query.conductor as string;
+            const placa = req.query.placa as string;
+            const bomba = req.query.bomba as string;
 
             let query = (req.supabase || supabase).from('tanqueo_relaciones').select('area_operacion, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
             if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
+            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
+            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
+            if (placa) query = query.ilike('placa', `%${placa}%`);
+            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
@@ -605,11 +619,21 @@ export const tanqueosDashboardController = {
         try {
             const fecha_inicio = req.query.fecha_inicio as string;
             const fecha_fin = req.query.fecha_fin as string;
+            const conductor = req.query.conductor as string;
+            const placa = req.query.placa as string;
+            const bomba = req.query.bomba as string;
+            const area_operacion = req.query.area_operacion as string;
+            const tipo_combustible = req.query.tipo_combustible as string;
 
             let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
+            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
+            if (placa) query = query.ilike('placa', `%${placa}%`);
+            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
+            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
+            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
@@ -761,11 +785,21 @@ export const tanqueosDashboardController = {
             const alertType = req.params.alertType as string;
             const fecha_inicio = req.query.fecha_inicio as string;
             const fecha_fin = req.query.fecha_fin as string;
+            const conductor = req.query.conductor as string;
+            const placa = req.query.placa as string;
+            const bomba = req.query.bomba as string;
+            const area_operacion = req.query.area_operacion as string;
+            const tipo_combustible = req.query.tipo_combustible as string;
 
             let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
+            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
+            if (placa) query = query.ilike('placa', `%${placa}%`);
+            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
+            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
+            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
