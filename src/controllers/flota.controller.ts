@@ -277,14 +277,15 @@ export const updateVehiculo = async (req: AuthRequest, res: Response, next: Next
     try {
         const { id } = req.params;
         const db = req.supabase!;
-        const { placa_id, empresa_id, operacion_id } = req.body;
+        const { placa_id, empresa_id, operacion_id, asignado_a } = req.body;
 
         const { data, error } = await db
             .from('vehiculo')
             .update({
                 placa_id,
                 empresa_id,
-                operacion_id
+                operacion_id,
+                asignado_a
             })
             .eq('id', id)
             .select(`
