@@ -349,7 +349,7 @@ export const presupuestosController = {
                     grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre),
                     rubro:maestro_rubros!rubro_id(id, codigo, nombre),
                     personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
-                    presupuesto_items(id, valor_total, ejecutado, meses_aplicables, tipo:tipos_presupuesto(id, nombre))
+                    presupuesto_items(id, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, tipo:tipos_presupuesto(id, nombre))
                 `, { count: 'exact' });
 
             // Filtros directos por ID
@@ -409,7 +409,7 @@ export const presupuestosController = {
             // For simplicity, we'll just filter by anio and estado for summary (the main filters)
             let summaryQuery = dbClient
                 .from('presupuestos')
-                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado)');
+                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes)');
 
             if (vehiculo_id) summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
             if (vehiculoIdFromPlaca !== null) summaryQuery = summaryQuery.eq('vehiculo_id', vehiculoIdFromPlaca);
@@ -436,9 +436,18 @@ export const presupuestosController = {
                 if (budgetIdsFromTipo.length > 0) summaryQuery = summaryQuery.in('id', budgetIdsFromTipo);
                 else summaryQuery = summaryQuery.eq('id', -1);
             }
+
+            let monthNum: number | null = null;
             if (mes && mes !== '' && mes !== 'undefined') {
                 if (budgetIdsFromMonth.length > 0) summaryQuery = summaryQuery.in('id', budgetIdsFromMonth);
                 else summaryQuery = summaryQuery.eq('id', -1);
+
+                const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+                const mesLower = String(mes).toLowerCase().trim();
+                const monthIndex = monthNames.indexOf(mesLower);
+                if (monthIndex !== -1) {
+                    monthNum = monthIndex + 1;
+                }
             }
 
             const { data: allMatching } = await summaryQuery;
@@ -455,7 +464,14 @@ export const presupuestosController = {
                     rubrosIds.add(p.rubro_id);
                     if (p.presupuesto_items) {
                         p.presupuesto_items.forEach((item: any) => {
-                            const total = item.valor_total || 0;
+                            let total = item.valor_total || 0;
+
+                            if (monthNum !== null) {
+                                const isApplicable = (item.meses_aplicables || []).includes(monthNum);
+                                if (!isApplicable) return;
+                                total = (item.valor_unitario || 0) * (item.frecuencia_mes || 1);
+                            }
+
                             totalPresupuesto += total;
 
                             // Aprobado vs Borrador
