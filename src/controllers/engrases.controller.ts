@@ -55,13 +55,46 @@ export const engrasesController = {
                 query = query.order('fecha', { ascending: false }).order('id', { ascending: false });
             }
 
-            const { data, error, count } = await query
-                .range(offset, offset + limit - 1);
+            // Definir consulta para los totales (Summary)
+            let summaryQuery = (req.supabase || supabase)
+                .from('engrases_relaciones')
+                .select('lavado, engrase, otros, suma');
+
+            // Aplicar los mismos filtros al summary
+            if (conductor) summaryQuery = summaryQuery.ilike('conductor', `%${conductor}%`);
+            if (placa) summaryQuery = summaryQuery.ilike('placa', `%${placa}%`);
+            if (area_operacion) summaryQuery = summaryQuery.ilike('area_operacion', `%${area_operacion}%`);
+            if (fecha_inicio) summaryQuery = summaryQuery.gte('fecha', fecha_inicio);
+            if (fecha_fin) summaryQuery = summaryQuery.lte('fecha', fecha_fin);
+
+            // Ejecutar ambas consultas en paralelo para mejorar rendimiento
+            const [pageRes, summaryRes] = await Promise.all([
+                query.range(offset, offset + limit - 1),
+                summaryQuery
+            ]);
+
+            const { data, error, count } = pageRes;
+            const summaryData = summaryRes.data;
 
             if (error) {
                 console.error('Error en getAll Engrases:', error);
                 res.status(400).json({ error: error.message });
                 return;
+            }
+
+            // Calcular totales de forma eficiente
+            let totalLavado = 0;
+            let totalEngrase = 0;
+            let totalOtros = 0;
+            let totalGeneral = 0;
+
+            if (summaryData && summaryData.length > 0) {
+                for (let i = 0; i < summaryData.length; i++) {
+                    totalLavado += (summaryData[i].lavado || 0);
+                    totalEngrase += (summaryData[i].engrase || 0);
+                    totalOtros += (summaryData[i].otros || 0);
+                    totalGeneral += (summaryData[i].suma || 0);
+                }
             }
 
             res.json({
@@ -71,6 +104,12 @@ export const engrasesController = {
                     limit,
                     total: count || 0,
                     totalPages: Math.ceil((count || 0) / limit)
+                },
+                summary: {
+                    total_lavado: Math.round(totalLavado * 100) / 100,
+                    total_engrase: Math.round(totalEngrase * 100) / 100,
+                    total_otros: Math.round(totalOtros * 100) / 100,
+                    total_general: Math.round(totalGeneral * 100) / 100
                 }
             });
         } catch (error) {
