@@ -190,6 +190,7 @@ export const presupuestosController = {
                 grupo_rubro,
                 rubro,
                 sub_rubro,
+                mes,
                 sort_by = 'id',
                 sort_order = 'desc'
             } = req.query;
@@ -306,6 +307,32 @@ export const presupuestosController = {
                 }
             }
 
+            // Resolve mes filter (abbreviated month to number 1-12)
+            let budgetIdsFromMonth: number[] = [];
+            if (mes && mes !== 'undefined' && mes !== '') {
+                const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+                const mesLower = String(mes).toLowerCase().trim();
+                const monthIndex = monthNames.indexOf(mesLower);
+                
+                if (monthIndex !== -1) {
+                    const monthNum = monthIndex + 1;
+                    
+                    // Find all presupuesto_items where meses_aplicables contains the monthNum
+                    const { data: itemData, error: itemError } = await dbClient
+                        .from('presupuesto_items')
+                        .select('presupuesto_id')
+                        .contains('meses_aplicables', [monthNum]);
+                        
+                    if (itemError) {
+                        console.error('Error finding budgets for month filter:', itemError);
+                    } else if (itemData && itemData.length > 0) {
+                        budgetIdsFromMonth = [...new Set(itemData.map(d => Number(d.presupuesto_id)))];
+                    }
+                }
+                
+                console.log(`[Presupuestos Filter] Mes: "${mes}" (Index: ${monthIndex + 1}) -> BudgetIDsWithMonthCount: ${budgetIdsFromMonth.length}`);
+            }
+
             // 1. Consulta principal para la tabla (paginada)
             let query = dbClient
                 .from('presupuestos')
@@ -350,6 +377,13 @@ export const presupuestosController = {
             if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
                 if (budgetIdsFromTipo.length > 0) {
                     query = query.in('id', budgetIdsFromTipo);
+                } else {
+                    query = query.eq('id', -1);
+                }
+            }
+            if (mes && mes !== '' && mes !== 'undefined') {
+                if (budgetIdsFromMonth.length > 0) {
+                    query = query.in('id', budgetIdsFromMonth);
                 } else {
                     query = query.eq('id', -1);
                 }
@@ -400,6 +434,10 @@ export const presupuestosController = {
             }
             if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
                 if (budgetIdsFromTipo.length > 0) summaryQuery = summaryQuery.in('id', budgetIdsFromTipo);
+                else summaryQuery = summaryQuery.eq('id', -1);
+            }
+            if (mes && mes !== '' && mes !== 'undefined') {
+                if (budgetIdsFromMonth.length > 0) summaryQuery = summaryQuery.in('id', budgetIdsFromMonth);
                 else summaryQuery = summaryQuery.eq('id', -1);
             }
 
