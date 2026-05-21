@@ -6,7 +6,7 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
         console.log('GET /vehiculos request received');
         const empresa_id = req.query.empresa_id as string;
         const operacion_id = req.query.operacion_id as string;
-        const placa = req.query.placa as string;
+        const placa = req.query.placa as string; // Contiene el término general de búsqueda
         
         // Pagination setup
         const page = parseInt(req.query.page as string) || 1;
@@ -20,36 +20,33 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
         const db = req.supabase;
         console.log('Supabase client initialized');
 
-        // Standard query
+        // Standard query — cargamos todas las relaciones necesarias para el filtro inteligente
         let selectStr = `
             id,
             placa_id,
             empresa_id,
             operacion_id,
-            areas_placas${placa ? '!inner' : ''} ( placa ),
+            areas_placas ( placa ),
             empresas ( empresa ),
             areas_operacion ( nombre ),
             vehiculo_caracteristicas (
                 clase_vehiculo_id,
                 cat_clase_vehiculo ( nombre ),
+                tipo_vehiculo_id,
+                cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
                 marca_id,
                 cat_marca:cat_marca!vehiculo_caracteristicas_marca_id_fkey ( nombre ),
                 anio:año
             )
         `;
 
-        let query = db.from('vehiculo').select(selectStr, { count: 'exact' });
+        let query = db.from('vehiculo').select(selectStr);
 
         if (empresa_id) query = query.eq('empresa_id', empresa_id);
         if (operacion_id) query = query.eq('operacion_id', operacion_id);
-        if (placa) {
-            // Because areas_placas is marked as !inner if placa is present, this ilike filter works.
-            query = query.ilike('areas_placas.placa', `%${placa}%`);
-        }
 
         console.log('Executing query...');
-        const { data, count, error } = await query
-            .range(offset, offset + limit - 1)
+        const { data, error } = await query
             .order('empresa_id', { ascending: false, nullsFirst: false })
             .order('operacion_id', { ascending: false, nullsFirst: false })
             .order('id', { ascending: false });
@@ -59,20 +56,56 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
             throw error;
         }
 
-        console.log(`Query successful. Returning ${data?.length} records of ${count} total.`);
+        // Filtro general en memoria para búsqueda inteligente (soporta placa, marca, tipo, clase, empresa, área)
+        let filteredData = data || [];
+        if (placa) {
+            const searchTerm = placa.toLowerCase().trim();
+            filteredData = filteredData.filter((v: any) => {
+                // 1. Placa
+                const placaData = Array.isArray(v.areas_placas) ? v.areas_placas[0] : v.areas_placas;
+                const pVal = placaData?.placa || v.placa || '';
+                if (pVal.toLowerCase().includes(searchTerm)) return true;
+
+                // 2. Empresa
+                const empData = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas;
+                const empVal = empData?.empresa || '';
+                if (empVal.toLowerCase().includes(searchTerm)) return true;
+
+                // 3. Área de Operación
+                const areaData = Array.isArray(v.areas_operacion) ? v.areas_operacion[0] : v.areas_operacion;
+                const areaVal = areaData?.nombre || '';
+                if (areaVal.toLowerCase().includes(searchTerm)) return true;
+
+                // 4. Marca
+                const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                const marcaVal = chars?.cat_marca?.nombre || '';
+                if (marcaVal.toLowerCase().includes(searchTerm)) return true;
+
+                // 5. Clase / Tipo
+                const claseVal = chars?.cat_clase_vehiculo?.nombre || '';
+                const tipoVal = chars?.cat_tipo_vehiculo?.nombre || '';
+                if (claseVal.toLowerCase().includes(searchTerm) || tipoVal.toLowerCase().includes(searchTerm)) return true;
+
+                return false;
+            });
+        }
+
+        const total = filteredData.length;
+        const paginatedData = filteredData.slice(offset, offset + limit);
+
+        console.log(`Query successful. Returning ${paginatedData.length} records of ${total} total.`);
         
         res.json({
-            data,
+            data: paginatedData,
             pagination: {
-                total: count || 0,
+                total,
                 page,
                 limit,
-                totalPages: count ? Math.ceil(count / limit) : 0
+                totalPages: Math.ceil(total / limit)
             }
         });
     } catch (error) {
         console.error('Error fetching vehiculos:', error);
-        // Send explicit error to client for debugging
         res.status(500).json({
             error: 'Internal Server Error',
             details: error instanceof Error ? error.message : String(error)
