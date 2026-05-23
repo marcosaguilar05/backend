@@ -846,11 +846,13 @@ export const tanqueosDashboardController = {
     async getVehiclePerformance(req: AuthRequest, res: Response): Promise<void> {
         try {
             const dbClient = req.supabase || supabase;
-            const { mes, vehiculo, area_operacion } = req.query;
+            const { mes, vehiculo, area_operacion, fecha_inicio, fecha_fin } = req.query;
 
             let query = dbClient.from('rendimiento_mensual_vehiculo').select('*');
 
             if (mes) query = query.eq('mes', mes);
+            if (fecha_inicio) query = query.gte('mes', fecha_inicio);
+            if (fecha_fin) query = query.lte('mes', fecha_fin);
             if (vehiculo) query = query.ilike('vehiculo', `%${vehiculo}%`);
             if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
 
