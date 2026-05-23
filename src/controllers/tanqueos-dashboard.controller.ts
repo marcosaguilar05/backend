@@ -225,11 +225,13 @@ export const tanqueosDashboardController = {
                         fecha: t.fecha,
                         tipo_combustible: t.tipo_combustible,
                         galones: 0,
-                        valor: 0
+                        valor: 0,
+                        tanqueos: 0
                     };
                 }
                 grouped[key].galones += t.cantidad_galones || 0;
                 grouped[key].valor += t.valor_tanqueo || 0;
+                grouped[key].tanqueos += 1;
             });
 
             res.json(Object.values(grouped));
@@ -949,9 +951,10 @@ export const tanqueosDashboardController = {
 
                 // Consumption Over Time
                 const timeKey = `${fecha}|${tipo}`;
-                if (!consumptionTime[timeKey]) consumptionTime[timeKey] = { fecha, tipo_combustible: tipo, galones: 0, valor: 0 };
+                if (!consumptionTime[timeKey]) consumptionTime[timeKey] = { fecha, tipo_combustible: tipo, galones: 0, valor: 0, tanqueos: 0 };
                 consumptionTime[timeKey].galones += gal;
                 consumptionTime[timeKey].valor += val;
+                consumptionTime[timeKey].tanqueos += 1;
 
                 // Fuel Distribution
                 if (!fuelDistribution[tipo]) fuelDistribution[tipo] = { tipo_combustible: tipo, total_galones: 0, total_valor: 0 };
