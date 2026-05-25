@@ -19,7 +19,7 @@ exports.engrasesController = {
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
             // Query base
-            let query = supabase_1.supabase
+            let query = (req.supabase || supabase_1.supabase)
                 .from('engrases_relaciones')
                 .select('*', { count: 'exact' });
             // Aplicar filtros
@@ -49,12 +49,45 @@ exports.engrasesController = {
             else {
                 query = query.order('fecha', { ascending: false }).order('id', { ascending: false });
             }
-            const { data, error, count } = await query
-                .range(offset, offset + limit - 1);
+            // Definir consulta para los totales (Summary)
+            let summaryQuery = (req.supabase || supabase_1.supabase)
+                .from('engrases_relaciones')
+                .select('lavado, engrase, otros, suma');
+            // Aplicar los mismos filtros al summary
+            if (conductor)
+                summaryQuery = summaryQuery.ilike('conductor', `%${conductor}%`);
+            if (placa)
+                summaryQuery = summaryQuery.ilike('placa', `%${placa}%`);
+            if (area_operacion)
+                summaryQuery = summaryQuery.ilike('area_operacion', `%${area_operacion}%`);
+            if (fecha_inicio)
+                summaryQuery = summaryQuery.gte('fecha', fecha_inicio);
+            if (fecha_fin)
+                summaryQuery = summaryQuery.lte('fecha', fecha_fin);
+            // Ejecutar ambas consultas en paralelo para mejorar rendimiento
+            const [pageRes, summaryRes] = await Promise.all([
+                query.range(offset, offset + limit - 1),
+                summaryQuery
+            ]);
+            const { data, error, count } = pageRes;
+            const summaryData = summaryRes.data;
             if (error) {
                 console.error('Error en getAll Engrases:', error);
                 res.status(400).json({ error: error.message });
                 return;
+            }
+            // Calcular totales de forma eficiente
+            let totalLavado = 0;
+            let totalEngrase = 0;
+            let totalOtros = 0;
+            let totalGeneral = 0;
+            if (summaryData && summaryData.length > 0) {
+                for (let i = 0; i < summaryData.length; i++) {
+                    totalLavado += (summaryData[i].lavado || 0);
+                    totalEngrase += (summaryData[i].engrase || 0);
+                    totalOtros += (summaryData[i].otros || 0);
+                    totalGeneral += (summaryData[i].suma || 0);
+                }
             }
             res.json({
                 data: data,
@@ -63,6 +96,12 @@ exports.engrasesController = {
                     limit,
                     total: count || 0,
                     totalPages: Math.ceil((count || 0) / limit)
+                },
+                summary: {
+                    total_lavado: Math.round(totalLavado * 100) / 100,
+                    total_engrase: Math.round(totalEngrase * 100) / 100,
+                    total_otros: Math.round(totalOtros * 100) / 100,
+                    total_general: Math.round(totalGeneral * 100) / 100
                 }
             });
         }
@@ -101,7 +140,7 @@ exports.engrasesController = {
     async getById(req, res) {
         try {
             const { id } = req.params;
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('engrases_relaciones')
                 .select('*')
                 .eq('id', id)
@@ -131,7 +170,7 @@ exports.engrasesController = {
                 creado_por: req.user?.id,
                 suma: (parseFloat(req.body.lavado) || 0) + (parseFloat(req.body.engrase) || 0) + (parseFloat(req.body.otros) || 0)
             };
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('engrase')
                 .insert([engraseData])
                 .select();
@@ -163,7 +202,7 @@ exports.engrasesController = {
                 actualizado_en: new Date().toISOString()
             };
             updateData.suma = (updateData.lavado || 0) + (updateData.engrase || 0) + (updateData.otros || 0);
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('engrase')
                 .update(updateData)
                 .eq('id', id)
@@ -187,7 +226,7 @@ exports.engrasesController = {
     async delete(req, res) {
         try {
             const { id } = req.params;
-            const { error } = await supabase_1.supabase
+            const { error } = await (req.supabase || supabase_1.supabase)
                 .from('engrase')
                 .delete()
                 .eq('id', id);
@@ -203,6 +242,29 @@ exports.engrasesController = {
             res.status(500).json({ error: 'Error en el servidor' });
         }
     },
+    async deleteBatch(req, res) {
+        try {
+            const { ids } = req.body;
+            if (!Array.isArray(ids) || ids.length === 0) {
+                res.status(400).json({ error: 'No se enviaron IDs válidos para eliminar' });
+                return;
+            }
+            const { error } = await (req.supabase || supabase_1.supabase)
+                .from('engrase')
+                .delete()
+                .in('id', ids);
+            if (error) {
+                console.error('Error en deleteBatch engrases:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            res.json({ message: `${ids.length} registros eliminados exitosamente` });
+        }
+        catch (error) {
+            console.error('Error eliminando engrases en lote:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
     async getFinancialReport(req, res) {
         try {
             const fecha_inicio = req.query.fecha_inicio;
@@ -211,7 +273,7 @@ exports.engrasesController = {
             const conductor = req.query.conductor;
             const placa = req.query.placa;
             const area_operacion = req.query.area_operacion;
-            let query = supabase_1.supabase.from('engrase_financiero').select('*');
+            let query = (req.supabase || supabase_1.supabase).from('engrase_financiero').select('*');
             // Filtros de fecha ("Fecha de Creacion" segun estructura dada)
             if (fecha_inicio)
                 query = query.gte('Fecha de Creacion', fecha_inicio);
@@ -245,7 +307,7 @@ exports.engrasesController = {
             const area_operacion = req.query.area_operacion;
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
-            let query = supabase_1.supabase.from('engrases_relaciones').select('*');
+            let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('*');
             if (conductor)
                 query = query.ilike('conductor', `%${conductor}%`);
             if (placa)
@@ -276,7 +338,7 @@ exports.engrasesController = {
                 res.status(401).json({ error: 'Usuario no autenticado' });
                 return;
             }
-            const { data: userData } = await supabase_1.supabase
+            const { data: userData } = await (req.supabase || supabase_1.supabase)
                 .from('usuarios')
                 .select('area_operacion_id')
                 .eq('id', userId)
@@ -290,9 +352,9 @@ exports.engrasesController = {
             // BUT in the example data in the PROMPT for this task:
             // "link":"https://...", "link_engrase":"https://..."
             // It strongly suggests I should use 'link_engrase' for this module.
-            let query = supabase_1.supabase.from('tableros').select('link_engrase').limit(1);
+            let query = (req.supabase || supabase_1.supabase).from('tableros').select('link_engrase').limit(1);
             if (userAreaId) {
-                const { data: specificBoard } = await supabase_1.supabase
+                const { data: specificBoard } = await (req.supabase || supabase_1.supabase)
                     .from('tableros')
                     .select('link_engrase')
                     .eq('area_operacion_id', userAreaId)
@@ -303,7 +365,7 @@ exports.engrasesController = {
                 }
             }
             // Fallback
-            const { data: defaultBoard, error: defaultError } = await supabase_1.supabase
+            const { data: defaultBoard, error: defaultError } = await (req.supabase || supabase_1.supabase)
                 .from('tableros')
                 .select('link_engrase')
                 .is('area_operacion_id', null)

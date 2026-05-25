@@ -24,11 +24,18 @@ async function authMiddleware(req, res, next) {
             res.status(401).json({ error: 'Usuario no encontrado en la base de datos' });
             return;
         }
+        // Verificar si el usuario es auditor
+        const { data: auditorData } = await supabase_1.supabase
+            .from('Auditores')
+            .select('id')
+            .eq('id_usuario', user.id)
+            .maybeSingle();
         req.user = {
             id: user.id,
             email: userData.email,
             nombre: userData.nombre,
-            rol: userData.rol
+            rol: userData.rol,
+            isAuditor: !!auditorData
         };
         // Guardar token y crear cliente autenticado para RLS
         req.accessToken = token;

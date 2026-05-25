@@ -29,12 +29,19 @@ exports.authController = {
                 res.status(404).json({ error: 'Usuario no encontrado en la base de datos' });
                 return;
             }
+            // Verificar si es auditor usando maybeSingle en lugar de single, con el cliente global (seguro para roles admin)
+            const { data: auditorData } = await supabase_1.supabase
+                .from('Auditores')
+                .select('id')
+                .eq('id_usuario', authData.user.id)
+                .maybeSingle();
             const response = {
                 user: {
                     id: authData.user.id,
                     email: userData.email,
                     nombre: userData.nombre,
-                    rol: userData.rol
+                    rol: userData.rol,
+                    isAuditor: !!auditorData
                 },
                 access_token: authData.session.access_token,
                 refresh_token: authData.session.refresh_token,
@@ -64,7 +71,12 @@ exports.authController = {
     },
     async getUser(req, res) {
         try {
-            res.json({ user: req.user });
+            const { data: auditorData } = await supabase_1.supabase
+                .from('Auditores')
+                .select('id')
+                .eq('id_usuario', req.user?.id)
+                .maybeSingle();
+            res.json({ user: { ...req.user, isAuditor: !!auditorData } });
         }
         catch (error) {
             console.error('Error obteniendo usuario:', error);

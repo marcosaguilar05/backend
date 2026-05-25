@@ -6,6 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
 // IMPORTANTE: Cargar dotenv PRIMERO antes de otros imports
 dotenv_1.default.config();
+const mongo_1 = require("./config/mongo");
+// Inicializar la conexión a la base de datos externa de MongoDB
+(0, mongo_1.connectMongoDB)();
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
@@ -18,6 +21,9 @@ const saldosBombas_routes_1 = __importDefault(require("./routes/saldosBombas.rou
 const presupuestos_routes_1 = __importDefault(require("./routes/presupuestos.routes"));
 const flota_routes_1 = __importDefault(require("./routes/flota.routes"));
 const mantenimiento_routes_1 = __importDefault(require("./routes/mantenimiento.routes"));
+const horometro_routes_1 = __importDefault(require("./routes/horometro.routes"));
+const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
+const pagos_routes_1 = __importDefault(require("./routes/pagos.routes"));
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
 // Middlewares
@@ -44,6 +50,9 @@ app.use('/api/saldos-bombas', saldosBombas_routes_1.default);
 app.use('/api/presupuestos', presupuestos_routes_1.default);
 app.use('/api/flota', flota_routes_1.default);
 app.use('/api/mantenimiento', mantenimiento_routes_1.default);
+app.use('/api/horometro', horometro_routes_1.default);
+app.use('/api/admin', admin_routes_1.default);
+app.use('/api/pagos', pagos_routes_1.default);
 // Ruta de prueba
 app.get('/api/health', (req, res) => {
     res.json({

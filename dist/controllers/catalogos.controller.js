@@ -4,7 +4,7 @@ exports.catalogosController = void 0;
 const supabase_1 = require("../config/supabase");
 exports.catalogosController = {
     async getBombas(req, res) {
-        const { data, error } = await supabase_1.supabase
+        const { data, error } = await (req.supabase || supabase_1.supabase)
             .from('areas_bombas')
             .select('id, bomba')
             .eq('estado', 'ACTIVADA') // Asumiendo filtro de estado activo
@@ -14,7 +14,7 @@ exports.catalogosController = {
         res.json(data);
     },
     async getConductores(req, res) {
-        const { data, error } = await supabase_1.supabase
+        const { data, error } = await (req.supabase || supabase_1.supabase)
             .from('areas_conductores')
             .select('id, conductor')
             .order('conductor');
@@ -23,7 +23,7 @@ exports.catalogosController = {
         res.json(data);
     },
     async getPlacas(req, res) {
-        const { data, error } = await supabase_1.supabase
+        const { data, error } = await (req.supabase || supabase_1.supabase)
             .from('areas_placas')
             .select('id, placa')
             .eq('estado', 'ACTIVADA')
@@ -33,10 +33,19 @@ exports.catalogosController = {
         res.json(data);
     },
     async getAreas(req, res) {
-        const { data, error } = await supabase_1.supabase
+        const { data, error } = await (req.supabase || supabase_1.supabase)
             .from('areas_operacion')
             .select('id, nombre')
             .order('nombre');
+        if (error)
+            return res.status(400).json({ error: error.message });
+        res.json(data);
+    },
+    async getEmpresas(req, res) {
+        const { data, error } = await (req.supabase || supabase_1.supabase)
+            .from('empresas')
+            .select('id, empresa')
+            .order('empresa');
         if (error)
             return res.status(400).json({ error: error.message });
         res.json(data);
@@ -50,7 +59,7 @@ exports.catalogosController = {
             }
             // Buscar el último registro para esa bomba en fecha <= fecha dada
             // Usamos tanqueo_relaciones para asegurar consistencia
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('tanqueo_relaciones')
                 .select('saldo_disponible')
                 .eq('bomba_id', parseInt(bombaId))

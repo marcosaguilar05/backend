@@ -361,14 +361,24 @@ const getProximosMantenimientos = async (req, res, next) => {
         const db = req.supabase;
         if (!db)
             return res.status(500).json({ error: 'Supabase client missing' });
-        // Join with vehiculo and areas_placas to show the plate in the list
+        // Join with vehiculo and all relational fields to allow full search/filtering
         const { data, error } = await db
             .from('v_proximo_mantenimiento')
             .select(`
                 *,
                 vehiculo:vehiculo_id (
                     id,
-                    areas_placas ( placa )
+                    areas_placas ( placa ),
+                    empresas ( empresa ),
+                    areas_operacion ( nombre ),
+                    vehiculo_caracteristicas (
+                        clase_vehiculo_id,
+                        cat_clase_vehiculo ( nombre ),
+                        tipo_vehiculo_id,
+                        cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
+                        marca_id,
+                        cat_marca:cat_marca!vehiculo_caracteristicas_marca_id_fkey ( nombre )
+                    )
                 )
             `)
             .order('fecha_proximo', { ascending: true, nullsFirst: false });

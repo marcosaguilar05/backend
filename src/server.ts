@@ -3,6 +3,10 @@ import dotenv from 'dotenv';
 // IMPORTANTE: Cargar dotenv PRIMERO antes de otros imports
 dotenv.config();
 
+import { connectMongoDB } from './config/mongo';
+// Inicializar la conexión a la base de datos externa de MongoDB
+connectMongoDB();
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.routes';
@@ -17,6 +21,7 @@ import flotaRoutes from './routes/flota.routes';
 import mantenimientoRoutes from './routes/mantenimiento.routes';
 import horometroRoutes from './routes/horometro.routes';
 import adminRoutes from './routes/admin.routes';
+import pagosRoutes from './routes/pagos.routes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -49,6 +54,7 @@ app.use('/api/flota', flotaRoutes);
 app.use('/api/mantenimiento', mantenimientoRoutes);
 app.use('/api/horometro', horometroRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/pagos', pagosRoutes);
 
 // Ruta de prueba
 app.get('/api/health', (req: Request, res: Response) => {

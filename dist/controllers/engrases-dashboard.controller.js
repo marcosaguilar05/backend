@@ -14,7 +14,7 @@ exports.engrasesDashboardController = {
             const placa = req.query.placa;
             const area_operacion = req.query.area_operacion;
             const conductor = req.query.conductor;
-            let query = supabase_1.supabase.from('engrases_relaciones').select('*');
+            let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -73,7 +73,7 @@ exports.engrasesDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
-            let query = supabase_1.supabase.from('engrases_relaciones').select('fecha, lavado, engrase, otros, suma');
+            let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('fecha, lavado, engrase, otros, suma');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -115,7 +115,7 @@ exports.engrasesDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
-            let query = supabase_1.supabase.from('engrases_relaciones').select('fecha, lavado, engrase');
+            let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('fecha, lavado, engrase');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -157,7 +157,7 @@ exports.engrasesDashboardController = {
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
-            let query = supabase_1.supabase.from('engrases_relaciones').select('placa, conductor, lavado, engrase, otros, suma, fecha');
+            let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('placa, conductor, lavado, engrase, otros, suma, fecha');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -214,7 +214,7 @@ exports.engrasesDashboardController = {
         try {
             const placa = req.params.placa;
             const year = req.query.year;
-            let query = supabase_1.supabase.from('engrases_relaciones')
+            let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones')
                 .select('fecha, lavado, engrase, otros, suma, observaciones')
                 .ilike('placa', `%${placa}%`);
             if (year) {
@@ -266,7 +266,7 @@ exports.engrasesDashboardController = {
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
             const placa = req.query.placa;
-            let query = supabase_1.supabase.from('engrases_relaciones').select('area_operacion, lavado, engrase, otros, suma');
+            let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('area_operacion, lavado, engrase, otros, suma');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -320,7 +320,7 @@ exports.engrasesDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
-            let query = supabase_1.supabase.from('engrases_relaciones').select('*');
+            let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -413,7 +413,7 @@ exports.engrasesDashboardController = {
             const placa = req.query.placa;
             const area_operacion = req.query.area_operacion;
             const conductor = req.query.conductor;
-            let query = supabase_1.supabase.from('engrases_relaciones').select('*', { count: 'exact' });
+            let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('*', { count: 'exact' });
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -475,7 +475,7 @@ exports.engrasesDashboardController = {
             const alertType = req.params.alertType;
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
-            let query = supabase_1.supabase.from('engrases_relaciones').select('*');
+            let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -525,7 +525,7 @@ exports.engrasesDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
-            let query = supabase_1.supabase.from('engrases_relaciones').select('placa, fecha, lavado, engrase, suma');
+            let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('placa, fecha, lavado, engrase, suma');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)

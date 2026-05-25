@@ -23,7 +23,7 @@ exports.tanqueosController = {
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
             // Query base
-            let query = supabase_1.supabase
+            let query = (req.supabase || supabase_1.supabase)
                 .from('tanqueo_relaciones')
                 .select('*', { count: 'exact' });
             // Aplicar filtros
@@ -67,16 +67,12 @@ exports.tanqueosController = {
                 // Por defecto: Fecha descendente
                 query = query.order('fecha', { ascending: false }).order('id', { ascending: false });
             }
-            const { data, error, count } = await query
-                .range(offset, offset + limit - 1);
-            if (error) {
-                console.error('Error en getAll:', error);
-                res.status(400).json({ error: error.message });
-                return;
-            }
-            // Calcular totales de todos los registros que coinciden con los filtros (no solo la página actual)
-            let summaryQuery = req.supabase?.from('tanqueo_relaciones').select('cantidad_galones, valor_tanqueo') || supabase_1.supabase.from('tanqueo_relaciones').select('cantidad_galones, valor_tanqueo');
-            // Aplicar los mismos filtros para los totales
+            // Definir consulta para los totales (Summary)
+            // IMPORTANTE: Seleccionamos solo columnas mínimas necesarias
+            let summaryQuery = (req.supabase || supabase_1.supabase)
+                .from('tanqueo_relaciones')
+                .select('cantidad_galones, valor_tanqueo');
+            // Aplicar los mismos filtros al summary
             if (conductor)
                 summaryQuery = summaryQuery.ilike('conductor', `%${conductor}%`);
             if (placa)
@@ -95,10 +91,27 @@ exports.tanqueosController = {
                 summaryQuery = summaryQuery.gte('fecha', fecha_inicio);
             if (fecha_fin)
                 summaryQuery = summaryQuery.lte('fecha', fecha_fin);
-            const { data: summaryData } = await summaryQuery;
-            // Calcular totales
-            const totalGalones = summaryData?.reduce((sum, item) => sum + (item.cantidad_galones || 0), 0) || 0;
-            const totalValor = summaryData?.reduce((sum, item) => sum + (item.valor_tanqueo || 0), 0) || 0;
+            // Ejecutar ambas consultas en paralelo para reducir el tiempo de espera a la mitad
+            const [pageRes, summaryRes] = await Promise.all([
+                query.range(offset, offset + limit - 1),
+                summaryQuery
+            ]);
+            const { data, error, count } = pageRes;
+            const summaryData = summaryRes.data;
+            if (error) {
+                console.error('Error en getAll:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            // Calcular totales de forma eficiente
+            let totalGalones = 0;
+            let totalValor = 0;
+            if (summaryData && summaryData.length > 0) {
+                for (let i = 0; i < summaryData.length; i++) {
+                    totalGalones += (summaryData[i].cantidad_galones || 0);
+                    totalValor += (summaryData[i].valor_tanqueo || 0);
+                }
+            }
             res.json({
                 data: data,
                 pagination: {
@@ -124,27 +137,21 @@ exports.tanqueosController = {
             // Usar cliente autenticado para que RLS aplique automáticamente
             const dbClient = req.supabase || supabase_1.supabase;
             // Ejecutar queries en paralelo para mejorar rendimiento
-            // Consultar directamente las tablas maestras para obtener valores disponibles según RLS
-            const [conductoresRes, placasRes, bombasRes, areasRes, tiposCombustibleRes, tiposOperacionRes] = await Promise.all([
+            // Usamos las tablas maestras para los filtros principales, lo cual es MUCHO más rápido
+            const [conductoresRes, placasRes, bombasRes, areasRes] = await Promise.all([
                 dbClient.from('areas_conductores').select('conductor').order('conductor'),
                 dbClient.from('areas_placas').select('placa').eq('estado', 'ACTIVADA').order('placa'),
                 dbClient.from('areas_bombas').select('bomba').eq('estado', 'ACTIVADA').order('bomba'),
-                dbClient.from('areas_operacion').select('nombre').order('nombre'),
-                dbClient.from('tanqueo_relaciones').select('tipo_combustible').not('tipo_combustible', 'is', null),
-                dbClient.from('tanqueo_relaciones').select('tipo_operacion').not('tipo_operacion', 'is', null)
+                dbClient.from('areas_operacion').select('nombre').order('nombre')
             ]);
-            // Extraer valores únicos
-            const conductores = [...new Set(conductoresRes.data?.map(t => t.conductor))].filter(Boolean).sort();
-            const placas = [...new Set(placasRes.data?.map(t => t.placa))].filter(Boolean).sort();
-            const bombas = [...new Set(bombasRes.data?.map(t => t.bomba))].filter(Boolean).sort();
-            const areas = [...new Set(areasRes.data?.map(t => t.nombre))].filter(Boolean).sort();
-            const tipos_combustible = [...new Set(tiposCombustibleRes.data?.map(t => t.tipo_combustible))].filter(Boolean).sort();
-            const tipos_operacion = [...new Set(tiposOperacionRes.data?.map(t => t.tipo_operacion))].filter(Boolean).sort();
+            // Tipos de combustible y operación se definen como constantes para evitar consultas masivas innecesarias
+            const tipos_combustible = ['ACPM', 'GASOLINA', 'EXTRA', 'GAS'];
+            const tipos_operacion = ['TANQUEO', 'ANTICIPO'];
             const responseData = {
-                conductores,
-                placas,
-                bombas,
-                areas_operacion: areas,
+                conductores: [...new Set(conductoresRes.data?.map(t => t.conductor))].filter(Boolean).sort(),
+                placas: [...new Set(placasRes.data?.map(t => t.placa))].filter(Boolean).sort(),
+                bombas: [...new Set(bombasRes.data?.map(t => t.bomba))].filter(Boolean).sort(),
+                areas_operacion: [...new Set(areasRes.data?.map(t => t.nombre))].filter(Boolean).sort(),
                 tipos_combustible,
                 conceptos: ['OPERATIVO', 'ADMINISTRATIVO'],
                 tipos_operacion
@@ -160,7 +167,7 @@ exports.tanqueosController = {
     async getById(req, res) {
         try {
             const { id } = req.params;
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('tanqueo_relaciones')
                 .select('*')
                 .eq('id', id)
@@ -206,7 +213,7 @@ exports.tanqueosController = {
                     tanqueoData.costo_por_galon = tanqueoData.valor_tanqueo / tanqueoData.cantidad_galones;
                 }
             }
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('tanqueo')
                 .insert([tanqueoData])
                 .select();
@@ -259,7 +266,7 @@ exports.tanqueosController = {
                     updateData.costo_por_galon = updateData.valor_tanqueo / updateData.cantidad_galones;
                 }
             }
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('tanqueo')
                 .update(updateData)
                 .eq('id', id)
@@ -283,7 +290,7 @@ exports.tanqueosController = {
     async delete(req, res) {
         try {
             const { id } = req.params;
-            const { error } = await supabase_1.supabase
+            const { error } = await (req.supabase || supabase_1.supabase)
                 .from('tanqueo')
                 .delete()
                 .eq('id', id);
@@ -299,6 +306,29 @@ exports.tanqueosController = {
             res.status(500).json({ error: 'Error en el servidor' });
         }
     },
+    async deleteBatch(req, res) {
+        try {
+            const { ids } = req.body;
+            if (!Array.isArray(ids) || ids.length === 0) {
+                res.status(400).json({ error: 'No se enviaron IDs válidos para eliminar' });
+                return;
+            }
+            const { error } = await (req.supabase || supabase_1.supabase)
+                .from('tanqueo')
+                .delete()
+                .in('id', ids);
+            if (error) {
+                console.error('Error en deleteBatch:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            res.json({ message: `${ids.length} registros eliminados exitosamente` });
+        }
+        catch (error) {
+            console.error('Error eliminando tanqueos en lote:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
     async getFinancialReport(req, res) {
         try {
             const fecha_inicio = req.query.fecha_inicio;
@@ -310,7 +340,7 @@ exports.tanqueosController = {
             const area_operacion = req.query.area_operacion;
             const tipo_combustible = req.query.tipo_combustible; // Asumiendo Sub-Rubro
             const concepto = req.query.concepto;
-            let query = supabase_1.supabase.from('tanqueo_financiero').select('*');
+            let query = (req.supabase || supabase_1.supabase).from('tanqueo_financiero').select('*');
             // Filtros de fecha
             if (fecha_inicio)
                 query = query.gte('Fecha de Creacion', fecha_inicio);
@@ -354,7 +384,7 @@ exports.tanqueosController = {
             const tipo_operacion = req.query.tipo_operacion;
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
-            let query = supabase_1.supabase.from('tanqueo_relaciones').select('*');
+            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('*');
             if (conductor)
                 query = query.ilike('conductor', `%${conductor}%`);
             if (placa)
@@ -408,7 +438,7 @@ exports.tanqueosController = {
             // Intentar buscar un tablero default (area_operacion_id IS NULL)
             // Si el requerimiento dice "segun el area de operacion asignada al usuario", necesito saber esa area.
             // Voy a suponer que hay una tabla 'usuarios' donde id = user.id.
-            const { data: userData, error: userError } = await supabase_1.supabase
+            const { data: userData, error: userError } = await (req.supabase || supabase_1.supabase)
                 .from('usuarios') // Ajustar nombre de tabla si es diferente
                 .select('area_operacion_id')
                 .eq('id', userId)
@@ -416,7 +446,7 @@ exports.tanqueosController = {
             // Si no se encuentra el usuario o error, asumimos sin área (null)
             const userAreaId = userData?.area_operacion_id || null;
             // 2. Buscar en tableros
-            let query = supabase_1.supabase
+            let query = (req.supabase || supabase_1.supabase)
                 .from('tableros')
                 .select('link')
                 .limit(1);
@@ -425,7 +455,7 @@ exports.tanqueosController = {
                 // Interpretación: Si SU AREA tiene link, ver ese. Si no tiene area, ver el general.
                 // Pero qué pasa si tiene área pero NO hay tablero para esa área? Probablemente fallback al general.
                 // Primero intentamos match exacto
-                const { data: specificBoard } = await supabase_1.supabase
+                const { data: specificBoard } = await (req.supabase || supabase_1.supabase)
                     .from('tableros')
                     .select('link')
                     .eq('area_operacion_id', userAreaId)
@@ -436,7 +466,7 @@ exports.tanqueosController = {
                 }
             }
             // Fallback: Default board
-            const { data: defaultBoard } = await supabase_1.supabase
+            const { data: defaultBoard } = await (req.supabase || supabase_1.supabase)
                 .from('tableros')
                 .select('link')
                 .is('area_operacion_id', null)
@@ -454,10 +484,13 @@ exports.tanqueosController = {
             let importedCount = 0;
             let errors = [];
             const userId = req.user?.id;
-            // 1. Fetch catalogs
-            // Corrected: Look into 'areas_placas' for plates and 'areas_conductores' for drivers
-            const { data: allPlacas } = await supabase_1.supabase.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').limit(10000);
-            const { data: allConductores } = await supabase_1.supabase.from('areas_conductores').select('id, conductor').limit(10000);
+            // 1. Fetch catalogs en paralelo con cliente admin (sin RLS para mayor velocidad)
+            const [placasRes, conductoresRes] = await Promise.all([
+                (req.supabase || supabase_1.supabase).from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA'),
+                (req.supabase || supabase_1.supabase).from('areas_conductores').select('id, conductor')
+            ]);
+            const allPlacas = placasRes.data;
+            const allConductores = conductoresRes.data;
             // Maps for lookup (Robust: Clean keys by removing non-alphanumeric)
             const cleanKey = (str) => str ? str.toString().replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase() : '';
             const placaMap = new Map();
@@ -550,11 +583,24 @@ exports.tanqueosController = {
                     errors.push({ index, error: err.message, row });
                 }
             }
-            // 3. Insert
+            // 3. Insert en chunks usando adminSupabase (bypasea RLS) para evitar timeout
+            const CHUNK_SIZE = 100;
             if (recordsToInsert.length > 0) {
-                const { error: insertError } = await supabase_1.supabase.from('tanqueo').insert(recordsToInsert);
-                if (insertError)
-                    throw insertError;
+                for (let i = 0; i < recordsToInsert.length; i += CHUNK_SIZE) {
+                    const chunk = recordsToInsert.slice(i, i + CHUNK_SIZE);
+                    const { error: insertError } = await supabase_1.adminSupabase.from('tanqueo').insert(chunk);
+                    if (insertError) {
+                        console.error(`Error Supabase al insertar chunk ${Math.floor(i / CHUNK_SIZE) + 1}:`, JSON.stringify(insertError, null, 2));
+                        res.status(500).json({
+                            error: 'Error al insertar registros en la base de datos',
+                            detail: insertError.message,
+                            code: insertError.code,
+                            hint: insertError.hint,
+                            imported_before_error: i
+                        });
+                        return;
+                    }
+                }
                 importedCount = recordsToInsert.length;
             }
             res.json({
@@ -564,8 +610,11 @@ exports.tanqueosController = {
             });
         }
         catch (error) {
-            console.error('Error en importación:', error);
-            res.status(500).json({ error: 'Error procesando el archivo' });
+            console.error('Error inesperado en importación:', error);
+            res.status(500).json({
+                error: 'Error procesando el archivo',
+                detail: error?.message || String(error)
+            });
         }
     }
 };

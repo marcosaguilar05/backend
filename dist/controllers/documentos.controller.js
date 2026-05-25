@@ -10,7 +10,7 @@ exports.documentosController = {
             const limitNum = Number(limit);
             const offset = (pageNum - 1) * limitNum;
             // Build query
-            let query = supabase_1.supabase
+            let query = (req.supabase || supabase_1.supabase)
                 .from('documentos_vehiculos_relaciones')
                 .select('*', { count: 'exact' });
             // Filters
@@ -46,7 +46,7 @@ exports.documentosController = {
     async getById(req, res) {
         try {
             const { id } = req.params;
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('documentos_vehiculos_relaciones')
                 .select('*')
                 .eq('id', id)
@@ -66,13 +66,13 @@ exports.documentosController = {
     async getFilterOptions(req, res) {
         try {
             // Fetch unique placas
-            const { data: placasData } = await supabase_1.supabase
+            const { data: placasData } = await (req.supabase || supabase_1.supabase)
                 .from('documentos_vehiculos_relaciones')
                 .select('placa')
                 .order('placa');
             const placas = [...new Set(placasData?.map(p => p.placa).filter(Boolean))];
             // Fetch unique areas
-            const { data: areasData } = await supabase_1.supabase
+            const { data: areasData } = await (req.supabase || supabase_1.supabase)
                 .from('documentos_vehiculos_relaciones')
                 .select('area_operacion')
                 .order('area_operacion');
@@ -87,7 +87,7 @@ exports.documentosController = {
     async create(req, res) {
         try {
             const documentoData = req.body;
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('documentos_vehiculos')
                 .insert(documentoData)
                 .select()
@@ -105,7 +105,7 @@ exports.documentosController = {
         try {
             const { id } = req.params;
             const updateData = req.body;
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('documentos_vehiculos')
                 .update(updateData)
                 .eq('id', id)
@@ -123,7 +123,7 @@ exports.documentosController = {
     async delete(req, res) {
         try {
             const { id } = req.params;
-            const { error } = await supabase_1.supabase
+            const { error } = await (req.supabase || supabase_1.supabase)
                 .from('documentos_vehiculos')
                 .delete()
                 .eq('id', id);
@@ -133,6 +133,25 @@ exports.documentosController = {
         }
         catch (error) {
             console.error('Error deleting documento:', error);
+            res.status(500).json({ error: error.message });
+        }
+    },
+    async deleteBatch(req, res) {
+        try {
+            const { ids } = req.body;
+            if (!Array.isArray(ids) || ids.length === 0) {
+                return res.status(400).json({ error: 'No se enviaron IDs válidos para eliminar' });
+            }
+            const { error } = await (req.supabase || supabase_1.supabase)
+                .from('documentos_vehiculos')
+                .delete()
+                .in('id', ids);
+            if (error)
+                throw error;
+            res.json({ message: `${ids.length} registros eliminados exitosamente` });
+        }
+        catch (error) {
+            console.error('Error deleting batch documentos:', error);
             res.status(500).json({ error: error.message });
         }
     }

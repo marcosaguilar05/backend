@@ -21,6 +21,8 @@ router.get('/dashboard/by-driver', tanqueos_dashboard_controller_1.tanqueosDashb
 router.get('/dashboard/by-pump', tanqueos_dashboard_controller_1.tanqueosDashboardController.getByPump);
 router.get('/dashboard/alerts', tanqueos_dashboard_controller_1.tanqueosDashboardController.getAlerts);
 router.get('/dashboard/alerts/:alertType/records', tanqueos_dashboard_controller_1.tanqueosDashboardController.getAlertRecords);
+router.get('/dashboard/full-data', tanqueos_dashboard_controller_1.tanqueosDashboardController.getFullData);
+router.get('/dashboard/vehicle-performance', tanqueos_dashboard_controller_1.tanqueosDashboardController.getVehiclePerformance);
 router.get('/dashboard/detailed-table', tanqueos_dashboard_controller_1.tanqueosDashboardController.getDetailedTable);
 router.get('/reportes/financiero', tanqueos_controller_1.tanqueosController.getFinancialReport);
 router.get('/reportes/general', tanqueos_controller_1.tanqueosController.getExportData);
@@ -31,5 +33,6 @@ router.post('/import', tanqueos_controller_1.tanqueosController.importBatch);
 // Crear nuevo tanqueo
 router.post('/', tanqueos_controller_1.tanqueosController.create);
 router.put('/:id', tanqueos_controller_1.tanqueosController.update);
+router.post('/batch-delete', tanqueos_controller_1.tanqueosController.deleteBatch);
 router.delete('/:id', tanqueos_controller_1.tanqueosController.delete);
 exports.default = router;

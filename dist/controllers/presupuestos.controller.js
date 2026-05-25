@@ -10,7 +10,7 @@ exports.presupuestosController = {
             const tipo = req.query.tipo;
             const nivel = req.query.nivel;
             const padre_id = req.query.padre_id;
-            let query = supabase_1.supabase
+            let query = (req.supabase || supabase_1.supabase)
                 .from('maestro_rubros')
                 .select('*')
                 .eq('activo', true)
@@ -37,7 +37,7 @@ exports.presupuestosController = {
     async getTipos(req, res) {
         try {
             const { padre_id } = req.query;
-            let query = supabase_1.supabase
+            let query = (req.supabase || supabase_1.supabase)
                 .from('tipos_presupuesto')
                 .select('*')
                 .eq('activo', true)
@@ -61,7 +61,7 @@ exports.presupuestosController = {
     async getConceptos(req, res) {
         try {
             const tipo_id = req.query.tipo_id;
-            let query = supabase_1.supabase
+            let query = (req.supabase || supabase_1.supabase)
                 .from('conceptos_presupuesto')
                 .select('*')
                 .eq('activo', true)
@@ -155,51 +155,86 @@ exports.presupuestosController = {
     async getAll(req, res) {
         try {
             const dbClient = req.supabase || supabase_1.supabase;
-            const { page = 1, limit = 20, empresa, vehiculo_id, placa, area_operacion, anio, grupo_rubro, sub_rubro, sort_by = 'id', sort_order = 'desc' } = req.query;
+            const { page = 1, limit = 20, empresa, vehiculo_id, placa, area_operacion, anio, grupo_rubro, rubro, sub_rubro, mes, sort_by = 'id', sort_order = 'desc' } = req.query;
             const pageNum = Number(page);
             const limitNum = Number(limit);
             const offset = (pageNum - 1) * limitNum;
-            // Resolve area_operacion name to ID if provided
-            let areaId = null;
+            // Resolve area_operacion names to IDs
+            let areaIds = [];
             if (area_operacion && area_operacion !== 'undefined' && area_operacion !== '') {
-                const { data: areaData } = await dbClient
+                const { data: areaData, error: areaError } = await dbClient
                     .from('areas_operacion')
                     .select('id')
-                    .eq('nombre', area_operacion)
-                    .maybeSingle();
-                areaId = areaData?.id || null;
+                    .ilike('nombre', area_operacion.trim());
+                if (areaError)
+                    console.error('Error resolving area_operacion:', areaError);
+                areaIds = areaData?.map(a => a.id) || [];
+                console.log(`[Presupuestos Filter] Area: "${area_operacion}" -> ${areaIds}`);
             }
-            // Resolve empresa name to ID if provided
-            let empresaId = null;
+            // Resolve empresa names to IDs
+            let empresaIds = [];
             if (empresa && empresa !== 'undefined' && empresa !== '') {
-                const { data: empresaData } = await dbClient
+                const { data: empresaData, error: empresaError } = await dbClient
                     .from('empresas')
                     .select('id')
-                    .eq('empresa', empresa)
-                    .maybeSingle();
-                empresaId = empresaData?.id || null;
+                    .ilike('empresa', empresa.trim());
+                if (empresaError)
+                    console.error('Error resolving empresa:', empresaError);
+                empresaIds = empresaData?.map(e => e.id) || [];
+                console.log(`[Presupuestos Filter] Empresa: "${empresa}" -> ${empresaIds}`);
             }
-            // Resolve grupo_rubro name to ID if provided
-            let grupoRubroId = null;
+            // Resolve grupo_rubro names to IDs
+            let grupoRubroIds = [];
             if (grupo_rubro && grupo_rubro !== 'undefined' && grupo_rubro !== '') {
-                const { data: grupoData } = await dbClient
+                const { data: grupoData, error: grupoError } = await dbClient
                     .from('maestro_rubros')
                     .select('id')
-                    .eq('nombre', grupo_rubro)
-                    .is('rubro_padre_id', null)
-                    .maybeSingle();
-                grupoRubroId = grupoData?.id || null;
+                    .ilike('nombre', grupo_rubro.trim());
+                if (grupoError)
+                    console.error('Error resolving grupo_rubro:', grupoError);
+                grupoRubroIds = grupoData?.map(g => g.id) || [];
+                console.log(`[Presupuestos Filter] Grupo (L1): "${grupo_rubro}" -> ${grupoRubroIds}`);
             }
-            // Resolve sub_rubro name to ID if provided
-            let subRubroId = null;
-            if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') {
-                const { data: rubroData } = await dbClient
+            // Resolve rubro names to IDs
+            let rubroIds = [];
+            if (rubro && rubro !== 'undefined' && rubro !== '') {
+                const { data: rData, error: rError } = await dbClient
                     .from('maestro_rubros')
                     .select('id')
-                    .eq('nombre', sub_rubro)
-                    .not('rubro_padre_id', 'is', null)
-                    .maybeSingle();
-                subRubroId = rubroData?.id || null;
+                    .ilike('nombre', rubro.trim());
+                if (rError)
+                    console.error('Error resolving rubro:', rError);
+                rubroIds = rData?.map(r => r.id) || [];
+                console.log(`[Presupuestos Filter] Rubro (L2): "${rubro}" -> ${rubroIds}`);
+            }
+            // Resolve sub_rubro names STRICTLY to item types (Level 3) to avoid collision with Rubro (Level 2)
+            let budgetIdsFromTipo = [];
+            if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') {
+                const subRubroName = sub_rubro.trim();
+                // Resolve all matches from tipos_presupuesto (the item-level definition)
+                const { data: tipoData, error: tipoError } = await dbClient
+                    .from('tipos_presupuesto')
+                    .select('id')
+                    .ilike('nombre', subRubroName);
+                if (tipoError)
+                    console.error('Error resolving sub_rubro from tipos_presupuesto:', tipoError);
+                if (tipoData && tipoData.length > 0) {
+                    const tipoIds = tipoData.map(t => t.id);
+                    // Match found in items table!
+                    const { data: itemData, error: itemError } = await dbClient
+                        .from('presupuesto_items')
+                        .select('presupuesto_id')
+                        .in('tipo_presupuesto_id', tipoIds);
+                    if (itemError)
+                        console.error('Error finding budgets for tipo_presupuesto:', itemError);
+                    if (itemData && itemData.length > 0) {
+                        budgetIdsFromTipo = [...new Set(itemData.map(d => Number(d.presupuesto_id)))];
+                    }
+                }
+                console.log(`[Presupuestos Filter] Sub Rubro (L3): "${sub_rubro}" -> BudgetIDsWithTipoCount: ${budgetIdsFromTipo.length}`);
+                if (budgetIdsFromTipo.length === 0) {
+                    console.warn(`Could not resolve sub_rubro (L3): ${sub_rubro} in item types`);
+                }
             }
             // Resolve placa to vehiculo ID
             let vehiculoIdFromPlaca = null;
@@ -220,6 +255,28 @@ exports.presupuestosController = {
                     vehiculoIdFromPlaca = vData?.id || null;
                 }
             }
+            // Resolve mes filter (abbreviated month to number 1-12)
+            let budgetIdsFromMonth = [];
+            if (mes && mes !== 'undefined' && mes !== '') {
+                const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+                const mesLower = String(mes).toLowerCase().trim();
+                const monthIndex = monthNames.indexOf(mesLower);
+                if (monthIndex !== -1) {
+                    const monthNum = monthIndex + 1;
+                    // Find all presupuesto_items where meses_aplicables contains the monthNum
+                    const { data: itemData, error: itemError } = await dbClient
+                        .from('presupuesto_items')
+                        .select('presupuesto_id')
+                        .contains('meses_aplicables', [monthNum]);
+                    if (itemError) {
+                        console.error('Error finding budgets for month filter:', itemError);
+                    }
+                    else if (itemData && itemData.length > 0) {
+                        budgetIdsFromMonth = [...new Set(itemData.map(d => Number(d.presupuesto_id)))];
+                    }
+                }
+                console.log(`[Presupuestos Filter] Mes: "${mes}" (Index: ${monthIndex + 1}) -> BudgetIDsWithMonthCount: ${budgetIdsFromMonth.length}`);
+            }
             // 1. Consulta principal para la tabla (paginada)
             let query = dbClient
                 .from('presupuestos')
@@ -233,9 +290,10 @@ exports.presupuestosController = {
                     ),
                     areas_operacion(id, nombre),
                     empresas(id, empresa),
-                    grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(id, codigo, nombre),
-                    rubro:maestro_rubros!presupuestos_rubro_id_fkey(id, codigo, nombre),
-                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo)
+                    grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre),
+                    rubro:maestro_rubros!rubro_id(id, codigo, nombre),
+                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
+                    presupuesto_items(id, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, tipo:tipos_presupuesto(id, nombre))
                 `, { count: 'exact' });
             // Filtros directos por ID
             if (vehiculo_id)
@@ -243,17 +301,46 @@ exports.presupuestosController = {
             if (anio && anio !== 'undefined' && anio !== '')
                 query = query.eq('anio', Number(anio));
             // Filtros por ID resuelto
-            if (areaId !== null) {
-                query = query.eq('area_operacion_id', areaId);
+            // Filtros por IDs resueltos (si se proporcionó un nombre pero no se encontró un ID, forzamos -1 para 0 resultados)
+            if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
+                if (areaIds.length > 0)
+                    query = query.in('area_operacion_id', areaIds);
+                else
+                    query = query.eq('area_operacion_id', -1);
             }
-            if (empresaId !== null) {
-                query = query.eq('empresa_id', empresaId);
+            if (empresa && empresa !== '' && empresa !== 'undefined') {
+                if (empresaIds.length > 0)
+                    query = query.in('empresa_id', empresaIds);
+                else
+                    query = query.eq('empresa_id', -1);
             }
-            if (grupoRubroId !== null) {
-                query = query.eq('grupo_rubro_id', grupoRubroId);
+            if (grupo_rubro && grupo_rubro !== '' && grupo_rubro !== 'undefined') {
+                if (grupoRubroIds.length > 0)
+                    query = query.in('grupo_rubro_id', grupoRubroIds);
+                else
+                    query = query.eq('grupo_rubro_id', -1);
             }
-            if (subRubroId !== null) {
-                query = query.eq('rubro_id', subRubroId);
+            if (rubro && rubro !== '' && rubro !== 'undefined') {
+                if (rubroIds.length > 0)
+                    query = query.in('rubro_id', rubroIds);
+                else
+                    query = query.eq('rubro_id', -1);
+            }
+            if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
+                if (budgetIdsFromTipo.length > 0) {
+                    query = query.in('id', budgetIdsFromTipo);
+                }
+                else {
+                    query = query.eq('id', -1);
+                }
+            }
+            if (mes && mes !== '' && mes !== 'undefined') {
+                if (budgetIdsFromMonth.length > 0) {
+                    query = query.in('id', budgetIdsFromMonth);
+                }
+                else {
+                    query = query.eq('id', -1);
+                }
             }
             if (vehiculoIdFromPlaca !== null) {
                 query = query.eq('vehiculo_id', vehiculoIdFromPlaca);
@@ -272,38 +359,90 @@ exports.presupuestosController = {
             // For simplicity, we'll just filter by anio and estado for summary (the main filters)
             let summaryQuery = dbClient
                 .from('presupuestos')
-                .select('id, estado, rubro_id');
+                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes)');
             if (vehiculo_id)
                 summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
             if (vehiculoIdFromPlaca !== null)
                 summaryQuery = summaryQuery.eq('vehiculo_id', vehiculoIdFromPlaca);
             if (anio && anio !== 'undefined' && anio !== '')
                 summaryQuery = summaryQuery.eq('anio', Number(anio));
+            // Sync filters with the table results
+            if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
+                if (areaIds.length > 0)
+                    summaryQuery = summaryQuery.in('area_operacion_id', areaIds);
+                else
+                    summaryQuery = summaryQuery.eq('area_operacion_id', -1);
+            }
+            if (empresa && empresa !== '' && empresa !== 'undefined') {
+                if (empresaIds.length > 0)
+                    summaryQuery = summaryQuery.in('empresa_id', empresaIds);
+                else
+                    summaryQuery = summaryQuery.eq('empresa_id', -1);
+            }
+            if (grupo_rubro && grupo_rubro !== '' && grupo_rubro !== 'undefined') {
+                if (grupoRubroIds.length > 0)
+                    summaryQuery = summaryQuery.in('grupo_rubro_id', grupoRubroIds);
+                else
+                    summaryQuery = summaryQuery.eq('grupo_rubro_id', -1);
+            }
+            if (rubro && rubro !== '' && rubro !== 'undefined') {
+                if (rubroIds.length > 0)
+                    summaryQuery = summaryQuery.in('rubro_id', rubroIds);
+                else
+                    summaryQuery = summaryQuery.eq('rubro_id', -1);
+            }
+            if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
+                if (budgetIdsFromTipo.length > 0)
+                    summaryQuery = summaryQuery.in('id', budgetIdsFromTipo);
+                else
+                    summaryQuery = summaryQuery.eq('id', -1);
+            }
+            let monthNum = null;
+            if (mes && mes !== '' && mes !== 'undefined') {
+                if (budgetIdsFromMonth.length > 0)
+                    summaryQuery = summaryQuery.in('id', budgetIdsFromMonth);
+                else
+                    summaryQuery = summaryQuery.eq('id', -1);
+                const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+                const mesLower = String(mes).toLowerCase().trim();
+                const monthIndex = monthNames.indexOf(mesLower);
+                if (monthIndex !== -1) {
+                    monthNum = monthIndex + 1;
+                }
+            }
             const { data: allMatching } = await summaryQuery;
             let totalAprobado = 0;
             let totalBorrador = 0;
+            let totalEjecutado = 0;
+            let totalNoEjecutado = 0;
+            let totalPresupuesto = 0;
             const rubrosIds = new Set();
             if (allMatching && allMatching.length > 0) {
-                const budgetsIds = allMatching.map(p => p.id);
-                allMatching.forEach(p => rubrosIds.add(p.rubro_id));
-                // Obtener los totales desde presupuesto_items para estos IDs
-                const { data: itemTotals } = await dbClient
-                    .from('presupuesto_items')
-                    .select('presupuesto_id, valor_total')
-                    .in('presupuesto_id', budgetsIds);
-                if (itemTotals) {
-                    const budgetToTotalMap = itemTotals.reduce((acc, item) => {
-                        acc[item.presupuesto_id] = (acc[item.presupuesto_id] || 0) + item.valor_total;
-                        return acc;
-                    }, {});
-                    allMatching.forEach(p => {
-                        const total = budgetToTotalMap[p.id] || 0;
-                        if (p.estado === 'APROBADO')
-                            totalAprobado += total;
-                        else
-                            totalBorrador += total;
-                    });
-                }
+                allMatching.forEach((p) => {
+                    rubrosIds.add(p.rubro_id);
+                    if (p.presupuesto_items) {
+                        p.presupuesto_items.forEach((item) => {
+                            let total = item.valor_total || 0;
+                            if (monthNum !== null) {
+                                const isApplicable = (item.meses_aplicables || []).includes(monthNum);
+                                if (!isApplicable)
+                                    return;
+                                total = (item.valor_unitario || 0) * (item.frecuencia_mes || 1);
+                            }
+                            totalPresupuesto += total;
+                            // Aprobado vs Borrador
+                            if (item.estado === 'APROBADO')
+                                totalAprobado += total;
+                            else
+                                totalBorrador += total;
+                            // Ejecutado vs No Ejecutado
+                            if (item.ejecutado === 'SI')
+                                totalEjecutado += total;
+                            else
+                                totalNoEjecutado += total;
+                        });
+                    }
+                });
             }
             res.json({
                 data: data || [],
@@ -316,6 +455,9 @@ exports.presupuestosController = {
                 summary: {
                     totalAprobado,
                     totalBorrador,
+                    totalEjecutado,
+                    totalNoEjecutado,
+                    totalPresupuesto,
                     rubrosUtilizados: rubrosIds.size,
                     anioVigencia: anio || new Date().getFullYear()
                 }
@@ -345,7 +487,8 @@ exports.presupuestosController = {
                     area:areas_operacion(id, nombre),
                     grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre, rubro_padre_id),
                     rubro:maestro_rubros!rubro_id(id, codigo, nombre),
-                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo)
+                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
+                    empresas(id, empresa)
                 `)
                 .eq('id', id)
                 .single();
@@ -432,7 +575,7 @@ exports.presupuestosController = {
         try {
             const { id } = req.params;
             const { items, ...updateData } = req.body;
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('presupuestos')
                 .update(updateData)
                 .eq('id', id)
@@ -454,9 +597,9 @@ exports.presupuestosController = {
         try {
             const { id } = req.params;
             // Primero eliminar items
-            await supabase_1.supabase.from('presupuesto_items').delete().eq('presupuesto_id', id);
+            await (req.supabase || supabase_1.supabase).from('presupuesto_items').delete().eq('presupuesto_id', id);
             // Luego eliminar cabecera
-            const { error } = await supabase_1.supabase
+            const { error } = await (req.supabase || supabase_1.supabase)
                 .from('presupuestos')
                 .delete()
                 .eq('id', id);
@@ -478,7 +621,7 @@ exports.presupuestosController = {
             const { id } = req.params;
             const itemData = req.body;
             const valor_total = itemData.valor_unitario * itemData.frecuencia_mes * itemData.meses_aplicables.length;
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('presupuesto_items')
                 .insert({
                 presupuesto_id: parseInt(id),
@@ -512,7 +655,7 @@ exports.presupuestosController = {
             let updateData = { ...itemData };
             if (itemData.valor_unitario !== undefined || itemData.frecuencia_mes !== undefined || itemData.meses_aplicables !== undefined) {
                 // Obtener item actual para valores faltantes
-                const { data: current } = await supabase_1.supabase
+                const { data: current } = await (req.supabase || supabase_1.supabase)
                     .from('presupuesto_items')
                     .select('*')
                     .eq('id', itemId)
@@ -524,7 +667,7 @@ exports.presupuestosController = {
                     updateData.valor_total = valor_unitario * frecuencia_mes * meses_aplicables.length;
                 }
             }
-            const { data, error } = await supabase_1.supabase
+            const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('presupuesto_items')
                 .update(updateData)
                 .eq('id', itemId)
@@ -545,7 +688,7 @@ exports.presupuestosController = {
     async deleteItem(req, res) {
         try {
             const { itemId } = req.params;
-            const { error } = await supabase_1.supabase
+            const { error } = await (req.supabase || supabase_1.supabase)
                 .from('presupuesto_items')
                 .delete()
                 .eq('id', itemId);
@@ -603,32 +746,56 @@ exports.presupuestosController = {
                 clase_vehiculo: v.clase_vehiculo,
                 placa: v.areas_placas?.placa
             }));
-            // Grupos de rubro (rubros sin padre = nivel superior)
-            const { data: gruposRubroData } = await dbClient
+            // Grupos y Rubros: fetch what's actually in use in the budgets table
+            const { data: usedCategories } = await dbClient
+                .from('presupuestos')
+                .select('grupo_rubro_id, rubro_id');
+            const usedGroupIds = [...new Set(usedCategories?.map(p => p.grupo_rubro_id).filter(id => id !== null))];
+            const usedRubroIds = [...new Set(usedCategories?.map(p => p.rubro_id).filter(id => id !== null))];
+            const { data: groupsRaw } = await dbClient
                 .from('maestro_rubros')
                 .select('id, nombre')
-                .is('rubro_padre_id', null)
-                .eq('activo', true)
+                .in('id', usedGroupIds)
                 .order('nombre');
-            // Sub rubros (rubros con padre = nivel inferior)
-            const { data: subRubrosData } = await dbClient
+            const { data: rubrosRaw } = await dbClient
                 .from('maestro_rubros')
                 .select('id, nombre')
-                .not('rubro_padre_id', 'is', null)
-                .eq('activo', true)
+                .in('id', usedRubroIds)
                 .order('nombre');
+            // Help keep names unique in dropdown to avoid user confusion
+            const uniqueNamedFilter = (arr, keyName = 'nombre') => {
+                const map = new Map();
+                arr.forEach(item => {
+                    const val = item[keyName];
+                    if (val && !map.has(val))
+                        map.set(val, item);
+                });
+                return Array.from(map.values());
+            };
             // Personal (tipos de empleado)
             const { data: personalData } = await dbClient
                 .from('Personal')
                 .select('id, tipo')
                 .order('tipo');
+            // Tipos de presupuesto (Item level names like "LLANTAS NUEVAS")
+            const { data: tiposPresupuestoData } = await dbClient
+                .from('tipos_presupuesto')
+                .select('id, nombre')
+                .eq('activo', true)
+                .order('nombre');
+            const finalAreas = uniqueNamedFilter(areasData || [], 'nombre');
+            const finalEmpresas = uniqueNamedFilter(empresasData || [], 'empresa');
+            const finalGrupos = uniqueNamedFilter(groupsRaw || [], 'nombre');
+            const finalSubRubros = uniqueNamedFilter(rubrosRaw || [], 'nombre');
+            const finalTipos = uniqueNamedFilter(tiposPresupuestoData || [], 'nombre');
             res.json({
                 anios,
-                areas: areasData || [],
-                empresas: empresasData || [],
+                areas: finalAreas,
+                empresas: finalEmpresas,
                 vehiculos,
-                grupos_rubro: gruposRubroData || [],
-                sub_rubros: subRubrosData || [],
+                grupos_rubro: finalGrupos,
+                sub_rubros: finalSubRubros,
+                tipos_presupuesto: finalTipos,
                 personal: personalData || []
             });
         }
