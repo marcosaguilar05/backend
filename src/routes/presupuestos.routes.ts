@@ -11,8 +11,12 @@ router.use(authMiddleware);
 router.get('/rubros', presupuestosController.getRubros);
 router.get('/tipos', presupuestosController.getTipos);
 router.post('/tipos', presupuestosController.createTipo);
+router.put('/tipos/:id', presupuestosController.updateTipo);
+router.delete('/tipos/:id', presupuestosController.deleteTipo);
 router.get('/conceptos', presupuestosController.getConceptos);
 router.post('/conceptos', presupuestosController.createConcepto);
+router.put('/conceptos/:id', presupuestosController.updateConcepto);
+router.delete('/conceptos/:id', presupuestosController.deleteConcepto);
 router.get('/filters', presupuestosController.getFilterOptions);
 
 // CRUD Presupuestos

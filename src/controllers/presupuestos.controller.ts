@@ -173,6 +173,156 @@ export const presupuestosController = {
         }
     },
 
+    // Actualizar tipo de presupuesto (Solo ADMIN)
+    async updateTipo(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const dbClient = req.supabase || supabase;
+
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+
+            const { id } = req.params;
+            const { nombre, descripcion } = req.body;
+
+            if (!nombre) {
+                res.status(400).json({ error: 'Nombre es requerido' });
+                return;
+            }
+
+            const { data, error } = await dbClient
+                .from('tipos_presupuesto')
+                .update({
+                    nombre,
+                    descripcion
+                })
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Error de Supabase en updateTipo:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.json(data);
+        } catch (error) {
+            console.error('Error en updateTipo:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Actualizar concepto de presupuesto (Solo ADMIN)
+    async updateConcepto(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const dbClient = req.supabase || supabase;
+
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+
+            const { id } = req.params;
+            const { nombre, unidad } = req.body;
+
+            if (!nombre) {
+                res.status(400).json({ error: 'Nombre es requerido' });
+                return;
+            }
+
+            const { data, error } = await dbClient
+                .from('conceptos_presupuesto')
+                .update({
+                    nombre,
+                    unidad
+                })
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Error de Supabase en updateConcepto:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.json(data);
+        } catch (error) {
+            console.error('Error en updateConcepto:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Eliminar tipo de presupuesto (Solo ADMIN)
+    async deleteTipo(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const dbClient = req.supabase || supabase;
+
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+
+            const { id } = req.params;
+
+            const { error } = await dbClient
+                .from('tipos_presupuesto')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                console.error('Error de Supabase en deleteTipo:', error);
+                if (error.code === '23503') {
+                    res.status(400).json({ error: 'No se puede eliminar este Tipo porque está siendo utilizado en ítems de presupuesto' });
+                    return;
+                }
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.json({ message: 'Tipo eliminado correctamente' });
+        } catch (error) {
+            console.error('Error en deleteTipo:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    // Eliminar concepto de presupuesto (Solo ADMIN)
+    async deleteConcepto(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const dbClient = req.supabase || supabase;
+
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+
+            const { id } = req.params;
+
+            const { error } = await dbClient
+                .from('conceptos_presupuesto')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                console.error('Error de Supabase en deleteConcepto:', error);
+                if (error.code === '23503') {
+                    res.status(400).json({ error: 'No se puede eliminar este Concepto porque está siendo utilizado en ítems de presupuesto' });
+                    return;
+                }
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            res.json({ message: 'Concepto eliminado correctamente' });
+        } catch (error) {
+            console.error('Error en deleteConcepto:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
     // ==================== PRESUPUESTOS ====================
 
     // Listar presupuestos con paginación
