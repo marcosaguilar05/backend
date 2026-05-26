@@ -18,6 +18,20 @@ export interface IPago {
     cuentaBancariaEmpresa?: string;
     banco?: string;
     observacionesUsuario?: string;
+    // Nuevos campos agregados
+    responsable?: string;
+    empresa?: string;
+    areaOperacion?: string;
+    dependencia?: string;
+    grupoRubro?: string;
+    rubro?: string;
+    subRubro?: string;
+    factura?: string;
+    soporte?: string;
+    activo?: boolean;
+    valorFactura?: number;
+    pagoParcial?: boolean;
+    ingresoGasto?: string;
 }
 
 const pagoSchema = new Schema<IPago>(
@@ -39,6 +53,20 @@ const pagoSchema = new Schema<IPago>(
         cuentaBancariaEmpresa: { type: String },
         banco: { type: String },
         observacionesUsuario: { type: String },
+        // Nuevos campos agregados al esquema Mongoose
+        responsable: { type: String },
+        empresa: { type: String },
+        areaOperacion: { type: String },
+        dependencia: { type: String },
+        grupoRubro: { type: String },
+        rubro: { type: String },
+        subRubro: { type: String },
+        factura: { type: String },
+        soporte: { type: String },
+        activo: { type: Boolean, default: true },
+        valorFactura: { type: Number },
+        pagoParcial: { type: Boolean, default: false },
+        ingresoGasto: { type: String }
     },
     { timestamps: true, collection: 'pagos' }
 );

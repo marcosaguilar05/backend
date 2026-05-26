@@ -28,8 +28,8 @@ export const pagosController = {
             // 1. Buscar al usuario en la base de datos externa de MongoDB
             const mongoUser = await UserModel.findOne({ email: userEmail });
 
-            if (!mongoUser) {
-                console.log(`ℹ️ Usuario con correo ${userEmail} no registrado en base de datos externa de pagos`);
+            if (!mongoUser || mongoUser.activo === false) {
+                console.log(`ℹ️ Usuario con correo ${userEmail} no registrado o inactivo en base de datos externa de pagos`);
                 return res.json({
                     data: [],
                     pagination: {
@@ -41,8 +41,11 @@ export const pagosController = {
                 });
             }
 
-            // 2. Construir la consulta de pagos en MongoDB
-            const query: any = { userId: mongoUser._id };
+            // 2. Construir la consulta de pagos en MongoDB: dependencia TRANSPORTES y activo true
+            const query: any = {
+                dependencia: 'TRANSPORTES',
+                activo: true
+            };
 
             // Filtro por estado de pago
             if (estadoPago) {
