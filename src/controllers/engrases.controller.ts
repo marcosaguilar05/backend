@@ -309,6 +309,13 @@ export const engrasesController = {
             const placa = req.query.placa as string;
             const area_operacion = req.query.area_operacion as string;
 
+            const applyFilter = (q: any, field: string, value: string) => {
+                if (!value) return q;
+                const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length === 0) return q;
+                return q.in(field, arr);
+            };
+
             let query = (req.supabase || supabase).from('engrase_financiero').select('*');
 
             // Filtros de fecha ("Fecha de Creacion" segun estructura dada)
@@ -316,9 +323,9 @@ export const engrasesController = {
             if (fecha_fin) query = query.lte('Fecha de Creacion', fecha_fin);
 
             // Mapeo de filtros a columnas de la vista financiera
-            if (conductor) query = query.ilike('Responsable', `%${conductor}%`);
-            if (placa) query = query.ilike('Placa', `%${placa}%`);
-            if (area_operacion) query = query.ilike('Área de Operacion', `%${area_operacion}%`);
+            if (conductor) query = applyFilter(query, 'Responsable', conductor);
+            if (placa) query = applyFilter(query, 'Placa', placa);
+            if (area_operacion) query = applyFilter(query, 'Área de Operacion', area_operacion);
 
             query = query.order('Fecha de Creacion', { ascending: false });
 
@@ -345,11 +352,18 @@ export const engrasesController = {
             const fecha_inicio = req.query.fecha_inicio as string;
             const fecha_fin = req.query.fecha_fin as string;
 
+            const applyFilter = (q: any, field: string, value: string) => {
+                if (!value) return q;
+                const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length === 0) return q;
+                return q.in(field, arr);
+            };
+
             let query = (req.supabase || supabase).from('engrases_relaciones').select('*');
 
-            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-            if (placa) query = query.ilike('placa', `%${placa}%`);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
 

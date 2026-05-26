@@ -368,6 +368,13 @@ export const tanqueosController = {
             const tipo_combustible = req.query.tipo_combustible as string; // Asumiendo Sub-Rubro
             const concepto = req.query.concepto as string;
 
+            const applyFilter = (q: any, field: string, value: string) => {
+                if (!value) return q;
+                const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length === 0) return q;
+                return q.in(field, arr);
+            };
+
             let query = (req.supabase || supabase).from('tanqueo_financiero').select('*');
 
             // Filtros de fecha
@@ -375,12 +382,12 @@ export const tanqueosController = {
             if (fecha_fin) query = query.lte('Fecha de Creacion', fecha_fin);
 
             // Mapeo de filtros a columnas de la vista financiera
-            if (conductor) query = query.ilike('Responsable', `%${conductor}%`);
-            if (placa) query = query.ilike('Placa', `%${placa}%`);
-            if (bomba) query = query.ilike('Tercero', `%${bomba}%`);
-            if (area_operacion) query = query.ilike('Área de Operacion', `%${area_operacion}%`);
-            if (concepto) query = query.eq('Concepto', concepto);
-            if (tipo_combustible) query = query.ilike('Sub-Rubro', `%${tipo_combustible}%`);
+            if (conductor) query = applyFilter(query, 'Responsable', conductor);
+            if (placa) query = applyFilter(query, 'Placa', placa);
+            if (bomba) query = applyFilter(query, 'Tercero', bomba);
+            if (area_operacion) query = applyFilter(query, 'Área de Operacion', area_operacion);
+            if (concepto) query = applyFilter(query, 'Concepto', concepto);
+            if (tipo_combustible) query = applyFilter(query, 'Sub-Rubro', tipo_combustible);
 
             query = query.order('Fecha de Creacion', { ascending: false });
 
@@ -411,15 +418,22 @@ export const tanqueosController = {
             const fecha_inicio = req.query.fecha_inicio as string;
             const fecha_fin = req.query.fecha_fin as string;
 
+            const applyFilter = (q: any, field: string, value: string) => {
+                if (!value) return q;
+                const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length === 0) return q;
+                return q.in(field, arr);
+            };
+
             let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*');
 
-            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-            if (placa) query = query.ilike('placa', `%${placa}%`);
-            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
-            if (concepto) query = query.eq('concepto', concepto);
-            if (tipo_operacion) query = query.eq('tipo_operacion', tipo_operacion);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
+            if (concepto) query = applyFilter(query, 'concepto', concepto);
+            if (tipo_operacion) query = applyFilter(query, 'tipo_operacion', tipo_operacion);
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
 
