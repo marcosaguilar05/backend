@@ -970,11 +970,18 @@ export const presupuestosController = {
                 .select('id, empresa')
                 .order('empresa');
 
-            // Vehículos con su placa real y área asociada
-            // Use select(*) to work around accented column name issues
+            // Vehículos con su placa real y área asociada, consultado desde la tabla vehiculo
             const { data: vehiculosData, error: vehiculosError } = await dbClient
-                .from('control_flota')
-                .select('*, areas_placas(id, placa)')
+                .from('vehiculo')
+                .select(`
+                    id,
+                    placa_id,
+                    operacion_id,
+                    areas_placas ( id, placa ),
+                    vehiculo_caracteristicas (
+                        cat_clase_vehiculo ( nombre )
+                    )
+                `)
                 .order('placa_id');
 
             if (vehiculosError) {
@@ -982,15 +989,21 @@ export const presupuestosController = {
             }
 
             // Formatear vehículos para el frontend
-            // Use bracket notation for accented column operación_id
-            const vehiculos = (vehiculosData || []).map((v: any) => ({
-                id: v.id,
-                placa_id: v.placa_id,
-                operación_id: v.operación_id,
-                area_id: v.operación_id,
-                clase_vehiculo: v.clase_vehiculo,
-                placa: v.areas_placas?.placa
-            }));
+            const vehiculos = (vehiculosData || []).map((v: any) => {
+                const placaData = Array.isArray(v.areas_placas) ? v.areas_placas[0] : v.areas_placas;
+                const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                const catClase = chars?.cat_clase_vehiculo;
+                const clase_vehiculo = (Array.isArray(catClase) ? catClase[0] : catClase)?.nombre || '';
+
+                return {
+                    id: v.id,
+                    placa_id: v.placa_id,
+                    operación_id: v.operacion_id, // Compatible con la interfaz frontend
+                    area_id: v.operacion_id,      // Compatible con la interfaz frontend
+                    clase_vehiculo: clase_vehiculo,
+                    placa: placaData?.placa || ''
+                };
+            });
 
             // Grupos y Rubros: fetch what's actually in use in the budgets table
             const { data: usedCategories } = await dbClient
