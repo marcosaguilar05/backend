@@ -981,22 +981,34 @@ export const presupuestosController = {
                     vehiculo_caracteristicas (
                         cat_clase_vehiculo ( nombre )
                     )
-                `)
-                .order('placa_id');
+                `);
 
             if (vehiculosError) {
-                console.error('Error fetching vehiculos:', vehiculosError);
+                console.error('Error fetching vehiculos from vehiculo table:', vehiculosError);
             }
 
-            // Formatear vehículos para el frontend
+            // Consultamos control_flota para obtener el ID correcto que la tabla presupuestos espera para guardar
+            const { data: controlFlotaData, error: controlFlotaError } = await dbClient
+                .from('control_flota')
+                .select('id, placa_id');
+
+            if (controlFlotaError) {
+                console.error('Error fetching vehiculos from control_flota table:', controlFlotaError);
+            }
+
+            // Formatear vehículos para el frontend usando el control_flota.id correspondientes a la misma placa_id
             const vehiculos = (vehiculosData || []).map((v: any) => {
                 const placaData = Array.isArray(v.areas_placas) ? v.areas_placas[0] : v.areas_placas;
                 const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
                 const catClase = chars?.cat_clase_vehiculo;
                 const clase_vehiculo = (Array.isArray(catClase) ? catClase[0] : catClase)?.nombre || '';
 
+                // Buscamos la fila correspondiente en control_flota con el mismo placa_id para usar su ID real
+                const matchFlota = (controlFlotaData || []).find((cf: any) => cf.placa_id === v.placa_id);
+                const dbVehiculoId = matchFlota ? matchFlota.id : v.id;
+
                 return {
-                    id: v.id,
+                    id: dbVehiculoId,             // El ID de control_flota para que la base de datos lo guarde con la placa correcta
                     placa_id: v.placa_id,
                     operación_id: v.operacion_id, // Compatible con la interfaz frontend
                     area_id: v.operacion_id,      // Compatible con la interfaz frontend
@@ -1004,6 +1016,9 @@ export const presupuestosController = {
                     placa: placaData?.placa || ''
                 };
             });
+
+            // Ordenar alfabéticamente por placa para mejor UX
+            vehiculos.sort((a, b) => a.placa.localeCompare(b.placa));
 
             // Grupos y Rubros: fetch what's actually in use in the budgets table
             const { data: usedCategories } = await dbClient
