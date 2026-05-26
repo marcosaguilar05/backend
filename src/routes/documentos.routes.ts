@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { documentosController } from '../controllers/documentos.controller';
 import { documentosDashboardController } from '../controllers/documentos-dashboard.controller';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
+
+router.use(authMiddleware);
 
 // Dashboard routes (antes de rutas con params)
 router.get('/dashboard/kpis', documentosDashboardController.getKPIs);

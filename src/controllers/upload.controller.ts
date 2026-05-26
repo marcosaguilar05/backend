@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import multer from 'multer';
 import { supabase } from '../config/supabase';
+import { AuthRequest } from '../types';
 
 // Configurar multer para almacenar en memoria
 const storage = multer.memoryStorage();
@@ -17,7 +18,7 @@ export const upload = multer({
 });
 
 export const uploadController = {
-    async uploadDocument(req: Request, res: Response) {
+    async uploadDocument(req: AuthRequest, res: Response) {
         try {
             const file = req.file;
             const { folder, placa } = req.body;
@@ -43,7 +44,7 @@ export const uploadController = {
             const filePath = `${folder}/${fileName}`;
 
             // Subir a Supabase Storage
-            const { data, error } = await supabase.storage
+            const { data, error } = await (req.supabase || supabase).storage
                 .from('vehiculos_docs')
                 .upload(filePath, file.buffer, {
                     contentType: 'application/pdf',
@@ -66,7 +67,7 @@ export const uploadController = {
         }
     },
 
-    async deleteDocument(req: Request, res: Response) {
+    async deleteDocument(req: AuthRequest, res: Response) {
         try {
             const { path } = req.body;
 
@@ -74,7 +75,7 @@ export const uploadController = {
                 return res.status(400).json({ error: 'Path es requerido' });
             }
 
-            const { error } = await supabase.storage
+            const { error } = await (req.supabase || supabase).storage
                 .from('vehiculos_docs')
                 .remove([path]);
 
