@@ -8,5 +8,6 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', pagosController.getAll);
+router.get('/filters', pagosController.getFilters);
 
 export default router;

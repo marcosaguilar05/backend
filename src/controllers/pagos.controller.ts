@@ -11,6 +11,10 @@ export const pagosController = {
                 limit = 20,
                 search = '',
                 estadoPago = '',
+                grupoRubro = '',
+                rubro = '',
+                subRubro = '',
+                placa = '',
                 sort_by = 'fecha',
                 sort_order = 'desc'
             } = req.query;
@@ -52,6 +56,26 @@ export const pagosController = {
                 query.estadoPago = estadoPago;
             }
 
+            // Filtro por grupo de rubro
+            if (grupoRubro) {
+                query.grupoRubro = grupoRubro;
+            }
+
+            // Filtro por rubro
+            if (rubro) {
+                query.rubro = rubro;
+            }
+
+            // Filtro por subrubro
+            if (subRubro) {
+                query.subRubro = subRubro;
+            }
+
+            // Filtro por placa (vehículo)
+            if (placa) {
+                query.placa = placa;
+            }
+
             // Filtro por término de búsqueda (concepto, tercero o placa)
             if (search) {
                 const searchRegex = new RegExp(String(search), 'i');
@@ -87,6 +111,55 @@ export const pagosController = {
             });
         } catch (error: any) {
             console.error('Error al obtener pagos desde MongoDB:', error);
+            res.status(500).json({ error: error.message || 'Error interno del servidor' });
+        }
+    },
+
+    async getFilters(req: AuthRequest, res: Response) {
+        try {
+            const userEmail = req.user?.email;
+
+            if (!userEmail) {
+                return res.status(401).json({ error: 'Correo de usuario no disponible' });
+            }
+
+            // Buscar al usuario en la base de datos externa de MongoDB
+            const mongoUser = await UserModel.findOne({ email: userEmail });
+
+            if (!mongoUser || mongoUser.activo === false) {
+                return res.json({
+                    grupos: [],
+                    rubros: [],
+                    subRubros: [],
+                    placas: []
+                });
+            }
+
+            const query = {
+                dependencia: 'TRANSPORTES',
+                activo: true
+            };
+
+            // Obtener valores distintos para poblar los filtros
+            const [grupos, rubros, subRubros, placas] = await Promise.all([
+                PagoModel.distinct('grupoRubro', query),
+                PagoModel.distinct('rubro', query),
+                PagoModel.distinct('subRubro', query),
+                PagoModel.distinct('placa', query)
+            ]);
+
+            // Filtrar valores vacíos, nulos o indefinidos y ordenar alfabéticamente
+            const cleanAndSort = (arr: any[]) => 
+                arr.filter(item => item !== null && item !== undefined && item !== '').sort();
+
+            res.json({
+                grupos: cleanAndSort(grupos),
+                rubros: cleanAndSort(rubros),
+                subRubros: cleanAndSort(subRubros),
+                placas: cleanAndSort(placas)
+            });
+        } catch (error: any) {
+            console.error('Error al obtener filtros únicos desde MongoDB:', error);
             res.status(500).json({ error: error.message || 'Error interno del servidor' });
         }
     }
