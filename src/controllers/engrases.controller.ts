@@ -14,6 +14,13 @@ export const engrasesController = {
             const limit = parseInt(req.query.limit as string) || 20;
             const offset = (page - 1) * limit;
 
+            const applyFilter = (q: any, field: string, value: string) => {
+                if (!value) return q;
+                const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length === 0) return q;
+                return q.in(field, arr);
+            };
+
             // Filtros
             const conductor = req.query.conductor as string;
             const placa = req.query.placa as string;
@@ -27,15 +34,9 @@ export const engrasesController = {
                 .select('*', { count: 'exact' });
 
             // Aplicar filtros
-            if (conductor) {
-                query = query.ilike('conductor', `%${conductor}%`);
-            }
-            if (placa) {
-                query = query.ilike('placa', `%${placa}%`);
-            }
-            if (area_operacion) {
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
-            }
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
             if (fecha_inicio) {
                 query = query.gte('fecha', fecha_inicio);
             }
@@ -61,9 +62,9 @@ export const engrasesController = {
                 .select('lavado, engrase, otros, suma');
 
             // Aplicar los mismos filtros al summary
-            if (conductor) summaryQuery = summaryQuery.ilike('conductor', `%${conductor}%`);
-            if (placa) summaryQuery = summaryQuery.ilike('placa', `%${placa}%`);
-            if (area_operacion) summaryQuery = summaryQuery.ilike('area_operacion', `%${area_operacion}%`);
+            if (conductor) summaryQuery = applyFilter(summaryQuery, 'conductor', conductor);
+            if (placa) summaryQuery = applyFilter(summaryQuery, 'placa', placa);
+            if (area_operacion) summaryQuery = applyFilter(summaryQuery, 'area_operacion', area_operacion);
             if (fecha_inicio) summaryQuery = summaryQuery.gte('fecha', fecha_inicio);
             if (fecha_fin) summaryQuery = summaryQuery.lte('fecha', fecha_fin);
 

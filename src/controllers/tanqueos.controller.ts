@@ -14,6 +14,13 @@ export const tanqueosController = {
             const limit = parseInt(req.query.limit as string) || 20;
             const offset = (page - 1) * limit;
 
+            const applyFilter = (q: any, field: string, value: string) => {
+                if (!value) return q;
+                const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length === 0) return q;
+                return q.in(field, arr);
+            };
+
             // Filtros
             const conductor = req.query.conductor as string;
             const placa = req.query.placa as string;
@@ -31,27 +38,13 @@ export const tanqueosController = {
                 .select('*', { count: 'exact' });
 
             // Aplicar filtros
-            if (conductor) {
-                query = query.ilike('conductor', `%${conductor}%`);
-            }
-            if (placa) {
-                query = query.ilike('placa', `%${placa}%`);
-            }
-            if (bomba) {
-                query = query.ilike('bomba', `%${bomba}%`);
-            }
-            if (area_operacion) {
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
-            }
-            if (tipo_combustible) {
-                query = query.eq('tipo_combustible', tipo_combustible);
-            }
-            if (concepto) {
-                query = query.eq('concepto', concepto);
-            }
-            if (tipo_operacion) {
-                query = query.eq('tipo_operacion', tipo_operacion);
-            }
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
+            if (concepto) query = applyFilter(query, 'concepto', concepto);
+            if (tipo_operacion) query = applyFilter(query, 'tipo_operacion', tipo_operacion);
             if (fecha_inicio) {
                 query = query.gte('fecha', fecha_inicio);
             }
@@ -80,13 +73,13 @@ export const tanqueosController = {
                 .select('cantidad_galones, valor_tanqueo');
 
             // Aplicar los mismos filtros al summary
-            if (conductor) summaryQuery = summaryQuery.ilike('conductor', `%${conductor}%`);
-            if (placa) summaryQuery = summaryQuery.ilike('placa', `%${placa}%`);
-            if (bomba) summaryQuery = summaryQuery.ilike('bomba', `%${bomba}%`);
-            if (area_operacion) summaryQuery = summaryQuery.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) summaryQuery = summaryQuery.eq('tipo_combustible', tipo_combustible);
-            if (concepto) summaryQuery = summaryQuery.eq('concepto', concepto);
-            if (tipo_operacion) summaryQuery = summaryQuery.eq('tipo_operacion', tipo_operacion);
+            if (conductor) summaryQuery = applyFilter(summaryQuery, 'conductor', conductor);
+            if (placa) summaryQuery = applyFilter(summaryQuery, 'placa', placa);
+            if (bomba) summaryQuery = applyFilter(summaryQuery, 'bomba', bomba);
+            if (area_operacion) summaryQuery = applyFilter(summaryQuery, 'area_operacion', area_operacion);
+            if (tipo_combustible) summaryQuery = applyFilter(summaryQuery, 'tipo_combustible', tipo_combustible);
+            if (concepto) summaryQuery = applyFilter(summaryQuery, 'concepto', concepto);
+            if (tipo_operacion) summaryQuery = applyFilter(summaryQuery, 'tipo_operacion', tipo_operacion);
             if (fecha_inicio) summaryQuery = summaryQuery.gte('fecha', fecha_inicio);
             if (fecha_fin) summaryQuery = summaryQuery.lte('fecha', fecha_fin);
 

@@ -51,30 +51,29 @@ export const pagosController = {
                 activo: true
             };
 
+            // Helper to apply multi-value filters in MongoDB
+            const applyMongoFilter = (field: string, val: any) => {
+                if (!val) return;
+                const arr = String(val).split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length > 0) {
+                    query[field] = { $in: arr };
+                }
+            };
+
             // Filtro por estado de pago
-            if (estadoPago) {
-                query.estadoPago = estadoPago;
-            }
+            applyMongoFilter('estadoPago', estadoPago);
 
             // Filtro por grupo de rubro
-            if (grupoRubro) {
-                query.grupoRubro = grupoRubro;
-            }
+            applyMongoFilter('grupoRubro', grupoRubro);
 
             // Filtro por rubro
-            if (rubro) {
-                query.rubro = rubro;
-            }
+            applyMongoFilter('rubro', rubro);
 
             // Filtro por subrubro
-            if (subRubro) {
-                query.subRubro = subRubro;
-            }
+            applyMongoFilter('subRubro', subRubro);
 
             // Filtro por placa (vehículo)
-            if (placa) {
-                query.placa = placa;
-            }
+            applyMongoFilter('placa', placa);
 
             // Filtro por término de búsqueda (concepto, tercero o placa)
             if (search) {
