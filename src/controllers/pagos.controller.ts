@@ -86,17 +86,29 @@ export const pagosController = {
                 ];
             }
 
-            // 3. Ejecutar conteo y búsqueda en paralelo
+            // 3. Ejecutar conteo, búsqueda y sumatorias en paralelo
             const sortOrderValue = sort_order === 'asc' ? 1 : -1;
             const sortByField = String(sort_by);
 
-            const [total, data] = await Promise.all([
+            const [total, data, totalsResult] = await Promise.all([
                 PagoModel.countDocuments(query),
                 PagoModel.find(query)
                     .sort({ [sortByField]: sortOrderValue })
                     .skip(skipNum)
                     .limit(limitNum)
-                    .lean()
+                    .lean(),
+                PagoModel.aggregate([
+                    { $match: query },
+                    {
+                        $group: {
+                            _id: null,
+                            totalOperacion: { $sum: '$valorOperacion' },
+                            totalNeto: { $sum: '$valorNeto' },
+                            totalRetencion: { $sum: '$retencion' },
+                            totalDescuento: { $sum: '$descuento' }
+                        }
+                    }
+                ])
             ]);
 
             res.json({
@@ -106,6 +118,12 @@ export const pagosController = {
                     limit: limitNum,
                     total: total || 0,
                     totalPages: Math.ceil((total || 0) / limitNum)
+                },
+                totals: totalsResult[0] || {
+                    totalOperacion: 0,
+                    totalNeto: 0,
+                    totalRetencion: 0,
+                    totalDescuento: 0
                 }
             });
         } catch (error: any) {
