@@ -22,6 +22,7 @@ import mantenimientoRoutes from './routes/mantenimiento.routes';
 import horometroRoutes from './routes/horometro.routes';
 import adminRoutes from './routes/admin.routes';
 import pagosRoutes from './routes/pagos.routes';
+import gpsRoutes from './routes/gps.routes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -55,6 +56,7 @@ app.use('/api/mantenimiento', mantenimientoRoutes);
 app.use('/api/horometro', horometroRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/pagos', pagosRoutes);
+app.use('/api/gps', gpsRoutes);
 
 // Ruta de prueba
 app.get('/api/health', (req: Request, res: Response) => {
