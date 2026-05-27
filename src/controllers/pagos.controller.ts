@@ -15,6 +15,8 @@ export const pagosController = {
                 rubro = '',
                 subRubro = '',
                 placa = '',
+                fecha_inicio = '',
+                fecha_fin = '',
                 sort_by = 'fecha',
                 sort_order = 'desc'
             } = req.query;
@@ -75,15 +77,49 @@ export const pagosController = {
             // Filtro por placa (vehículo)
             applyMongoFilter('placa', placa);
 
+            // Construir condiciones compuestas ($and)
+            const andConditions: any[] = [];
+
             // Filtro por término de búsqueda (concepto, tercero o placa)
             if (search) {
                 const searchRegex = new RegExp(String(search), 'i');
-                query.$or = [
-                    { concepto: searchRegex },
-                    { tercero: searchRegex },
-                    { placa: searchRegex },
-                    { consecutivo: searchRegex }
-                ];
+                andConditions.push({
+                    $or: [
+                        { concepto: searchRegex },
+                        { tercero: searchRegex },
+                        { placa: searchRegex },
+                        { consecutivo: searchRegex }
+                    ]
+                });
+            }
+
+            // Filtro por rango de fechas (Fecha de Pago o Registro)
+            if (fecha_inicio || fecha_fin) {
+                const dateRange: any = {};
+                if (fecha_inicio) {
+                    dateRange.$gte = new Date(String(fecha_inicio));
+                }
+                if (fecha_fin) {
+                    const endDate = new Date(String(fecha_fin));
+                    endDate.setUTCHours(23, 59, 59, 999);
+                    dateRange.$lte = endDate;
+                }
+
+                andConditions.push({
+                    $or: [
+                        { fechaPago: dateRange },
+                        {
+                            $and: [
+                                { $or: [{ fechaPago: { $exists: false } }, { fechaPago: null }] },
+                                { fecha: dateRange }
+                            ]
+                        }
+                    ]
+                });
+            }
+
+            if (andConditions.length > 0) {
+                query.$and = andConditions;
             }
 
             // 3. Ejecutar conteo, búsqueda y sumatorias en paralelo
