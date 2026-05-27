@@ -8,5 +8,6 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/tracking', gpsController.getTracking);
+router.get('/history/:deviceId', gpsController.getHistory);
 
 export default router;

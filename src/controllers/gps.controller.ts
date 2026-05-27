@@ -51,20 +51,23 @@ async function getGeotabSession() {
     return cachedSession;
 }
 
-async function queryGeotab(method: string, typeName: string, search?: any): Promise<any> {
+async function queryGeotab(method: string, typeName: string, search?: any, resultsLimit?: number): Promise<any> {
     const session = await getGeotabSession();
     
+    const params: any = {
+        typeName,
+        credentials: session.credentials
+    };
+    if (search) params.search = search;
+    if (resultsLimit) params.resultsLimit = resultsLimit;
+
     const response = await fetch(session.serverUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             jsonrpc: "2.0",
             method,
-            params: {
-                typeName,
-                search,
-                credentials: session.credentials
-            },
+            params,
             id: 2
         })
     });
@@ -75,7 +78,7 @@ async function queryGeotab(method: string, typeName: string, search?: any): Prom
     if (body.error && body.error.message && body.error.message.includes("SessionExpiredException")) {
         console.log("⚠️ Geotab session expired, re-authenticating...");
         cachedSession = null; // Clear cache
-        return queryGeotab(method, typeName, search); // Retry once
+        return queryGeotab(method, typeName, search, resultsLimit); // Retry once
     }
 
     if (body.error) {
@@ -123,6 +126,113 @@ export const gpsController = {
         } catch (error: any) {
             console.error("Error fetching GPS tracking data:", error);
             res.status(500).json({ error: error.message || "Error al obtener datos de GPS Geotab" });
+        }
+    },
+
+    async getHistory(req: AuthRequest, res: Response) {
+        try {
+            const { deviceId } = req.params;
+            // Optional date query param (ISO), defaults to today in Colombia time
+            const dateParam = req.query.date as string | undefined;
+
+            // Build the day range (Colombia UTC-5)
+            let startOfDay: Date;
+            let endOfDay: Date;
+            if (dateParam) {
+                startOfDay = new Date(`${dateParam}T00:00:00-05:00`);
+                endOfDay   = new Date(`${dateParam}T23:59:59-05:00`);
+            } else {
+                const now = new Date();
+                const colOffset = -5 * 60 * 60 * 1000;
+                const colNow = new Date(now.getTime() + colOffset);
+                const dayStr = colNow.toISOString().slice(0, 10);
+                startOfDay = new Date(`${dayStr}T00:00:00-05:00`);
+                endOfDay   = new Date(`${dayStr}T23:59:59-05:00`);
+            }
+
+            console.log(`📜 Fetching route history for device ${deviceId} from ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
+
+            const records: any[] = await queryGeotab(
+                "Get",
+                "LogRecord",
+                {
+                    deviceSearch: { id: deviceId },
+                    fromDate: startOfDay.toISOString(),
+                    toDate: endOfDay.toISOString()
+                },
+                10000 // limit to 10k points for performance
+            );
+
+            if (!Array.isArray(records) || records.length === 0) {
+                return res.json({ trail: [], stops: [] });
+            }
+
+            // Sort ascending by time
+            records.sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+
+            // Build trail: only keep points with valid coords
+            const trail = records
+                .filter(r => r.latitude !== 0 || r.longitude !== 0)
+                .map(r => ({
+                    lat: r.latitude,
+                    lng: r.longitude,
+                    speed: r.speed,
+                    dateTime: r.dateTime
+                }));
+
+            // Derive stops: consecutive points where speed < 5 km/h lasting > 2 minutes
+            const STOP_SPEED_KMH = 5;
+            const MIN_STOP_DURATION_MS = 2 * 60 * 1000; // 2 minutes
+
+            const stops: { lat: number; lng: number; startTime: string; endTime: string; durationMin: number }[] = [];
+            let stopStart: number | null = null;
+            let stopStartPoint: typeof trail[0] | null = null;
+
+            for (let i = 0; i < trail.length; i++) {
+                const point = trail[i];
+                const isStopped = point.speed < STOP_SPEED_KMH;
+
+                if (isStopped && stopStart === null) {
+                    stopStart = new Date(point.dateTime).getTime();
+                    stopStartPoint = point;
+                } else if (!isStopped && stopStart !== null && stopStartPoint !== null) {
+                    const prevPoint = trail[i - 1];
+                    const stopEnd = new Date(prevPoint.dateTime).getTime();
+                    const duration = stopEnd - stopStart;
+                    if (duration >= MIN_STOP_DURATION_MS) {
+                        stops.push({
+                            lat: stopStartPoint.lat,
+                            lng: stopStartPoint.lng,
+                            startTime: stopStartPoint.dateTime,
+                            endTime: prevPoint.dateTime,
+                            durationMin: Math.round(duration / 60000)
+                        });
+                    }
+                    stopStart = null;
+                    stopStartPoint = null;
+                }
+            }
+
+            // Close last open stop at end of trail
+            if (stopStart !== null && stopStartPoint !== null && trail.length > 0) {
+                const lastPoint = trail[trail.length - 1];
+                const stopEnd = new Date(lastPoint.dateTime).getTime();
+                const duration = stopEnd - stopStart;
+                if (duration >= MIN_STOP_DURATION_MS) {
+                    stops.push({
+                        lat: stopStartPoint.lat,
+                        lng: stopStartPoint.lng,
+                        startTime: stopStartPoint.dateTime,
+                        endTime: lastPoint.dateTime,
+                        durationMin: Math.round(duration / 60000)
+                    });
+                }
+            }
+
+            res.json({ trail, stops });
+        } catch (error: any) {
+            console.error("Error fetching GPS route history:", error);
+            res.status(500).json({ error: error.message || "Error al obtener historial de ruta" });
         }
     }
 };
