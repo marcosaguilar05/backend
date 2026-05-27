@@ -453,10 +453,25 @@ export const tanqueosDashboardController = {
                 return;
             }
 
+            const meses = req.query.meses as string;
+            let filteredData = data || [];
+            if (meses) {
+                const mesesArr = meses.split(',').map(m => m.trim()).filter(Boolean);
+                if (mesesArr.length > 0) {
+                    filteredData = filteredData.filter(t => {
+                        if (!t.fecha) return false;
+                        const datePart = t.fecha.includes('T') ? t.fecha.split('T')[0] : t.fecha;
+                        const parts = datePart.split('-');
+                        const month = parts[1];
+                        return mesesArr.includes(month);
+                    });
+                }
+            }
+
             // Agrupar por vehículo primero, luego por área
             const byVehicle: any = {};
 
-            data?.forEach(t => {
+            filteredData.forEach(t => {
                 const placa = t.placa;
                 const area = t.area_operacion || 'SIN ÁREA';
 
@@ -913,7 +928,21 @@ export const tanqueosDashboardController = {
             if (tanqueosRes.error) throw tanqueosRes.error;
             if (saldosRes.error) throw saldosRes.error;
 
-            const data = tanqueosRes.data || [];
+            const meses = req.query.meses as string;
+            let data = tanqueosRes.data || [];
+            if (meses) {
+                const mesesArr = meses.split(',').map(m => m.trim()).filter(Boolean);
+                if (mesesArr.length > 0) {
+                    data = data.filter(t => {
+                        if (!t.fecha) return false;
+                        // Support ISO timestamp or YYYY-MM-DD date formats
+                        const datePart = t.fecha.includes('T') ? t.fecha.split('T')[0] : t.fecha;
+                        const parts = datePart.split('-');
+                        const month = parts[1]; // e.g. "05"
+                        return mesesArr.includes(month);
+                    });
+                }
+            }
             const bombas = saldosRes.data || [];
 
             // --- AGREGACIONES EN MEMORIA (MUCHO MÁS RÁPIDO QUE SQL MÚLTIPLE) ---
