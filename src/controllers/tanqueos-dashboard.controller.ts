@@ -11,6 +11,13 @@ const FUEL_PRICE_THRESHOLDS = {
 
 const SALDO_CRITICO = -500000;
 
+const applyFilter = (q: any, field: string, value: string) => {
+    if (!value) return q;
+    const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+    if (arr.length === 0) return q;
+    return q.in(field, arr);
+};
+
 export const tanqueosDashboardController = {
     // KPIs Ejecutivos
     async getKPIs(req: AuthRequest, res: Response): Promise<void> {
@@ -28,11 +35,11 @@ export const tanqueosDashboardController = {
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-            if (placa) query = query.ilike('placa', `%${placa}%`);
-            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
 
             // Solo tanqueos (no anticipos)
             query = query.eq('tipo_operacion', 'TANQUEO');
@@ -201,11 +208,11 @@ export const tanqueosDashboardController = {
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
-            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-            if (placa) query = query.ilike('placa', `%${placa}%`);
-            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
 
             query = query.eq('tipo_operacion', 'TANQUEO').order('fecha');
 
@@ -255,10 +262,10 @@ export const tanqueosDashboardController = {
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-            if (placa) query = query.ilike('placa', `%${placa}%`);
-            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
@@ -318,11 +325,11 @@ export const tanqueosDashboardController = {
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-            if (placa) query = query.ilike('placa', `%${placa}%`);
-            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
@@ -368,8 +375,8 @@ export const tanqueosDashboardController = {
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
@@ -431,11 +438,11 @@ export const tanqueosDashboardController = {
                 query = query.gte('fecha', twoMonthsAgo.toISOString().split('T')[0]);
             }
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
-            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-            if (placa) query = query.ilike('placa', `%${placa}%`);
-            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
 
             query = query.eq('tipo_operacion', 'TANQUEO').order('fecha', { ascending: false });
 
@@ -528,8 +535,8 @@ export const tanqueosDashboardController = {
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
@@ -581,8 +588,8 @@ export const tanqueosDashboardController = {
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
@@ -631,11 +638,11 @@ export const tanqueosDashboardController = {
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-            if (placa) query = query.ilike('placa', `%${placa}%`);
-            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
@@ -723,11 +730,11 @@ export const tanqueosDashboardController = {
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-            if (placa) query = query.ilike('placa', `%${placa}%`);
-            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
 
             query = query.eq('tipo_operacion', 'TANQUEO')
                 .order('fecha', { ascending: false })
@@ -787,11 +794,11 @@ export const tanqueosDashboardController = {
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-            if (placa) query = query.ilike('placa', `%${placa}%`);
-            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
@@ -853,8 +860,8 @@ export const tanqueosDashboardController = {
             if (mes) query = query.eq('mes', mes);
             if (fecha_inicio) query = query.gte('mes', fecha_inicio);
             if (fecha_fin) query = query.lte('mes', fecha_fin);
-            if (vehiculo) query = query.ilike('vehiculo', `%${vehiculo}%`);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
+            if (vehiculo) query = applyFilter(query, 'vehiculo', vehiculo as string);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion as string);
 
             const { data, error } = await query.order('mes', { ascending: false }).order('vehiculo');
 
@@ -893,11 +900,11 @@ export const tanqueosDashboardController = {
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
-            if (conductor) query = query.ilike('conductor', `%${conductor}%`);
-            if (placa) query = query.ilike('placa', `%${placa}%`);
-            if (bomba) query = query.ilike('bomba', `%${bomba}%`);
-            if (area_operacion) query = query.ilike('area_operacion', `%${area_operacion}%`);
-            if (tipo_combustible) query = query.eq('tipo_combustible', tipo_combustible);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
