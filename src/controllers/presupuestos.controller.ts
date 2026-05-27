@@ -674,19 +674,36 @@ export const presupuestosController = {
                 applyMongoFilter('rubro', rubro);
                 applyMongoFilter('subRubro', sub_rubro);
 
-                // Filtrado por fecha (Año y Meses)
+                // Filtrado por fecha (Año y Meses) - Usando fechaPago con fallback a fecha
                 const yearNum = anio && anio !== 'undefined' && anio !== '' ? Number(anio) : new Date().getFullYear();
+
+                const getDateQuery = (start: Date, end: Date) => {
+                    const dateRange = { $gte: start, $lte: end };
+                    return {
+                        $or: [
+                            { fechaPago: dateRange },
+                            {
+                                $and: [
+                                    { $or: [{ fechaPago: { $exists: false } }, { fechaPago: null }] },
+                                    { fecha: dateRange }
+                                ]
+                            }
+                        ]
+                    };
+                };
+
                 if (monthNums.length > 0) {
                     const ranges = monthNums.map(m => {
                         const start = new Date(Date.UTC(yearNum, m - 1, 1, 0, 0, 0, 0));
                         const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
-                        return { fecha: { $gte: start, $lte: end } };
+                        return getDateQuery(start, end);
                     });
                     mongoQuery.$or = ranges;
                 } else {
                     const start = new Date(Date.UTC(yearNum, 0, 1, 0, 0, 0, 0));
                     const end = new Date(Date.UTC(yearNum, 11, 31, 23, 59, 59, 999));
-                    mongoQuery.fecha = { $gte: start, $lte: end };
+                    const baseQuery = getDateQuery(start, end);
+                    mongoQuery.$or = baseQuery.$or;
                 }
 
                 const aggregateResult = await PagoModel.aggregate([
