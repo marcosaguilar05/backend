@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest, Presupuesto, PresupuestoItem } from '../types';
+import { PagoModel } from '../models/pagos.model';
 
 export const presupuestosController = {
     // ==================== CATÁLOGOS ====================
@@ -650,6 +651,61 @@ export const presupuestosController = {
                 });
             }
 
+            // --- CÁLCULO DE TOTAL EJECUTADO REAL DESDE MONGODB ---
+            let totalEjecutadoReal = 0;
+            try {
+                const mongoQuery: any = {
+                    dependencia: 'TRANSPORTES',
+                    activo: true
+                };
+
+                const applyMongoFilter = (field: string, val: any) => {
+                    if (!val || val === 'undefined') return;
+                    const arr = String(val).split(',').map(s => s.trim()).filter(Boolean);
+                    if (arr.length > 0) {
+                        mongoQuery[field] = { $in: arr };
+                    }
+                };
+
+                applyMongoFilter('placa', placa);
+                applyMongoFilter('areaOperacion', area_operacion);
+                applyMongoFilter('empresa', empresa);
+                applyMongoFilter('grupoRubro', grupo_rubro);
+                applyMongoFilter('rubro', rubro);
+                applyMongoFilter('subRubro', sub_rubro);
+
+                // Filtrado por fecha (Año y Meses)
+                const yearNum = anio && anio !== 'undefined' && anio !== '' ? Number(anio) : new Date().getFullYear();
+                if (monthNums.length > 0) {
+                    const ranges = monthNums.map(m => {
+                        const start = new Date(Date.UTC(yearNum, m - 1, 1, 0, 0, 0, 0));
+                        const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
+                        return { fecha: { $gte: start, $lte: end } };
+                    });
+                    mongoQuery.$or = ranges;
+                } else {
+                    const start = new Date(Date.UTC(yearNum, 0, 1, 0, 0, 0, 0));
+                    const end = new Date(Date.UTC(yearNum, 11, 31, 23, 59, 59, 999));
+                    mongoQuery.fecha = { $gte: start, $lte: end };
+                }
+
+                const aggregateResult = await PagoModel.aggregate([
+                    { $match: mongoQuery },
+                    {
+                        $group: {
+                            _id: null,
+                            totalOperacion: { $sum: '$valorOperacion' }
+                        }
+                    }
+                ]);
+
+                if (aggregateResult && aggregateResult.length > 0) {
+                    totalEjecutadoReal = aggregateResult[0].totalOperacion || 0;
+                }
+            } catch (mongoError) {
+                console.error('❌ Error al calcular totalEjecutadoReal desde MongoDB:', mongoError);
+            }
+
             res.json({
                 data: data || [],
                 pagination: {
@@ -664,6 +720,7 @@ export const presupuestosController = {
                     totalEjecutado,
                     totalNoEjecutado,
                     totalPresupuesto,
+                    totalEjecutadoReal,
                     rubrosUtilizados: rubrosIds.size,
                     anioVigencia: anio || new Date().getFullYear()
                 }
