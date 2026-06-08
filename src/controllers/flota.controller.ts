@@ -26,6 +26,7 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
             placa_id,
             empresa_id,
             operacion_id,
+            asignado_a,
             areas_placas ( placa ),
             empresas ( empresa ),
             areas_operacion ( nombre ),
