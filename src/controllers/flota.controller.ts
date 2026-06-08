@@ -6,6 +6,7 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
         console.log('GET /vehiculos request received');
         const empresa_id = req.query.empresa_id as string;
         const operacion_id = req.query.operacion_id as string;
+        const asignado_a = req.query.asignado_a as string;
         const placa = req.query.placa as string; // Contiene el término general de búsqueda
         
         // Pagination setup
@@ -45,6 +46,7 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
 
         if (empresa_id) query = query.eq('empresa_id', empresa_id);
         if (operacion_id) query = query.eq('operacion_id', operacion_id);
+        if (asignado_a) query = query.eq('asignado_a', asignado_a);
 
         console.log('Executing query...');
         const { data, error } = await query
@@ -153,7 +155,7 @@ export const getCatalogos = async (req: AuthRequest, res: Response, next: NextFu
     try {
         const db = req.supabase!;
 
-        const [marcas, tipos, clases, combustibles, marcasCompactadora, empresas, operaciones, placas] = await Promise.all([
+        const [marcas, tipos, clases, combustibles, marcasCompactadora, empresas, operaciones, placas, asignadosResult] = await Promise.all([
             db.from('cat_marca').select('*'),
             db.from('cat_tipo_vehiculo').select('*'),
             db.from('cat_clase_vehiculo').select('*'),
@@ -161,7 +163,8 @@ export const getCatalogos = async (req: AuthRequest, res: Response, next: NextFu
             db.from('cat_marca_compactadora').select('*'),
             db.from('empresas').select('id, empresa').order('empresa'),
             db.from('areas_operacion').select('id, nombre').order('nombre'),
-            db.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').order('placa')
+            db.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').order('placa'),
+            db.from('vehiculo').select('asignado_a').not('asignado_a', 'is', null)
         ]);
 
         // Filter plates that are already in the vehiculo table
@@ -172,6 +175,14 @@ export const getCatalogos = async (req: AuthRequest, res: Response, next: NextFu
         const placasData = placas.data || [];
         const placasDisponibles = placasData.filter(p => !existingPlacaIds.has(p.id));
 
+        const asignadosSet = new Set<string>();
+        if (asignadosResult?.data) {
+            asignadosResult.data.forEach((v: any) => {
+                if (v.asignado_a) asignadosSet.add(v.asignado_a);
+            });
+        }
+        const asignados = Array.from(asignadosSet).sort().map(a => ({ id: a, nombre: a }));
+
         res.json({
             marcas: marcas.data || [],
             tipos: tipos.data || [],
@@ -181,7 +192,8 @@ export const getCatalogos = async (req: AuthRequest, res: Response, next: NextFu
             empresas: empresas.data || [],
             operaciones: operaciones.data || [],
             placas: placasData,
-            placasDisponibles: placasDisponibles
+            placasDisponibles: placasDisponibles,
+            asignados: asignados
         });
     } catch (error) {
         console.error('Error fetching catalogs:', error);
