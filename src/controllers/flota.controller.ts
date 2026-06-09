@@ -11,6 +11,8 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
         const marca = req.query.marca as string;
         const clase = req.query.clase as string;
         const tipo = req.query.tipo as string;
+        const empresa = req.query.empresa as string;
+        const area_operacion = req.query.area_operacion as string;
         const estado_interno = req.query.estado_interno as string;
         const sort_by = req.query.sort_by as string;
         const sort_order = req.query.sort_order as string;
@@ -127,6 +129,20 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
                 const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
                 const e = chars?.Estado || 'Operativo';
                 return estados.includes(e);
+            });
+        }
+        if (empresa) {
+            const empresas = empresa.split(',');
+            filteredData = filteredData.filter((v: any) => {
+                const empData = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas;
+                return empresas.includes(empData?.empresa);
+            });
+        }
+        if (area_operacion) {
+            const areas = area_operacion.split(',');
+            filteredData = filteredData.filter((v: any) => {
+                const areaData = Array.isArray(v.areas_operacion) ? v.areas_operacion[0] : v.areas_operacion;
+                return areas.includes(areaData?.nombre);
             });
         }
 
