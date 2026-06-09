@@ -155,7 +155,7 @@ export const getCatalogos = async (req: AuthRequest, res: Response, next: NextFu
     try {
         const db = req.supabase!;
 
-        const [marcas, tipos, clases, combustibles, marcasCompactadora, empresas, operaciones, placas, asignadosResult] = await Promise.all([
+        const [marcas, tipos, clases, combustibles, marcasCompactadora, empresas, operaciones, placas, asignadosResult, encargados] = await Promise.all([
             db.from('cat_marca').select('*'),
             db.from('cat_tipo_vehiculo').select('*'),
             db.from('cat_clase_vehiculo').select('*'),
@@ -164,7 +164,8 @@ export const getCatalogos = async (req: AuthRequest, res: Response, next: NextFu
             db.from('empresas').select('id, empresa').order('empresa'),
             db.from('areas_operacion').select('id, nombre').order('nombre'),
             db.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').order('placa'),
-            db.from('vehiculo').select('asignado_a').not('asignado_a', 'is', null)
+            db.from('vehiculo').select('asignado_a').not('asignado_a', 'is', null),
+            db.from('encargados').select('*')
         ]);
 
         // Filter plates that are already in the vehiculo table
@@ -193,7 +194,8 @@ export const getCatalogos = async (req: AuthRequest, res: Response, next: NextFu
             operaciones: operaciones.data || [],
             placas: placasData,
             placasDisponibles: placasDisponibles,
-            asignados: asignados
+            asignados: asignados,
+            encargados: encargados.data || []
         });
     } catch (error) {
         console.error('Error fetching catalogs:', error);
