@@ -8,6 +8,12 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
         const operacion_id = req.query.operacion_id as string;
         const asignado_a = req.query.asignado_a as string;
         const placa = req.query.placa as string; // Contiene el término general de búsqueda
+        const marca = req.query.marca as string;
+        const clase = req.query.clase as string;
+        const tipo = req.query.tipo as string;
+        const estado_interno = req.query.estado_interno as string;
+        const sort_by = req.query.sort_by as string;
+        const sort_order = req.query.sort_order as string;
         
         // Pagination setup
         const page = parseInt(req.query.page as string) || 1;
@@ -38,7 +44,8 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
                 cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
                 marca_id,
                 cat_marca:cat_marca!vehiculo_caracteristicas_marca_id_fkey ( nombre ),
-                anio:año
+                anio:año,
+                Estado
             )
         `;
 
@@ -93,6 +100,106 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
             });
         }
 
+        if (marca) {
+            const marcas = marca.split(',');
+            filteredData = filteredData.filter((v: any) => {
+                const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                return marcas.includes(chars?.cat_marca?.nombre);
+            });
+        }
+        if (clase) {
+            const clases = clase.split(',');
+            filteredData = filteredData.filter((v: any) => {
+                const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                return clases.includes(chars?.cat_clase_vehiculo?.nombre);
+            });
+        }
+        if (tipo) {
+            const tipos = tipo.split(',');
+            filteredData = filteredData.filter((v: any) => {
+                const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                return tipos.includes(chars?.cat_tipo_vehiculo?.nombre);
+            });
+        }
+        if (estado_interno) {
+            const estados = estado_interno.split(',');
+            filteredData = filteredData.filter((v: any) => {
+                const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                const e = chars?.Estado || 'Operativo';
+                return estados.includes(e);
+            });
+        }
+
+        if (sort_by) {
+            filteredData.sort((a: any, b: any) => {
+                let valA = '';
+                let valB = '';
+                
+                const getChars = (v: any) => Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                
+                if (sort_by === 'placa') {
+                    const pa = Array.isArray(a.areas_placas) ? a.areas_placas[0] : a.areas_placas;
+                    const pb = Array.isArray(b.areas_placas) ? b.areas_placas[0] : b.areas_placas;
+                    valA = (pa?.placa || a.placa || '').toLowerCase();
+                    valB = (pb?.placa || b.placa || '').toLowerCase();
+                } else if (sort_by === 'clase') {
+                    valA = (getChars(a)?.cat_clase_vehiculo?.nombre || '').toLowerCase();
+                    valB = (getChars(b)?.cat_clase_vehiculo?.nombre || '').toLowerCase();
+                } else if (sort_by === 'tipo') {
+                    valA = (getChars(a)?.cat_tipo_vehiculo?.nombre || '').toLowerCase();
+                    valB = (getChars(b)?.cat_tipo_vehiculo?.nombre || '').toLowerCase();
+                } else if (sort_by === 'marca') {
+                    valA = (getChars(a)?.cat_marca?.nombre || '').toLowerCase();
+                    valB = (getChars(b)?.cat_marca?.nombre || '').toLowerCase();
+                } else if (sort_by === 'empresa') {
+                    const ea = Array.isArray(a.empresas) ? a.empresas[0] : a.empresas;
+                    const eb = Array.isArray(b.empresas) ? b.empresas[0] : b.empresas;
+                    valA = (ea?.empresa || '').toLowerCase();
+                    valB = (eb?.empresa || '').toLowerCase();
+                } else if (sort_by === 'area_operacion') {
+                    const aa = Array.isArray(a.areas_operacion) ? a.areas_operacion[0] : a.areas_operacion;
+                    const ab = Array.isArray(b.areas_operacion) ? b.areas_operacion[0] : b.areas_operacion;
+                    valA = (aa?.nombre || '').toLowerCase();
+                    valB = (ab?.nombre || '').toLowerCase();
+                } else if (sort_by === 'asignado_a') {
+                    valA = (a.asignado_a || '').toLowerCase();
+                    valB = (b.asignado_a || '').toLowerCase();
+                } else if (sort_by === 'estado_interno') {
+                    valA = (getChars(a)?.Estado || 'Operativo').toLowerCase();
+                    valB = (getChars(b)?.Estado || 'Operativo').toLowerCase();
+                }
+
+                if (valA < valB) return sort_order === 'asc' ? -1 : 1;
+                if (valA > valB) return sort_order === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        const aggregations = {
+            clase: {} as Record<string, number>,
+            tipo: {} as Record<string, number>,
+            empresa: {} as Record<string, number>,
+            asignado_a: {} as Record<string, number>,
+            estado_interno: {} as Record<string, number>
+        };
+
+        filteredData.forEach((v: any) => {
+            const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+            const empData = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas;
+            
+            const clase = chars?.cat_clase_vehiculo?.nombre || 'Sin Clase';
+            const tipo = chars?.cat_tipo_vehiculo?.nombre || 'Sin Tipo';
+            const empresa = empData?.empresa || 'Sin Empresa';
+            const asignado = v.asignado_a || 'Sin Asignar';
+            const estado = chars?.Estado || 'Operativo';
+
+            aggregations.clase[clase] = (aggregations.clase[clase] || 0) + 1;
+            aggregations.tipo[tipo] = (aggregations.tipo[tipo] || 0) + 1;
+            aggregations.empresa[empresa] = (aggregations.empresa[empresa] || 0) + 1;
+            aggregations.asignado_a[asignado] = (aggregations.asignado_a[asignado] || 0) + 1;
+            aggregations.estado_interno[estado] = (aggregations.estado_interno[estado] || 0) + 1;
+        });
+
         const total = filteredData.length;
         const paginatedData = filteredData.slice(offset, offset + limit);
 
@@ -105,7 +212,8 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
                 page,
                 limit,
                 totalPages: Math.ceil(total / limit)
-            }
+            },
+            aggregations
         });
     } catch (error) {
         console.error('Error fetching vehiculos:', error);
