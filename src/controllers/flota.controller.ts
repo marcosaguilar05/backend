@@ -200,6 +200,27 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
             area_operacion: {} as Record<string, number>
         };
 
+        // Pre-populate keys so they don't disappear when filtered
+        (data || []).forEach((v: any) => {
+            const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+            const empData = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas;
+            const areaData = Array.isArray(v.areas_operacion) ? v.areas_operacion[0] : v.areas_operacion;
+            
+            const clase = chars?.cat_clase_vehiculo?.nombre || 'Sin Clase';
+            const tipo = chars?.cat_tipo_vehiculo?.nombre || 'Sin Tipo';
+            const empresa = empData?.empresa || 'Sin Empresa';
+            const asignado = v.asignado_a || 'Sin Asignar';
+            const estado = chars?.Estado || 'Operativo';
+            const area = areaData?.nombre || 'Sin Área';
+
+            if (aggregations.clase[clase] === undefined) aggregations.clase[clase] = 0;
+            if (aggregations.tipo[tipo] === undefined) aggregations.tipo[tipo] = 0;
+            if (aggregations.empresa[empresa] === undefined) aggregations.empresa[empresa] = 0;
+            if (aggregations.asignado_a[asignado] === undefined) aggregations.asignado_a[asignado] = 0;
+            if (aggregations.estado_interno[estado] === undefined) aggregations.estado_interno[estado] = 0;
+            if (aggregations.area_operacion[area] === undefined) aggregations.area_operacion[area] = 0;
+        });
+
         filteredData.forEach((v: any) => {
             const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
             const empData = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas;
