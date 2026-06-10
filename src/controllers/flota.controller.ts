@@ -196,24 +196,28 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
             tipo: {} as Record<string, number>,
             empresa: {} as Record<string, number>,
             asignado_a: {} as Record<string, number>,
-            estado_interno: {} as Record<string, number>
+            estado_interno: {} as Record<string, number>,
+            area_operacion: {} as Record<string, number>
         };
 
         filteredData.forEach((v: any) => {
             const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
             const empData = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas;
+            const areaData = Array.isArray(v.areas_operacion) ? v.areas_operacion[0] : v.areas_operacion;
             
             const clase = chars?.cat_clase_vehiculo?.nombre || 'Sin Clase';
             const tipo = chars?.cat_tipo_vehiculo?.nombre || 'Sin Tipo';
             const empresa = empData?.empresa || 'Sin Empresa';
             const asignado = v.asignado_a || 'Sin Asignar';
             const estado = chars?.Estado || 'Operativo';
+            const area = areaData?.nombre || 'Sin Área';
 
             aggregations.clase[clase] = (aggregations.clase[clase] || 0) + 1;
             aggregations.tipo[tipo] = (aggregations.tipo[tipo] || 0) + 1;
             aggregations.empresa[empresa] = (aggregations.empresa[empresa] || 0) + 1;
             aggregations.asignado_a[asignado] = (aggregations.asignado_a[asignado] || 0) + 1;
             aggregations.estado_interno[estado] = (aggregations.estado_interno[estado] || 0) + 1;
+            aggregations.area_operacion[area] = (aggregations.area_operacion[area] || 0) + 1;
         });
 
         const total = filteredData.length;
