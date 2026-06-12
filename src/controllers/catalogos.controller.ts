@@ -57,7 +57,7 @@ export const catalogosController = {
 
     async getSaldoBomba(req: AuthRequest, res: Response) {
         try {
-            const { bombaId, fecha } = req.query;
+            const { bombaId, fecha, excludeId } = req.query;
 
             if (!bombaId || !fecha) {
                 res.status(400).json({ error: 'Bomba ID y fecha son requeridos' });
@@ -66,11 +66,20 @@ export const catalogosController = {
 
             // Buscar el último registro para esa bomba en fecha <= fecha dada
             // Usamos tanqueo_relaciones para asegurar consistencia
-            const { data, error } = await (req.supabase || supabase)
+            let dbQuery = (req.supabase || supabase)
                 .from('tanqueo_relaciones')
                 .select('saldo_disponible')
-                .eq('bomba_id', parseInt(bombaId as string))
-                .lte('fecha', fecha)
+                .eq('bomba_id', parseInt(bombaId as string));
+
+            if (excludeId) {
+                // Si estamos editando, queremos el último saldo ANTES de este registro.
+                // Es decir, registros con fecha menor, o con la misma fecha pero ID menor.
+                dbQuery = dbQuery.or(`fecha.lt.${fecha},and(fecha.eq.${fecha},id.lt.${excludeId})`);
+            } else {
+                dbQuery = dbQuery.lte('fecha', fecha);
+            }
+
+            const { data, error } = await dbQuery
                 .order('fecha', { ascending: false })
                 .order('id', { ascending: false })
                 .limit(1)
