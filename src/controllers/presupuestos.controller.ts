@@ -520,7 +520,7 @@ export const presupuestosController = {
                     grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre),
                     rubro:maestro_rubros!rubro_id(id, codigo, nombre),
                     personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
-                    presupuesto_items(id, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, tipo:tipos_presupuesto(id, nombre))
+                    presupuesto_items(id, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre, unidad))
                 `, { count: 'exact' });
 
             // Filtros directos por ID
