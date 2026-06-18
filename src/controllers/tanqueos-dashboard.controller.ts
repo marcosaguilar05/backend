@@ -72,7 +72,7 @@ export const tanqueosDashboardController = {
             // Solo tanqueos (no anticipos)
             query = query.eq('tipo_operacion', 'TANQUEO');
 
-            const { data, error } = await query;
+            const { data, error } = await query.order('fecha', { ascending: false }).limit(100000);
 
             if (error) {
                 console.error('Error en getKPIs:', error);
@@ -689,7 +689,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
-            const { data, error } = await query;
+            const { data, error } = await query.order('fecha', { ascending: false }).limit(100000);
             const { data: limitesData } = await (req.supabase || supabase).from('limites_combustible').select('*');
 
             if (error) {
@@ -837,7 +837,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
-            const { data, error } = await query.order('fecha', { ascending: false });
+            const { data, error } = await query.order('fecha', { ascending: false }).limit(100000);
             const { data: limitesData } = await (req.supabase || supabase).from('limites_combustible').select('*');
 
             if (error) {
@@ -937,12 +937,16 @@ export const tanqueosDashboardController = {
             if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
             if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
 
-            query = query.eq('tipo_operacion', 'TANQUEO');
+            query = query.eq('tipo_operacion', 'TANQUEO').order('fecha', { ascending: false }).limit(100000);
 
-            const [saldosRes, tanqueosRes] = await Promise.all([saldosPromise, query]);
+            const limitesPromise = (req.supabase || supabase).from('limites_combustible').select('*');
+            const [saldosRes, tanqueosRes, limitesRes] = await Promise.all([saldosPromise, query, limitesPromise]);
 
             if (tanqueosRes.error) throw tanqueosRes.error;
             if (saldosRes.error) throw saldosRes.error;
+            if (limitesRes.error) throw limitesRes.error;
+            
+            const limitesData = limitesRes.data || [];
 
             const meses = req.query.meses as string;
             let data = tanqueosRes.data || [];
@@ -987,7 +991,7 @@ export const tanqueosDashboardController = {
                 totalGalones += gal;
                 totalValor += val;
                 totalSaldo += t.saldo_disponible || 0;
-                if (!t.horometro) sinHorometro++;
+                if (!t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM') sinHorometro++;
 
                 // porCombustible (KPIs)
                 if (!porCombustible[tipo]) porCombustible[tipo] = { galones: 0, valor: 0, cantidad: 0 };
@@ -1049,11 +1053,7 @@ export const tanqueosDashboardController = {
             const alerts: any[] = [];
             if (sinHorometro > 0) alerts.push({ tipo_alerta: 'SIN_HOROMETRO', mensaje: `${sinHorometro} tanqueo(s) sin registro de horómetro`, cantidad: sinHorometro, severidad: 'warning' });
             
-            const costsAnormales = data.filter(t => {
-                if (!t.costo_por_galon || !t.tipo_combustible) return false;
-                const threshold = FUEL_PRICE_THRESHOLDS[t.tipo_combustible as keyof typeof FUEL_PRICE_THRESHOLDS];
-                return threshold ? (t.costo_por_galon < threshold.min || t.costo_por_galon > threshold.max) : false;
-            }).length;
+            const costsAnormales = data.filter(t => isCostoAnormal(t, limitesData)).length;
             if (costsAnormales > 0) alerts.push({ tipo_alerta: 'COSTO_ANORMAL', mensaje: `${costsAnormales} tanqueo(s) con costo por galón fuera de rango`, cantidad: costsAnormales, severidad: 'error' });
 
 
