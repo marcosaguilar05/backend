@@ -19,18 +19,29 @@ const applyFilter = (q: any, field: string, value: string) => {
 };
 
 const isCostoAnormal = (t: any, limitesData?: any[]) => {
-    if (t.costo_por_galon === null || t.costo_por_galon === undefined || !t.tipo_combustible) return false;
+    // Si el costo es 0 o no existe, no lo contamos como "fuera de rango"
+    if (!t.costo_por_galon || !t.tipo_combustible) return false;
     
-    const costo = Number(t.costo_por_galon);
+    // Redondeamos para evitar que decimales (ej 6999.99) disparen falsas alertas frente a 7000
+    const costo = Math.round(Number(t.costo_por_galon));
     let min = null;
     let max = null;
     
     if (limitesData && t.fecha) {
         const fechaTanqueo = t.fecha.split('T')[0];
-        const limite = limitesData.find((l: any) => 
+        let limite = limitesData.find((l: any) => 
             l.tipo_combustible === t.tipo_combustible &&
             fechaTanqueo >= l.fecha_inicio && fechaTanqueo <= l.fecha_final
         );
+        
+        // Si no se encuentra un rango de fechas exacto (ej. un registro de 2024 o un hueco en 2025),
+        // buscamos el límite más reciente de la BD para ese tipo de combustible como fallback seguro
+        if (!limite) {
+            limite = limitesData
+                .filter((l: any) => l.tipo_combustible === t.tipo_combustible)
+                .sort((a: any, b: any) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime())[0];
+        }
+
         if (limite && limite.lit_inferior != null && limite.lit_superior != null) {
             min = Number(limite.lit_inferior);
             max = Number(limite.lit_superior);
@@ -44,6 +55,7 @@ const isCostoAnormal = (t: any, limitesData?: any[]) => {
         max = threshold.max;
     }
     
+    // Es alerta SÓLO si está estrictamente POR DEBAJO del mínimo o POR ENCIMA del máximo
     return costo < min || costo > max;
 };
 
