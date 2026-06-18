@@ -19,8 +19,9 @@ const applyFilter = (q: any, field: string, value: string) => {
 };
 
 const isCostoAnormal = (t: any, limitesData?: any[]) => {
-    if (!t.costo_por_galon || !t.tipo_combustible) return false;
+    if (t.costo_por_galon === null || t.costo_por_galon === undefined || !t.tipo_combustible) return false;
     
+    const costo = Number(t.costo_por_galon);
     let min = null;
     let max = null;
     
@@ -30,20 +31,20 @@ const isCostoAnormal = (t: any, limitesData?: any[]) => {
             l.tipo_combustible === t.tipo_combustible &&
             fechaTanqueo >= l.fecha_inicio && fechaTanqueo <= l.fecha_final
         );
-        if (limite) {
-            min = limite.lit_inferior;
-            max = limite.lit_superior;
+        if (limite && limite.lit_inferior != null && limite.lit_superior != null) {
+            min = Number(limite.lit_inferior);
+            max = Number(limite.lit_superior);
         }
     }
     
-    if (min === null || max === null) {
+    if (min === null || max === null || isNaN(min) || isNaN(max)) {
         const threshold = FUEL_PRICE_THRESHOLDS[t.tipo_combustible as keyof typeof FUEL_PRICE_THRESHOLDS];
         if (!threshold) return false;
         min = threshold.min;
         max = threshold.max;
     }
     
-    return t.costo_por_galon < min || t.costo_por_galon > max;
+    return costo < min || costo > max;
 };
 
 export const tanqueosDashboardController = {
