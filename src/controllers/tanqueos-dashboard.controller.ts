@@ -18,6 +18,34 @@ const applyFilter = (q: any, field: string, value: string) => {
     return q.in(field, arr);
 };
 
+const isCostoAnormal = (t: any, limitesData?: any[]) => {
+    if (!t.costo_por_galon || !t.tipo_combustible) return false;
+    
+    let min = null;
+    let max = null;
+    
+    if (limitesData && t.fecha) {
+        const fechaTanqueo = t.fecha.split('T')[0];
+        const limite = limitesData.find((l: any) => 
+            l.tipo_combustible === t.tipo_combustible &&
+            fechaTanqueo >= l.fecha_inicio && fechaTanqueo <= l.fecha_final
+        );
+        if (limite) {
+            min = limite.lit_inferior;
+            max = limite.lit_superior;
+        }
+    }
+    
+    if (min === null || max === null) {
+        const threshold = FUEL_PRICE_THRESHOLDS[t.tipo_combustible as keyof typeof FUEL_PRICE_THRESHOLDS];
+        if (!threshold) return false;
+        min = threshold.min;
+        max = threshold.max;
+    }
+    
+    return t.costo_por_galon < min || t.costo_por_galon > max;
+};
+
 export const tanqueosDashboardController = {
     // KPIs Ejecutivos
     async getKPIs(req: AuthRequest, res: Response): Promise<void> {
@@ -662,6 +690,7 @@ export const tanqueosDashboardController = {
             query = query.eq('tipo_operacion', 'TANQUEO');
 
             const { data, error } = await query;
+            const { data: limitesData } = await (req.supabase || supabase).from('limites_combustible').select('*');
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -682,12 +711,7 @@ export const tanqueosDashboardController = {
             }
 
             // 2. Costos por galón fuera de rango
-            const costosAnormales = data?.filter(t => {
-                if (!t.costo_por_galon || !t.tipo_combustible) return false;
-                const threshold = FUEL_PRICE_THRESHOLDS[t.tipo_combustible as keyof typeof FUEL_PRICE_THRESHOLDS];
-                if (!threshold) return false;
-                return t.costo_por_galon < threshold.min || t.costo_por_galon > threshold.max;
-            }).length || 0;
+            const costosAnormales = data?.filter(t => isCostoAnormal(t, limitesData || [])).length || 0;
 
             if (costosAnormales > 0) {
                 alerts.push({
@@ -756,6 +780,7 @@ export const tanqueosDashboardController = {
                 .order('id', { ascending: false });
 
             const { data, error, count } = await query.range(offset, offset + limit - 1);
+            const { data: limitesData } = await (req.supabase || supabase).from('limites_combustible').select('*');
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -764,16 +789,11 @@ export const tanqueosDashboardController = {
 
             // Agregar flags a cada registro
             const enrichedData = data?.map((t: any) => {
-                const threshold = FUEL_PRICE_THRESHOLDS[t.tipo_combustible as keyof typeof FUEL_PRICE_THRESHOLDS];
-
                 return {
                     ...t,
                     flags: {
                         sin_horometro: !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM',
-                        costo_anormal: threshold ? (
-                            (t.costo_por_galon || 0) < threshold.min ||
-                            (t.costo_por_galon || 0) > threshold.max
-                        ) : false
+                        costo_anormal: isCostoAnormal(t, limitesData || [])
                     }
                 };
             });
@@ -818,6 +838,7 @@ export const tanqueosDashboardController = {
             query = query.eq('tipo_operacion', 'TANQUEO');
 
             const { data, error } = await query.order('fecha', { ascending: false });
+            const { data: limitesData } = await (req.supabase || supabase).from('limites_combustible').select('*');
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -832,12 +853,7 @@ export const tanqueosDashboardController = {
                     break;
 
                 case 'COSTO_ANORMAL':
-                    filteredRecords = data?.filter(t => {
-                        if (!t.costo_por_galon || !t.tipo_combustible) return false;
-                        const threshold = FUEL_PRICE_THRESHOLDS[t.tipo_combustible as keyof typeof FUEL_PRICE_THRESHOLDS];
-                        if (!threshold) return false;
-                        return t.costo_por_galon < threshold.min || t.costo_por_galon > threshold.max;
-                    }) || [];
+                    filteredRecords = data?.filter(t => isCostoAnormal(t, limitesData || [])) || [];
                     break;
 
 
