@@ -65,7 +65,7 @@ export const tanqueosDashboardController = {
             const conductoresActivos = new Set(data?.map(t => t.conductor).filter(Boolean)).size;
 
             // % sin horómetro
-            const sinHorometro = data?.filter(t => !t.horometro).length || 0;
+            const sinHorometro = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM').length || 0;
             const porcentajeSinHorometro = numTanqueos > 0 ? (sinHorometro / numTanqueos) * 100 : 0;
 
             // KPIs por tipo de combustible
@@ -671,7 +671,7 @@ export const tanqueosDashboardController = {
             const alerts: any[] = [];
 
             // 1. Tanqueos sin horómetro
-            const sinHorometro = data?.filter(t => !t.horometro).length || 0;
+            const sinHorometro = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM').length || 0;
             if (sinHorometro > 0) {
                 alerts.push({
                     tipo_alerta: 'SIN_HOROMETRO',
@@ -769,7 +769,7 @@ export const tanqueosDashboardController = {
                 return {
                     ...t,
                     flags: {
-                        sin_horometro: !t.horometro,
+                        sin_horometro: !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM',
                         costo_anormal: threshold ? (
                             (t.costo_por_galon || 0) < threshold.min ||
                             (t.costo_por_galon || 0) > threshold.max
@@ -828,7 +828,7 @@ export const tanqueosDashboardController = {
 
             switch (alertType) {
                 case 'SIN_HOROMETRO':
-                    filteredRecords = data?.filter(t => !t.horometro) || [];
+                    filteredRecords = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM') || [];
                     break;
 
                 case 'COSTO_ANORMAL':
