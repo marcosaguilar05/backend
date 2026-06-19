@@ -49,9 +49,15 @@ export const pagosController = {
 
             // 2. Construir la consulta de pagos en MongoDB: dependencia TRANSPORTES y activo true
             const query: any = {
-                dependencia: 'TRANSPORTES',
+                $or: [
+                    { dependencia: /TRANSPORTES/i },
+                    { dependencia: '67b64d6ec70c84f175463246' }
+                ],
                 activo: true
             };
+
+            // Construir condiciones compuestas ($and)
+            const andConditions: any[] = [];
 
             // Helper to apply multi-value filters in MongoDB
             const applyMongoFilter = (field: string, val: any) => {
@@ -65,8 +71,18 @@ export const pagosController = {
             // Filtro por estado de pago
             applyMongoFilter('estadoPago', estadoPago);
 
-            // Filtro por grupo de rubro
-            applyMongoFilter('grupoRubro', grupoRubro);
+            // Filtro por grupo de rubro (soporta campo viejo y nuevo)
+            if (grupoRubro) {
+                const arr = String(grupoRubro).split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length > 0) {
+                    andConditions.push({
+                        $or: [
+                            { grupoRubro: { $in: arr } },
+                            { nombreGrupoRubro: { $in: arr } }
+                        ]
+                    });
+                }
+            }
 
             // Filtro por rubro
             applyMongoFilter('rubro', rubro);
@@ -76,9 +92,6 @@ export const pagosController = {
 
             // Filtro por placa (vehículo)
             applyMongoFilter('placa', placa);
-
-            // Construir condiciones compuestas ($and)
-            const andConditions: any[] = [];
 
             // Filtro por término de búsqueda (concepto, tercero o placa)
             if (search) {
@@ -188,14 +201,18 @@ export const pagosController = {
                 });
             }
 
-            const query = {
-                dependencia: 'TRANSPORTES',
+            const query: any = {
+                $or: [
+                    { dependencia: /TRANSPORTES/i },
+                    { dependencia: '67b64d6ec70c84f175463246' }
+                ],
                 activo: true
             };
 
             // Obtener valores distintos para poblar los filtros
-            const [grupos, rubros, subRubros, placas] = await Promise.all([
+            const [grupos, gruposNuevos, rubros, subRubros, placas] = await Promise.all([
                 PagoModel.distinct('grupoRubro', query),
+                PagoModel.distinct('nombreGrupoRubro', query),
                 PagoModel.distinct('rubro', query),
                 PagoModel.distinct('subRubro', query),
                 PagoModel.distinct('placa', query)
@@ -205,8 +222,10 @@ export const pagosController = {
             const cleanAndSort = (arr: any[]) => 
                 arr.filter(item => item !== null && item !== undefined && item !== '').sort();
 
+            const allGrupos = [...new Set([...(grupos || []), ...(gruposNuevos || [])])];
+
             res.json({
-                grupos: cleanAndSort(grupos),
+                grupos: cleanAndSort(allGrupos),
                 rubros: cleanAndSort(rubros),
                 subRubros: cleanAndSort(subRubros),
                 placas: cleanAndSort(placas)

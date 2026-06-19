@@ -164,7 +164,6 @@ function applyFiltersToQuery(query: any, filters: any, queryParams: any) {
 // Helper para generar la consulta a MongoDB de Pagos
 function getMongoQueryForPagos(queryParams: any, monthNums: number[], dynamicValidacionGrupos: any) {
     const mongoQuery: any = {
-        dependencia: /TRANSPORTES/i,
         activo: true,
         ...dynamicValidacionGrupos
     };
@@ -180,7 +179,19 @@ function getMongoQueryForPagos(queryParams: any, monthNums: number[], dynamicVal
     applyMongoFilter('placa', queryParams.placa);
     applyMongoFilter('areaOperacion', queryParams.area_operacion);
     applyMongoFilter('empresa', queryParams.empresa);
-    applyMongoFilter('grupoRubro', queryParams.grupo_rubro);
+
+    if (queryParams.grupo_rubro && queryParams.grupo_rubro !== 'undefined') {
+        const arr = String(queryParams.grupo_rubro).split(',').map(s => s.trim()).filter(Boolean);
+        if (arr.length > 0) {
+            const inRegExp = { $in: arr.map(a => new RegExp(a, 'i')) };
+            if (mongoQuery.$and) {
+                mongoQuery.$and.push({ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] });
+            } else {
+                mongoQuery.$and = [{ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] }];
+            }
+        }
+    }
+
     applyMongoFilter('rubro', queryParams.rubro);
     applyMongoFilter('subRubro', queryParams.sub_rubro);
 
@@ -238,8 +249,17 @@ async function getValidacionGruposDinamica(dbClient: any, queryParams: any) {
             const key = `${g}|${r}`;
             if (!combos.has(key)) {
                 combos.add(key);
-                const cond: any = { grupoRubro: new RegExp(`^${g}$`, 'i') };
-                if (r) cond.rubro = new RegExp(`^${r}$`, 'i');
+                const cond: any = { 
+                    $or: [
+                        { grupoRubro: new RegExp(`^${g}$`, 'i') },
+                        { nombreGrupoRubro: new RegExp(`^${g}$`, 'i') }
+                    ]
+                };
+                if (r) {
+                    cond.$or.forEach((orCond: any) => {
+                        orCond.rubro = new RegExp(`^${r}$`, 'i');
+                    });
+                }
                 orConditions.push(cond);
             }
         });
@@ -420,7 +440,7 @@ export const presupuestosDashboardController = {
                         $group: {
                             _id: { 
                                 placa: '$placa', 
-                                grupoRubro: '$grupoRubro', 
+                                grupoRubro: { $ifNull: ['$grupoRubro', '$nombreGrupoRubro'] }, 
                                 rubro: '$rubro', 
                                 subRubro: '$subRubro', 
                                 concepto: '$concepto', 
