@@ -659,38 +659,31 @@ export const presupuestosController = {
                 
                 const { data: presupuestosForValidation } = await dbClient
                     .from('presupuestos')
-                    .select('grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre), rubro:maestro_rubros!presupuestos_rubro_id_fkey(nombre)')
+                    .select('grupo_rubro_id, grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre, codigo_concatenado)')
                     .eq('anio', yearNum);
 
                 let validacionGrupos: any = { _id: null }; // Fallback para no coincidir nada
                 if (presupuestosForValidation && presupuestosForValidation.length > 0) {
-                    const combos = new Set<string>();
-                    const orConditions: any[] = [];
+                    const groups = new Set<string>();
+                    const codigos = new Set<string>();
                     presupuestosForValidation.forEach((p: any) => {
-                        const g = (p.grupo?.nombre || '').trim();
-                        const r = (p.rubro?.nombre || '').trim();
-                        if (!g) return;
-
-                        const key = `${g}|${r}`;
-                        if (!combos.has(key)) {
-                            combos.add(key);
-                            const cond: any = { 
-                                $or: [
-                                    { grupoRubro: new RegExp(`^${g}$`, 'i') },
-                                    { nombreGrupoRubro: new RegExp(`^${g}$`, 'i') }
-                                ]
-                            };
-                            if (r) {
-                                cond.$or.forEach((orCond: any) => {
-                                    orCond.rubro = new RegExp(`^${r}$`, 'i');
-                                });
-                            }
-                            orConditions.push(cond);
-                        }
+                        if (p.grupo?.nombre) groups.add(p.grupo.nombre.trim());
+                        if (p.grupo?.codigo_concatenado) codigos.add(p.grupo.codigo_concatenado.trim());
                     });
-                    if (orConditions.length > 0) {
-                        validacionGrupos = { $or: orConditions };
+
+                    const inRegExp = { $in: Array.from(groups).map(g => new RegExp(g, 'i')) };
+                    const orFilters: any[] = [
+                        { grupoRubro: inRegExp },
+                        { nombreGrupoRubro: inRegExp }
+                    ];
+
+                    if (codigos.size > 0) {
+                        const codesArray = Array.from(codigos);
+                        orFilters.push({ grupoRubro: { $in: codesArray } });
+                        orFilters.push({ nombreGrupoRubro: { $in: codesArray } });
                     }
+
+                    validacionGrupos = { $or: orFilters };
                 }
 
                 const mongoQuery: any = {
@@ -714,10 +707,28 @@ export const presupuestosController = {
                     const arr = String(grupo_rubro).split(',').map(s => s.trim()).filter(Boolean);
                     if (arr.length > 0) {
                         const inRegExp = { $in: arr.map(a => new RegExp(a, 'i')) };
+                        
+                        // Agregar soporte para los codigos concatenados si se filtra por nombre de grupo
+                        let codigos: string[] = [];
+                        if (grupoRubroIds && grupoRubroIds.length > 0) {
+                            const { data: grData } = await dbClient.from('maestro_rubros').select('codigo_concatenado').in('id', grupoRubroIds);
+                            codigos = grData?.map(d => d.codigo_concatenado).filter(Boolean) || [];
+                        }
+
+                        const orFilter: any[] = [
+                            { grupoRubro: inRegExp },
+                            { nombreGrupoRubro: inRegExp }
+                        ];
+
+                        if (codigos.length > 0) {
+                            orFilter.push({ grupoRubro: { $in: codigos } });
+                            orFilter.push({ nombreGrupoRubro: { $in: codigos } });
+                        }
+
                         if (mongoQuery.$and) {
-                            mongoQuery.$and.push({ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] });
+                            mongoQuery.$and.push({ $or: orFilter });
                         } else {
-                            mongoQuery.$and = [{ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] }];
+                            mongoQuery.$and = [{ $or: orFilter }];
                         }
                     }
                 }
