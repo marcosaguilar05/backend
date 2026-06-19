@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.presupuestosController = void 0;
 const supabase_1 = require("../config/supabase");
+const pagos_model_1 = require("../models/pagos.model");
 exports.presupuestosController = {
     // ==================== CATÁLOGOS ====================
     // Obtener maestro de rubros
@@ -150,6 +151,134 @@ exports.presupuestosController = {
             res.status(500).json({ error: 'Error en el servidor' });
         }
     },
+    // Actualizar tipo de presupuesto (Solo ADMIN)
+    async updateTipo(req, res) {
+        try {
+            const dbClient = req.supabase || supabase_1.supabase;
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+            const { id } = req.params;
+            const { nombre, descripcion } = req.body;
+            if (!nombre) {
+                res.status(400).json({ error: 'Nombre es requerido' });
+                return;
+            }
+            const { data, error } = await dbClient
+                .from('tipos_presupuesto')
+                .update({
+                nombre,
+                descripcion
+            })
+                .eq('id', id)
+                .select()
+                .single();
+            if (error) {
+                console.error('Error de Supabase en updateTipo:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            res.json(data);
+        }
+        catch (error) {
+            console.error('Error en updateTipo:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+    // Actualizar concepto de presupuesto (Solo ADMIN)
+    async updateConcepto(req, res) {
+        try {
+            const dbClient = req.supabase || supabase_1.supabase;
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+            const { id } = req.params;
+            const { nombre, unidad } = req.body;
+            if (!nombre) {
+                res.status(400).json({ error: 'Nombre es requerido' });
+                return;
+            }
+            const { data, error } = await dbClient
+                .from('conceptos_presupuesto')
+                .update({
+                nombre,
+                unidad
+            })
+                .eq('id', id)
+                .select()
+                .single();
+            if (error) {
+                console.error('Error de Supabase en updateConcepto:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            res.json(data);
+        }
+        catch (error) {
+            console.error('Error en updateConcepto:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+    // Eliminar tipo de presupuesto (Solo ADMIN)
+    async deleteTipo(req, res) {
+        try {
+            const dbClient = req.supabase || supabase_1.supabase;
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+            const { id } = req.params;
+            const { error } = await dbClient
+                .from('tipos_presupuesto')
+                .delete()
+                .eq('id', id);
+            if (error) {
+                console.error('Error de Supabase en deleteTipo:', error);
+                if (error.code === '23503') {
+                    res.status(400).json({ error: 'No se puede eliminar este Tipo porque está siendo utilizado en ítems de presupuesto' });
+                    return;
+                }
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            res.json({ message: 'Tipo eliminado correctamente' });
+        }
+        catch (error) {
+            console.error('Error en deleteTipo:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+    // Eliminar concepto de presupuesto (Solo ADMIN)
+    async deleteConcepto(req, res) {
+        try {
+            const dbClient = req.supabase || supabase_1.supabase;
+            if (req.user?.rol !== 'ADMIN') {
+                res.status(403).json({ error: 'No tiene permisos para realizar esta acción' });
+                return;
+            }
+            const { id } = req.params;
+            const { error } = await dbClient
+                .from('conceptos_presupuesto')
+                .delete()
+                .eq('id', id);
+            if (error) {
+                console.error('Error de Supabase en deleteConcepto:', error);
+                if (error.code === '23503') {
+                    res.status(400).json({ error: 'No se puede eliminar este Concepto porque está siendo utilizado en ítems de presupuesto' });
+                    return;
+                }
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            res.json({ message: 'Concepto eliminado correctamente' });
+        }
+        catch (error) {
+            console.error('Error en deleteConcepto:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
     // ==================== PRESUPUESTOS ====================
     // Listar presupuestos con paginación
     async getAll(req, res) {
@@ -162,120 +291,141 @@ exports.presupuestosController = {
             // Resolve area_operacion names to IDs
             let areaIds = [];
             if (area_operacion && area_operacion !== 'undefined' && area_operacion !== '') {
-                const { data: areaData, error: areaError } = await dbClient
-                    .from('areas_operacion')
-                    .select('id')
-                    .ilike('nombre', area_operacion.trim());
-                if (areaError)
-                    console.error('Error resolving area_operacion:', areaError);
-                areaIds = areaData?.map(a => a.id) || [];
+                const names = String(area_operacion).split(',').map(s => s.trim()).filter(Boolean);
+                if (names.length > 0) {
+                    const { data: areaData, error: areaError } = await dbClient
+                        .from('areas_operacion')
+                        .select('id')
+                        .in('nombre', names);
+                    if (areaError)
+                        console.error('Error resolving area_operacion:', areaError);
+                    areaIds = areaData?.map(a => a.id) || [];
+                }
                 console.log(`[Presupuestos Filter] Area: "${area_operacion}" -> ${areaIds}`);
             }
             // Resolve empresa names to IDs
             let empresaIds = [];
             if (empresa && empresa !== 'undefined' && empresa !== '') {
-                const { data: empresaData, error: empresaError } = await dbClient
-                    .from('empresas')
-                    .select('id')
-                    .ilike('empresa', empresa.trim());
-                if (empresaError)
-                    console.error('Error resolving empresa:', empresaError);
-                empresaIds = empresaData?.map(e => e.id) || [];
+                const names = String(empresa).split(',').map(s => s.trim()).filter(Boolean);
+                if (names.length > 0) {
+                    const { data: empresaData, error: empresaError } = await dbClient
+                        .from('empresas')
+                        .select('id')
+                        .in('empresa', names);
+                    if (empresaError)
+                        console.error('Error resolving empresa:', empresaError);
+                    empresaIds = empresaData?.map(e => e.id) || [];
+                }
                 console.log(`[Presupuestos Filter] Empresa: "${empresa}" -> ${empresaIds}`);
             }
             // Resolve grupo_rubro names to IDs
             let grupoRubroIds = [];
             if (grupo_rubro && grupo_rubro !== 'undefined' && grupo_rubro !== '') {
-                const { data: grupoData, error: grupoError } = await dbClient
-                    .from('maestro_rubros')
-                    .select('id')
-                    .ilike('nombre', grupo_rubro.trim());
-                if (grupoError)
-                    console.error('Error resolving grupo_rubro:', grupoError);
-                grupoRubroIds = grupoData?.map(g => g.id) || [];
+                const names = String(grupo_rubro).split(',').map(s => s.trim()).filter(Boolean);
+                if (names.length > 0) {
+                    const { data: grupoData, error: grupoError } = await dbClient
+                        .from('maestro_rubros')
+                        .select('id')
+                        .in('nombre', names);
+                    if (grupoError)
+                        console.error('Error resolving grupo_rubro:', grupoError);
+                    grupoRubroIds = grupoData?.map(g => g.id) || [];
+                }
                 console.log(`[Presupuestos Filter] Grupo (L1): "${grupo_rubro}" -> ${grupoRubroIds}`);
             }
             // Resolve rubro names to IDs
             let rubroIds = [];
             if (rubro && rubro !== 'undefined' && rubro !== '') {
-                const { data: rData, error: rError } = await dbClient
-                    .from('maestro_rubros')
-                    .select('id')
-                    .ilike('nombre', rubro.trim());
-                if (rError)
-                    console.error('Error resolving rubro:', rError);
-                rubroIds = rData?.map(r => r.id) || [];
+                const names = String(rubro).split(',').map(s => s.trim()).filter(Boolean);
+                if (names.length > 0) {
+                    const { data: rData, error: rError } = await dbClient
+                        .from('maestro_rubros')
+                        .select('id')
+                        .in('nombre', names);
+                    if (rError)
+                        console.error('Error resolving rubro:', rError);
+                    rubroIds = rData?.map(r => r.id) || [];
+                }
                 console.log(`[Presupuestos Filter] Rubro (L2): "${rubro}" -> ${rubroIds}`);
             }
             // Resolve sub_rubro names STRICTLY to item types (Level 3) to avoid collision with Rubro (Level 2)
             let budgetIdsFromTipo = [];
             if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') {
-                const subRubroName = sub_rubro.trim();
-                // Resolve all matches from tipos_presupuesto (the item-level definition)
-                const { data: tipoData, error: tipoError } = await dbClient
-                    .from('tipos_presupuesto')
-                    .select('id')
-                    .ilike('nombre', subRubroName);
-                if (tipoError)
-                    console.error('Error resolving sub_rubro from tipos_presupuesto:', tipoError);
-                if (tipoData && tipoData.length > 0) {
-                    const tipoIds = tipoData.map(t => t.id);
-                    // Match found in items table!
-                    const { data: itemData, error: itemError } = await dbClient
-                        .from('presupuesto_items')
-                        .select('presupuesto_id')
-                        .in('tipo_presupuesto_id', tipoIds);
-                    if (itemError)
-                        console.error('Error finding budgets for tipo_presupuesto:', itemError);
-                    if (itemData && itemData.length > 0) {
-                        budgetIdsFromTipo = [...new Set(itemData.map(d => Number(d.presupuesto_id)))];
+                const subRubroNames = String(sub_rubro).split(',').map(s => s.trim()).filter(Boolean);
+                if (subRubroNames.length > 0) {
+                    // Resolve all matches from tipos_presupuesto (the item-level definition)
+                    const { data: tipoData, error: tipoError } = await dbClient
+                        .from('tipos_presupuesto')
+                        .select('id')
+                        .in('nombre', subRubroNames);
+                    if (tipoError)
+                        console.error('Error resolving sub_rubro from tipos_presupuesto:', tipoError);
+                    if (tipoData && tipoData.length > 0) {
+                        const tipoIds = tipoData.map(t => t.id);
+                        // Match found in items table!
+                        const { data: itemData, error: itemError } = await dbClient
+                            .from('presupuesto_items')
+                            .select('presupuesto_id')
+                            .in('tipo_presupuesto_id', tipoIds);
+                        if (itemError)
+                            console.error('Error finding budgets for tipo_presupuesto:', itemError);
+                        if (itemData && itemData.length > 0) {
+                            budgetIdsFromTipo = [...new Set(itemData.map((d) => Number(d.presupuesto_id)))];
+                        }
                     }
                 }
                 console.log(`[Presupuestos Filter] Sub Rubro (L3): "${sub_rubro}" -> BudgetIDsWithTipoCount: ${budgetIdsFromTipo.length}`);
-                if (budgetIdsFromTipo.length === 0) {
-                    console.warn(`Could not resolve sub_rubro (L3): ${sub_rubro} in item types`);
-                }
             }
             // Resolve placa to vehiculo ID
-            let vehiculoIdFromPlaca = null;
+            let vehiculoIdsFromPlaca = [];
             if (placa && placa !== 'undefined' && placa !== '') {
-                // Find placa_id first
-                const { data: placaData } = await dbClient
-                    .from('areas_placas')
-                    .select('id')
-                    .eq('placa', placa)
-                    .maybeSingle();
-                if (placaData) {
-                    // Find vehiculo_id from control_flota using placa_id
-                    const { data: vData } = await dbClient
-                        .from('control_flota')
+                const placas = String(placa).split(',').map(s => s.trim()).filter(Boolean);
+                if (placas.length > 0) {
+                    // Find placa_ids first
+                    const { data: placaData } = await dbClient
+                        .from('areas_placas')
                         .select('id')
-                        .eq('placa_id', placaData.id)
-                        .maybeSingle();
-                    vehiculoIdFromPlaca = vData?.id || null;
+                        .in('placa', placas);
+                    if (placaData && placaData.length > 0) {
+                        const placaIds = placaData.map(p => p.id);
+                        // Find vehiculo_ids from control_flota using placa_ids
+                        const { data: vData } = await dbClient
+                            .from('control_flota')
+                            .select('id')
+                            .in('placa_id', placaIds);
+                        if (vData && vData.length > 0) {
+                            vehiculoIdsFromPlaca = vData.map(d => d.id);
+                        }
+                    }
                 }
+                console.log(`[Presupuestos Filter] Placa: "${placa}" -> VehiculoIDs: ${vehiculoIdsFromPlaca}`);
             }
             // Resolve mes filter (abbreviated month to number 1-12)
             let budgetIdsFromMonth = [];
+            let monthNums = [];
             if (mes && mes !== 'undefined' && mes !== '') {
                 const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-                const mesLower = String(mes).toLowerCase().trim();
-                const monthIndex = monthNames.indexOf(mesLower);
-                if (monthIndex !== -1) {
-                    const monthNum = monthIndex + 1;
-                    // Find all presupuesto_items where meses_aplicables contains the monthNum
+                const mesList = String(mes).toLowerCase().trim().split(',').map(s => s.trim()).filter(Boolean);
+                mesList.forEach(m => {
+                    const monthIndex = monthNames.indexOf(m);
+                    if (monthIndex !== -1) {
+                        monthNums.push(monthIndex + 1);
+                    }
+                });
+                if (monthNums.length > 0) {
+                    // Find all presupuesto_items where meses_aplicables overlaps with monthNums
                     const { data: itemData, error: itemError } = await dbClient
                         .from('presupuesto_items')
                         .select('presupuesto_id')
-                        .contains('meses_aplicables', [monthNum]);
+                        .overlaps('meses_aplicables', monthNums);
                     if (itemError) {
                         console.error('Error finding budgets for month filter:', itemError);
                     }
                     else if (itemData && itemData.length > 0) {
-                        budgetIdsFromMonth = [...new Set(itemData.map(d => Number(d.presupuesto_id)))];
+                        budgetIdsFromMonth = [...new Set(itemData.map((d) => Number(d.presupuesto_id)))];
                     }
                 }
-                console.log(`[Presupuestos Filter] Mes: "${mes}" (Index: ${monthIndex + 1}) -> BudgetIDsWithMonthCount: ${budgetIdsFromMonth.length}`);
+                console.log(`[Presupuestos Filter] Mes: "${mes}" (Indices: ${monthNums}) -> BudgetIDsWithMonthCount: ${budgetIdsFromMonth.length}`);
             }
             // 1. Consulta principal para la tabla (paginada)
             let query = dbClient
@@ -293,14 +443,13 @@ exports.presupuestosController = {
                     grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre),
                     rubro:maestro_rubros!rubro_id(id, codigo, nombre),
                     personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
-                    presupuesto_items(id, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, tipo:tipos_presupuesto(id, nombre))
+                    presupuesto_items(id, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre, unidad))
                 `, { count: 'exact' });
             // Filtros directos por ID
             if (vehiculo_id)
                 query = query.eq('vehiculo_id', Number(vehiculo_id));
             if (anio && anio !== 'undefined' && anio !== '')
                 query = query.eq('anio', Number(anio));
-            // Filtros por ID resuelto
             // Filtros por IDs resueltos (si se proporcionó un nombre pero no se encontró un ID, forzamos -1 para 0 resultados)
             if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
                 if (areaIds.length > 0)
@@ -342,8 +491,11 @@ exports.presupuestosController = {
                     query = query.eq('id', -1);
                 }
             }
-            if (vehiculoIdFromPlaca !== null) {
-                query = query.eq('vehiculo_id', vehiculoIdFromPlaca);
+            if (vehiculoIdsFromPlaca.length > 0) {
+                query = query.in('vehiculo_id', vehiculoIdsFromPlaca);
+            }
+            else if (placa && placa !== 'undefined' && placa !== '') {
+                query = query.eq('vehiculo_id', -1);
             }
             const ascending = sort_order === 'asc';
             query = query.order(sort_by, { ascending });
@@ -355,15 +507,17 @@ exports.presupuestosController = {
                 return;
             }
             // 2. Cálculo de estadísticas reales (sin paginación, pero con los mismos filtros base)
-            // Note: Summary needs to filter by IDs, so we need to look up IDs if filtering by name
-            // For simplicity, we'll just filter by anio and estado for summary (the main filters)
             let summaryQuery = dbClient
                 .from('presupuestos')
                 .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes)');
             if (vehiculo_id)
                 summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
-            if (vehiculoIdFromPlaca !== null)
-                summaryQuery = summaryQuery.eq('vehiculo_id', vehiculoIdFromPlaca);
+            if (vehiculoIdsFromPlaca.length > 0) {
+                summaryQuery = summaryQuery.in('vehiculo_id', vehiculoIdsFromPlaca);
+            }
+            else if (placa && placa !== 'undefined' && placa !== '') {
+                summaryQuery = summaryQuery.eq('vehiculo_id', -1);
+            }
             if (anio && anio !== 'undefined' && anio !== '')
                 summaryQuery = summaryQuery.eq('anio', Number(anio));
             // Sync filters with the table results
@@ -397,18 +551,11 @@ exports.presupuestosController = {
                 else
                     summaryQuery = summaryQuery.eq('id', -1);
             }
-            let monthNum = null;
             if (mes && mes !== '' && mes !== 'undefined') {
                 if (budgetIdsFromMonth.length > 0)
                     summaryQuery = summaryQuery.in('id', budgetIdsFromMonth);
                 else
                     summaryQuery = summaryQuery.eq('id', -1);
-                const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-                const mesLower = String(mes).toLowerCase().trim();
-                const monthIndex = monthNames.indexOf(mesLower);
-                if (monthIndex !== -1) {
-                    monthNum = monthIndex + 1;
-                }
             }
             const { data: allMatching } = await summaryQuery;
             let totalAprobado = 0;
@@ -423,11 +570,11 @@ exports.presupuestosController = {
                     if (p.presupuesto_items) {
                         p.presupuesto_items.forEach((item) => {
                             let total = item.valor_total || 0;
-                            if (monthNum !== null) {
-                                const isApplicable = (item.meses_aplicables || []).includes(monthNum);
-                                if (!isApplicable)
+                            if (monthNums.length > 0) {
+                                const applicableSelectedMonths = (item.meses_aplicables || []).filter((m) => monthNums.includes(m));
+                                if (applicableSelectedMonths.length === 0)
                                     return;
-                                total = (item.valor_unitario || 0) * (item.frecuencia_mes || 1);
+                                total = (item.valor_unitario || 0) * (item.frecuencia_mes || 1) * applicableSelectedMonths.length;
                             }
                             totalPresupuesto += total;
                             // Aprobado vs Borrador
@@ -444,6 +591,101 @@ exports.presupuestosController = {
                     }
                 });
             }
+            // --- CÁLCULO DE TOTAL EJECUTADO REAL DESDE MONGODB ---
+            let totalEjecutadoReal = 0;
+            try {
+                // Obtener validacionGrupos dinámica basada en los presupuestos del año actual
+                const yearNum = anio && anio !== 'undefined' && anio !== '' ? Number(anio) : new Date().getFullYear();
+                const { data: presupuestosForValidation } = await dbClient
+                    .from('presupuestos')
+                    .select('grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre), rubro:maestro_rubros!presupuestos_rubro_id_fkey(nombre)')
+                    .eq('anio', yearNum);
+                let validacionGrupos = { _id: null }; // Fallback para no coincidir nada
+                if (presupuestosForValidation && presupuestosForValidation.length > 0) {
+                    const combos = new Set();
+                    const orConditions = [];
+                    presupuestosForValidation.forEach((p) => {
+                        const g = (p.grupo?.nombre || '').trim();
+                        const r = (p.rubro?.nombre || '').trim();
+                        if (!g)
+                            return;
+                        const key = `${g}|${r}`;
+                        if (!combos.has(key)) {
+                            combos.add(key);
+                            const cond = { grupoRubro: new RegExp(`^${g}$`, 'i') };
+                            if (r)
+                                cond.rubro = new RegExp(`^${r}$`, 'i');
+                            orConditions.push(cond);
+                        }
+                    });
+                    if (orConditions.length > 0) {
+                        validacionGrupos = { $or: orConditions };
+                    }
+                }
+                const mongoQuery = {
+                    dependencia: /TRANSPORTES/i,
+                    activo: true,
+                    ...validacionGrupos
+                };
+                const applyMongoFilter = (field, val) => {
+                    if (!val || val === 'undefined')
+                        return;
+                    const arr = String(val).split(',').map(s => s.trim()).filter(Boolean);
+                    if (arr.length > 0) {
+                        mongoQuery[field] = { $in: arr.map(a => new RegExp(a, 'i')) };
+                    }
+                };
+                applyMongoFilter('placa', placa);
+                applyMongoFilter('areaOperacion', area_operacion);
+                applyMongoFilter('empresa', empresa);
+                applyMongoFilter('grupoRubro', grupo_rubro);
+                applyMongoFilter('rubro', rubro);
+                applyMongoFilter('subRubro', sub_rubro);
+                // Filtrado por fecha (Año y Meses) - Usando fechaPago con fallback a fecha
+                const getDateQuery = (start, end) => {
+                    const dateRange = { $gte: start, $lte: end };
+                    return {
+                        $or: [
+                            { fechaPago: dateRange },
+                            {
+                                $and: [
+                                    { $or: [{ fechaPago: { $exists: false } }, { fechaPago: null }] },
+                                    { fecha: dateRange }
+                                ]
+                            }
+                        ]
+                    };
+                };
+                if (monthNums.length > 0) {
+                    const ranges = monthNums.map(m => {
+                        const start = new Date(Date.UTC(yearNum, m - 1, 1, 0, 0, 0, 0));
+                        const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
+                        return getDateQuery(start, end);
+                    });
+                    mongoQuery.$and = [{ $or: ranges }];
+                }
+                else {
+                    const start = new Date(Date.UTC(yearNum, 0, 1, 0, 0, 0, 0));
+                    const end = new Date(Date.UTC(yearNum, 11, 31, 23, 59, 59, 999));
+                    const baseQuery = getDateQuery(start, end);
+                    mongoQuery.$and = [{ $or: baseQuery.$or }];
+                }
+                const aggregateResult = await pagos_model_1.PagoModel.aggregate([
+                    { $match: mongoQuery },
+                    {
+                        $group: {
+                            _id: null,
+                            totalOperacion: { $sum: '$valorOperacion' }
+                        }
+                    }
+                ]);
+                if (aggregateResult && aggregateResult.length > 0) {
+                    totalEjecutadoReal = aggregateResult[0].totalOperacion || 0;
+                }
+            }
+            catch (mongoError) {
+                console.error('❌ Error al calcular totalEjecutadoReal desde MongoDB:', mongoError);
+            }
             res.json({
                 data: data || [],
                 pagination: {
@@ -458,6 +700,7 @@ exports.presupuestosController = {
                     totalEjecutado,
                     totalNoEjecutado,
                     totalPresupuesto,
+                    totalEjecutadoReal,
                     rubrosUtilizados: rubrosIds.size,
                     anioVigencia: anio || new Date().getFullYear()
                 }
@@ -575,7 +818,8 @@ exports.presupuestosController = {
         try {
             const { id } = req.params;
             const { items, ...updateData } = req.body;
-            const { data, error } = await (req.supabase || supabase_1.supabase)
+            const dbClient = req.supabase || supabase_1.supabase;
+            const { data, error } = await dbClient
                 .from('presupuestos')
                 .update(updateData)
                 .eq('id', id)
@@ -584,6 +828,53 @@ exports.presupuestosController = {
             if (error) {
                 res.status(400).json({ error: error.message });
                 return;
+            }
+            if (items) {
+                const currentItemIds = items.map(i => i.id).filter(Boolean);
+                if (currentItemIds.length > 0) {
+                    await dbClient
+                        .from('presupuesto_items')
+                        .delete()
+                        .eq('presupuesto_id', id)
+                        .not('id', 'in', `(${currentItemIds.join(',')})`);
+                }
+                else {
+                    await dbClient
+                        .from('presupuesto_items')
+                        .delete()
+                        .eq('presupuesto_id', id);
+                }
+                const itemsToInsert = items.filter(i => !i.id).map(item => ({
+                    presupuesto_id: Number(id),
+                    tipo_presupuesto_id: item.tipo_presupuesto_id,
+                    concepto_presupuesto_id: item.concepto_presupuesto_id,
+                    frecuencia_mes: item.frecuencia_mes,
+                    meses_aplicables: item.meses_aplicables,
+                    valor_unitario: item.valor_unitario,
+                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length,
+                    nota: item.nota,
+                    ejecutado: item.ejecutado || 'NO',
+                    estado: item.estado || 'BORRADOR'
+                }));
+                const itemsToUpdate = items.filter(i => i.id).map(item => ({
+                    id: item.id,
+                    presupuesto_id: Number(id),
+                    tipo_presupuesto_id: item.tipo_presupuesto_id,
+                    concepto_presupuesto_id: item.concepto_presupuesto_id,
+                    frecuencia_mes: item.frecuencia_mes,
+                    meses_aplicables: item.meses_aplicables,
+                    valor_unitario: item.valor_unitario,
+                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length,
+                    nota: item.nota,
+                    ejecutado: item.ejecutado || 'NO',
+                    estado: item.estado || 'BORRADOR'
+                }));
+                if (itemsToInsert.length > 0) {
+                    await dbClient.from('presupuesto_items').insert(itemsToInsert);
+                }
+                if (itemsToUpdate.length > 0) {
+                    await dbClient.from('presupuesto_items').upsert(itemsToUpdate);
+                }
             }
             res.json(data);
         }
@@ -727,25 +1018,48 @@ exports.presupuestosController = {
                 .from('empresas')
                 .select('id, empresa')
                 .order('empresa');
-            // Vehículos con su placa real y área asociada
-            // Use select(*) to work around accented column name issues
+            // Vehículos con su placa real y área asociada, consultado desde la tabla vehiculo
             const { data: vehiculosData, error: vehiculosError } = await dbClient
-                .from('control_flota')
-                .select('*, areas_placas(id, placa)')
-                .order('placa_id');
+                .from('vehiculo')
+                .select(`
+                    id,
+                    placa_id,
+                    operacion_id,
+                    areas_placas ( id, placa ),
+                    vehiculo_caracteristicas (
+                        cat_clase_vehiculo ( nombre )
+                    )
+                `);
             if (vehiculosError) {
-                console.error('Error fetching vehiculos:', vehiculosError);
+                console.error('Error fetching vehiculos from vehiculo table:', vehiculosError);
             }
-            // Formatear vehículos para el frontend
-            // Use bracket notation for accented column operación_id
-            const vehiculos = (vehiculosData || []).map((v) => ({
-                id: v.id,
-                placa_id: v.placa_id,
-                operación_id: v.operación_id,
-                area_id: v.operación_id,
-                clase_vehiculo: v.clase_vehiculo,
-                placa: v.areas_placas?.placa
-            }));
+            // Consultamos control_flota para obtener el ID correcto que la tabla presupuestos espera para guardar
+            const { data: controlFlotaData, error: controlFlotaError } = await dbClient
+                .from('control_flota')
+                .select('id, placa_id');
+            if (controlFlotaError) {
+                console.error('Error fetching vehiculos from control_flota table:', controlFlotaError);
+            }
+            // Formatear vehículos para el frontend usando el control_flota.id correspondientes a la misma placa_id
+            const vehiculos = (vehiculosData || []).map((v) => {
+                const placaData = Array.isArray(v.areas_placas) ? v.areas_placas[0] : v.areas_placas;
+                const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                const catClase = chars?.cat_clase_vehiculo;
+                const clase_vehiculo = (Array.isArray(catClase) ? catClase[0] : catClase)?.nombre || '';
+                // Buscamos la fila correspondiente en control_flota con el mismo placa_id para usar su ID real
+                const matchFlota = (controlFlotaData || []).find((cf) => cf.placa_id === v.placa_id);
+                const dbVehiculoId = matchFlota ? matchFlota.id : v.id;
+                return {
+                    id: dbVehiculoId, // El ID de control_flota para que la base de datos lo guarde con la placa correcta
+                    placa_id: v.placa_id,
+                    operación_id: v.operacion_id, // Compatible con la interfaz frontend
+                    area_id: v.operacion_id, // Compatible con la interfaz frontend
+                    clase_vehiculo: clase_vehiculo,
+                    placa: placaData?.placa || ''
+                };
+            });
+            // Ordenar alfabéticamente por placa para mejor UX
+            vehiculos.sort((a, b) => a.placa.localeCompare(b.placa));
             // Grupos y Rubros: fetch what's actually in use in the budgets table
             const { data: usedCategories } = await dbClient
                 .from('presupuestos')

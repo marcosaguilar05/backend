@@ -2,16 +2,25 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const presupuestos_controller_1 = require("../controllers/presupuestos.controller");
+const presupuestos_dashboard_controller_1 = require("../controllers/presupuestos-dashboard.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const router = (0, express_1.Router)();
 // Proteger todas las rutas
 router.use(auth_middleware_1.authMiddleware);
+// Dashboard
+router.get('/dashboard/kpis', presupuestos_dashboard_controller_1.presupuestosDashboardController.getKPIs);
+router.get('/dashboard/by-placa', presupuestos_dashboard_controller_1.presupuestosDashboardController.getByPlaca);
+router.get('/dashboard/by-empresa', presupuestos_dashboard_controller_1.presupuestosDashboardController.getByEmpresa);
 // Catálogos
 router.get('/rubros', presupuestos_controller_1.presupuestosController.getRubros);
 router.get('/tipos', presupuestos_controller_1.presupuestosController.getTipos);
 router.post('/tipos', presupuestos_controller_1.presupuestosController.createTipo);
+router.put('/tipos/:id', presupuestos_controller_1.presupuestosController.updateTipo);
+router.delete('/tipos/:id', presupuestos_controller_1.presupuestosController.deleteTipo);
 router.get('/conceptos', presupuestos_controller_1.presupuestosController.getConceptos);
 router.post('/conceptos', presupuestos_controller_1.presupuestosController.createConcepto);
+router.put('/conceptos/:id', presupuestos_controller_1.presupuestosController.updateConcepto);
+router.delete('/conceptos/:id', presupuestos_controller_1.presupuestosController.deleteConcepto);
 router.get('/filters', presupuestos_controller_1.presupuestosController.getFilterOptions);
 // CRUD Presupuestos
 router.get('/', presupuestos_controller_1.presupuestosController.getAll);

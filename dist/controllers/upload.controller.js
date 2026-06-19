@@ -42,7 +42,7 @@ exports.uploadController = {
             const fileName = `${cleanPlaca}_${year}.pdf`;
             const filePath = `${folder}/${fileName}`;
             // Subir a Supabase Storage
-            const { data, error } = await supabase_1.supabase.storage
+            const { data, error } = await (req.supabase || supabase_1.supabase).storage
                 .from('vehiculos_docs')
                 .upload(filePath, file.buffer, {
                 contentType: 'application/pdf',
@@ -69,7 +69,7 @@ exports.uploadController = {
             if (!path) {
                 return res.status(400).json({ error: 'Path es requerido' });
             }
-            const { error } = await supabase_1.supabase.storage
+            const { error } = await (req.supabase || supabase_1.supabase).storage
                 .from('vehiculos_docs')
                 .remove([path]);
             if (error) {

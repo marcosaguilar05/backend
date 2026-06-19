@@ -12,6 +12,14 @@ exports.engrasesController = {
             const page = parseInt(req.query.page) || 1;
             const limit = parseInt(req.query.limit) || 20;
             const offset = (page - 1) * limit;
+            const applyFilter = (q, field, value) => {
+                if (!value)
+                    return q;
+                const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length === 0)
+                    return q;
+                return q.in(field, arr);
+            };
             // Filtros
             const conductor = req.query.conductor;
             const placa = req.query.placa;
@@ -23,15 +31,12 @@ exports.engrasesController = {
                 .from('engrases_relaciones')
                 .select('*', { count: 'exact' });
             // Aplicar filtros
-            if (conductor) {
-                query = query.ilike('conductor', `%${conductor}%`);
-            }
-            if (placa) {
-                query = query.ilike('placa', `%${placa}%`);
-            }
-            if (area_operacion) {
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
-            }
+            if (conductor)
+                query = applyFilter(query, 'conductor', conductor);
+            if (placa)
+                query = applyFilter(query, 'placa', placa);
+            if (area_operacion)
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (fecha_inicio) {
                 query = query.gte('fecha', fecha_inicio);
             }
@@ -55,11 +60,11 @@ exports.engrasesController = {
                 .select('lavado, engrase, otros, suma');
             // Aplicar los mismos filtros al summary
             if (conductor)
-                summaryQuery = summaryQuery.ilike('conductor', `%${conductor}%`);
+                summaryQuery = applyFilter(summaryQuery, 'conductor', conductor);
             if (placa)
-                summaryQuery = summaryQuery.ilike('placa', `%${placa}%`);
+                summaryQuery = applyFilter(summaryQuery, 'placa', placa);
             if (area_operacion)
-                summaryQuery = summaryQuery.ilike('area_operacion', `%${area_operacion}%`);
+                summaryQuery = applyFilter(summaryQuery, 'area_operacion', area_operacion);
             if (fecha_inicio)
                 summaryQuery = summaryQuery.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -273,6 +278,14 @@ exports.engrasesController = {
             const conductor = req.query.conductor;
             const placa = req.query.placa;
             const area_operacion = req.query.area_operacion;
+            const applyFilter = (q, field, value) => {
+                if (!value)
+                    return q;
+                const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length === 0)
+                    return q;
+                return q.in(field, arr);
+            };
             let query = (req.supabase || supabase_1.supabase).from('engrase_financiero').select('*');
             // Filtros de fecha ("Fecha de Creacion" segun estructura dada)
             if (fecha_inicio)
@@ -281,11 +294,11 @@ exports.engrasesController = {
                 query = query.lte('Fecha de Creacion', fecha_fin);
             // Mapeo de filtros a columnas de la vista financiera
             if (conductor)
-                query = query.ilike('Responsable', `%${conductor}%`);
+                query = applyFilter(query, 'Responsable', conductor);
             if (placa)
-                query = query.ilike('Placa', `%${placa}%`);
+                query = applyFilter(query, 'Placa', placa);
             if (area_operacion)
-                query = query.ilike('Área de Operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'Área de Operacion', area_operacion);
             query = query.order('Fecha de Creacion', { ascending: false });
             const { data, error } = await query;
             if (error) {
@@ -307,13 +320,21 @@ exports.engrasesController = {
             const area_operacion = req.query.area_operacion;
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
+            const applyFilter = (q, field, value) => {
+                if (!value)
+                    return q;
+                const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length === 0)
+                    return q;
+                return q.in(field, arr);
+            };
             let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('*');
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)

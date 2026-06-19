@@ -26,6 +26,14 @@ function getDocumentStatus(fechaVencimiento) {
         return { estado: 'VIGENTE', diasRestantes, color: 'green' };
     }
 }
+const applyFilter = (q, field, value) => {
+    if (!value)
+        return q;
+    const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+    if (arr.length === 0)
+        return q;
+    return q.in(field, arr);
+};
 exports.documentosDashboardController = {
     // KPIs Ejecutivos
     async getKPIs(req, res) {
@@ -34,9 +42,9 @@ exports.documentosDashboardController = {
             const area_operacion = req.query.area_operacion;
             let query = supabase_1.supabase.from('documentos_vehiculos_relaciones').select('*');
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             const { data, error } = await query;
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -95,9 +103,9 @@ exports.documentosDashboardController = {
             let query = supabase_1.supabase.from('documentos_vehiculos_relaciones')
                 .select('id, placa, area_operacion, fecha_vencimiento_soat, fecha_vencimiento_rtm, fecha_vencimiento_poliza, pdf_soat, pdf_rtm, pdf_poliza');
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             const { data, error } = await query;
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -117,8 +125,11 @@ exports.documentosDashboardController = {
             data?.forEach((row) => {
                 documentTypes.forEach(docType => {
                     // Filtrar por tipo si está especificado
-                    if (tipo_documento && tipo_documento !== docType.label)
-                        return;
+                    if (tipo_documento) {
+                        const types = tipo_documento.split(',').map(s => s.trim()).filter(Boolean);
+                        if (types.length > 0 && !types.includes(docType.label))
+                            return;
+                    }
                     const fecha = row[docType.key];
                     if (!fecha)
                         return;
@@ -159,9 +170,9 @@ exports.documentosDashboardController = {
             let query = supabase_1.supabase.from('documentos_vehiculos_relaciones')
                 .select('id, placa, area_operacion, fecha_vencimiento_soat, fecha_vencimiento_rtm, fecha_vencimiento_poliza, pdf_soat, pdf_rtm, pdf_poliza');
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             const { data, error } = await query;
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -176,15 +187,21 @@ exports.documentosDashboardController = {
             data?.forEach((row) => {
                 documentTypes.forEach(docType => {
                     // Filtrar por tipo si está especificado
-                    if (tipo_documento && tipo_documento !== docType.label)
-                        return;
+                    if (tipo_documento) {
+                        const types = tipo_documento.split(',').map(s => s.trim()).filter(Boolean);
+                        if (types.length > 0 && !types.includes(docType.label))
+                            return;
+                    }
                     const fecha = row[docType.key];
                     if (!fecha)
                         return;
                     const { estado, diasRestantes, color } = getDocumentStatus(fecha);
                     // Filtrar por estado si está especificado
-                    if (estado_filter && estado_filter !== estado)
-                        return;
+                    if (estado_filter) {
+                        const states = estado_filter.split(',').map(s => s.trim()).filter(Boolean);
+                        if (states.length > 0 && !states.includes(estado))
+                            return;
+                    }
                     items.push({
                         id: `${row.id}-${docType.key}`,
                         vehiculo_id: row.id,

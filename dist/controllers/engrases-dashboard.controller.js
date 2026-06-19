@@ -5,6 +5,14 @@ const supabase_1 = require("../config/supabase");
 // Umbrales para alertas
 const LAVADO_THRESHOLD = { normal: 150000, alto: 250000 };
 const ENGRASE_THRESHOLD = { normal: 60000, alto: 100000 };
+const applyFilter = (q, field, value) => {
+    if (!value)
+        return q;
+    const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+    if (arr.length === 0)
+        return q;
+    return q.in(field, arr);
+};
 exports.engrasesDashboardController = {
     // KPIs Ejecutivos
     async getKPIs(req, res) {
@@ -20,11 +28,11 @@ exports.engrasesDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             const { data, error } = await query;
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -73,15 +81,18 @@ exports.engrasesDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
+            const conductor = req.query.conductor;
             let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('fecha, lavado, engrase, otros, suma');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
+            if (conductor)
+                query = applyFilter(query, 'conductor', conductor);
             query = query.order('fecha');
             const { data, error } = await query;
             if (error) {
@@ -115,15 +126,18 @@ exports.engrasesDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
+            const conductor = req.query.conductor;
             let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('fecha, lavado, engrase');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
+            if (conductor)
+                query = applyFilter(query, 'conductor', conductor);
             query = query.order('fecha');
             const { data, error } = await query;
             if (error) {
@@ -157,13 +171,19 @@ exports.engrasesDashboardController = {
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
+            const placa = req.query.placa;
+            const conductor = req.query.conductor;
             let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('placa, conductor, lavado, engrase, otros, suma, fecha');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
+            if (placa)
+                query = applyFilter(query, 'placa', placa);
+            if (conductor)
+                query = applyFilter(query, 'conductor', conductor);
             const { data, error } = await query;
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -266,13 +286,19 @@ exports.engrasesDashboardController = {
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
             const placa = req.query.placa;
+            const area_operacion = req.query.area_operacion;
+            const conductor = req.query.conductor;
             let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('area_operacion, lavado, engrase, otros, suma');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
+            if (area_operacion)
+                query = applyFilter(query, 'area_operacion', area_operacion);
+            if (conductor)
+                query = applyFilter(query, 'conductor', conductor);
             const { data, error } = await query;
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -320,15 +346,18 @@ exports.engrasesDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
+            const conductor = req.query.conductor;
             let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
+            if (conductor)
+                query = applyFilter(query, 'conductor', conductor);
             const { data, error } = await query;
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -419,11 +448,11 @@ exports.engrasesDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             query = query.order('fecha', { ascending: false }).order('id', { ascending: false });
             const { data, error, count } = await query.range(offset, offset + limit - 1);
             if (error) {
@@ -525,15 +554,18 @@ exports.engrasesDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
+            const conductor = req.query.conductor;
             let query = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select('placa, fecha, lavado, engrase, suma');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
+            if (conductor)
+                query = applyFilter(query, 'conductor', conductor);
             query = query.order('fecha');
             const { data, error } = await query;
             if (error) {

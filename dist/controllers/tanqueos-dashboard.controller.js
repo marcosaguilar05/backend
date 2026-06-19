@@ -9,6 +9,48 @@ const FUEL_PRICE_THRESHOLDS = {
     'EXTRA': { min: 11000, max: 17000 }
 };
 const SALDO_CRITICO = -500000;
+const applyFilter = (q, field, value) => {
+    if (!value)
+        return q;
+    const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+    if (arr.length === 0)
+        return q;
+    return q.in(field, arr);
+};
+const isCostoAnormal = (t, limitesData) => {
+    // Si el costo es 0 o no existe, no lo contamos como "fuera de rango"
+    if (!t.costo_por_galon || !t.tipo_combustible)
+        return false;
+    // Redondeamos para evitar que decimales (ej 6999.99) disparen falsas alertas frente a 7000
+    const costo = Math.round(Number(t.costo_por_galon));
+    let min = null;
+    let max = null;
+    if (limitesData && t.fecha) {
+        const fechaTanqueo = t.fecha.split('T')[0];
+        let limite = limitesData.find((l) => l.tipo_combustible === t.tipo_combustible &&
+            fechaTanqueo >= l.fecha_inicio && fechaTanqueo <= l.fecha_final);
+        // Si no se encuentra un rango de fechas exacto (ej. un registro de 2024 o un hueco en 2025),
+        // buscamos el límite más reciente de la BD para ese tipo de combustible como fallback seguro
+        if (!limite) {
+            limite = limitesData
+                .filter((l) => l.tipo_combustible === t.tipo_combustible)
+                .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime())[0];
+        }
+        if (limite && limite.lit_inferior != null && limite.lit_superior != null) {
+            min = Number(limite.lit_inferior);
+            max = Number(limite.lit_superior);
+        }
+    }
+    if (min === null || max === null || isNaN(min) || isNaN(max)) {
+        const threshold = FUEL_PRICE_THRESHOLDS[t.tipo_combustible];
+        if (!threshold)
+            return false;
+        min = threshold.min;
+        max = threshold.max;
+    }
+    // Es alerta SÓLO si está estrictamente POR DEBAJO del mínimo o POR ENCIMA del máximo
+    return costo < min || costo > max;
+};
 exports.tanqueosDashboardController = {
     // KPIs Ejecutivos
     async getKPIs(req, res) {
@@ -27,18 +69,18 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (bomba)
-                query = query.ilike('bomba', `%${bomba}%`);
+                query = applyFilter(query, 'bomba', bomba);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (tipo_combustible)
-                query = query.eq('tipo_combustible', tipo_combustible);
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
             // Solo tanqueos (no anticipos)
             query = query.eq('tipo_operacion', 'TANQUEO');
-            const { data, error } = await query;
+            const { data, error } = await query.order('fecha', { ascending: false }).limit(100000);
             if (error) {
                 console.error('Error en getKPIs:', error);
                 res.status(400).json({ error: error.message });
@@ -55,7 +97,7 @@ exports.tanqueosDashboardController = {
             const vehiculosActivos = new Set(data?.map(t => t.placa).filter(Boolean)).size;
             const conductoresActivos = new Set(data?.map(t => t.conductor).filter(Boolean)).size;
             // % sin horómetro
-            const sinHorometro = data?.filter(t => !t.horometro).length || 0;
+            const sinHorometro = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM').length || 0;
             const porcentajeSinHorometro = numTanqueos > 0 ? (sinHorometro / numTanqueos) * 100 : 0;
             // KPIs por tipo de combustible
             const porCombustible = {};
@@ -187,15 +229,15 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (tipo_combustible)
-                query = query.eq('tipo_combustible', tipo_combustible);
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (bomba)
-                query = query.ilike('bomba', `%${bomba}%`);
+                query = applyFilter(query, 'bomba', bomba);
             query = query.eq('tipo_operacion', 'TANQUEO').order('fecha');
             const { data, error } = await query;
             if (error) {
@@ -241,13 +283,13 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (bomba)
-                query = query.ilike('bomba', `%${bomba}%`);
+                query = applyFilter(query, 'bomba', bomba);
             query = query.eq('tipo_operacion', 'TANQUEO');
             const { data, error } = await query;
             if (error) {
@@ -301,15 +343,15 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (tipo_combustible)
-                query = query.eq('tipo_combustible', tipo_combustible);
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (bomba)
-                query = query.ilike('bomba', `%${bomba}%`);
+                query = applyFilter(query, 'bomba', bomba);
             query = query.eq('tipo_operacion', 'TANQUEO');
             const { data, error } = await query;
             if (error) {
@@ -351,9 +393,9 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (tipo_combustible)
-                query = query.eq('tipo_combustible', tipo_combustible);
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
             query = query.eq('tipo_operacion', 'TANQUEO');
             const { data, error } = await query;
             if (error) {
@@ -410,24 +452,39 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (tipo_combustible)
-                query = query.eq('tipo_combustible', tipo_combustible);
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (bomba)
-                query = query.ilike('bomba', `%${bomba}%`);
+                query = applyFilter(query, 'bomba', bomba);
             query = query.eq('tipo_operacion', 'TANQUEO').order('fecha', { ascending: false });
             const { data, error } = await query;
             if (error) {
                 res.status(400).json({ error: error.message });
                 return;
             }
+            const meses = req.query.meses;
+            let filteredData = data || [];
+            if (meses) {
+                const mesesArr = meses.split(',').map(m => m.trim()).filter(Boolean);
+                if (mesesArr.length > 0) {
+                    filteredData = filteredData.filter(t => {
+                        if (!t.fecha)
+                            return false;
+                        const datePart = t.fecha.includes('T') ? t.fecha.split('T')[0] : t.fecha;
+                        const parts = datePart.split('-');
+                        const month = parts[1];
+                        return mesesArr.includes(month);
+                    });
+                }
+            }
             // Agrupar por vehículo primero, luego por área
             const byVehicle = {};
-            data?.forEach(t => {
+            filteredData.forEach(t => {
                 const placa = t.placa;
                 const area = t.area_operacion || 'SIN ÁREA';
                 if (!byVehicle[placa]) {
@@ -495,9 +552,9 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (tipo_combustible)
-                query = query.eq('tipo_combustible', tipo_combustible);
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
             query = query.eq('tipo_operacion', 'TANQUEO');
             const { data, error } = await query;
             if (error) {
@@ -544,9 +601,9 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (tipo_combustible)
-                query = query.eq('tipo_combustible', tipo_combustible);
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
             query = query.eq('tipo_operacion', 'TANQUEO');
             const { data, error } = await query;
             if (error) {
@@ -591,24 +648,25 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (bomba)
-                query = query.ilike('bomba', `%${bomba}%`);
+                query = applyFilter(query, 'bomba', bomba);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (tipo_combustible)
-                query = query.eq('tipo_combustible', tipo_combustible);
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
             query = query.eq('tipo_operacion', 'TANQUEO');
-            const { data, error } = await query;
+            const { data, error } = await query.order('fecha', { ascending: false }).limit(100000);
+            const { data: limitesData } = await (req.supabase || supabase_1.supabase).from('limites_combustible').select('*');
             if (error) {
                 res.status(400).json({ error: error.message });
                 return;
             }
             const alerts = [];
             // 1. Tanqueos sin horómetro
-            const sinHorometro = data?.filter(t => !t.horometro).length || 0;
+            const sinHorometro = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM').length || 0;
             if (sinHorometro > 0) {
                 alerts.push({
                     tipo_alerta: 'SIN_HOROMETRO',
@@ -618,14 +676,7 @@ exports.tanqueosDashboardController = {
                 });
             }
             // 2. Costos por galón fuera de rango
-            const costosAnormales = data?.filter(t => {
-                if (!t.costo_por_galon || !t.tipo_combustible)
-                    return false;
-                const threshold = FUEL_PRICE_THRESHOLDS[t.tipo_combustible];
-                if (!threshold)
-                    return false;
-                return t.costo_por_galon < threshold.min || t.costo_por_galon > threshold.max;
-            }).length || 0;
+            const costosAnormales = data?.filter(t => isCostoAnormal(t, limitesData || [])).length || 0;
             if (costosAnormales > 0) {
                 alerts.push({
                     tipo_alerta: 'COSTO_ANORMAL',
@@ -677,32 +728,31 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (bomba)
-                query = query.ilike('bomba', `%${bomba}%`);
+                query = applyFilter(query, 'bomba', bomba);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (tipo_combustible)
-                query = query.eq('tipo_combustible', tipo_combustible);
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
             query = query.eq('tipo_operacion', 'TANQUEO')
                 .order('fecha', { ascending: false })
                 .order('id', { ascending: false });
             const { data, error, count } = await query.range(offset, offset + limit - 1);
+            const { data: limitesData } = await (req.supabase || supabase_1.supabase).from('limites_combustible').select('*');
             if (error) {
                 res.status(400).json({ error: error.message });
                 return;
             }
             // Agregar flags a cada registro
             const enrichedData = data?.map((t) => {
-                const threshold = FUEL_PRICE_THRESHOLDS[t.tipo_combustible];
                 return {
                     ...t,
                     flags: {
-                        sin_horometro: !t.horometro,
-                        costo_anormal: threshold ? ((t.costo_por_galon || 0) < threshold.min ||
-                            (t.costo_por_galon || 0) > threshold.max) : false
+                        sin_horometro: !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM',
+                        costo_anormal: isCostoAnormal(t, limitesData || [])
                     }
                 };
             });
@@ -738,17 +788,18 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (bomba)
-                query = query.ilike('bomba', `%${bomba}%`);
+                query = applyFilter(query, 'bomba', bomba);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (tipo_combustible)
-                query = query.eq('tipo_combustible', tipo_combustible);
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
             query = query.eq('tipo_operacion', 'TANQUEO');
-            const { data, error } = await query.order('fecha', { ascending: false });
+            const { data, error } = await query.order('fecha', { ascending: false }).limit(100000);
+            const { data: limitesData } = await (req.supabase || supabase_1.supabase).from('limites_combustible').select('*');
             if (error) {
                 res.status(400).json({ error: error.message });
                 return;
@@ -756,17 +807,10 @@ exports.tanqueosDashboardController = {
             let filteredRecords = [];
             switch (alertType) {
                 case 'SIN_HOROMETRO':
-                    filteredRecords = data?.filter(t => !t.horometro) || [];
+                    filteredRecords = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM') || [];
                     break;
                 case 'COSTO_ANORMAL':
-                    filteredRecords = data?.filter(t => {
-                        if (!t.costo_por_galon || !t.tipo_combustible)
-                            return false;
-                        const threshold = FUEL_PRICE_THRESHOLDS[t.tipo_combustible];
-                        if (!threshold)
-                            return false;
-                        return t.costo_por_galon < threshold.min || t.costo_por_galon > threshold.max;
-                    }) || [];
+                    filteredRecords = data?.filter(t => isCostoAnormal(t, limitesData || [])) || [];
                     break;
                 case 'CONSUMO_ATIPICO':
                     const galones = data?.map(t => t.cantidad_galones || 0).filter(g => g > 0) || [];
@@ -801,9 +845,9 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('mes', fecha_fin);
             if (vehiculo)
-                query = query.ilike('vehiculo', `%${vehiculo}%`);
+                query = applyFilter(query, 'vehiculo', vehiculo);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             const { data, error } = await query.order('mes', { ascending: false }).order('vehiculo');
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -839,22 +883,41 @@ exports.tanqueosDashboardController = {
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
             if (conductor)
-                query = query.ilike('conductor', `%${conductor}%`);
+                query = applyFilter(query, 'conductor', conductor);
             if (placa)
-                query = query.ilike('placa', `%${placa}%`);
+                query = applyFilter(query, 'placa', placa);
             if (bomba)
-                query = query.ilike('bomba', `%${bomba}%`);
+                query = applyFilter(query, 'bomba', bomba);
             if (area_operacion)
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
+                query = applyFilter(query, 'area_operacion', area_operacion);
             if (tipo_combustible)
-                query = query.eq('tipo_combustible', tipo_combustible);
-            query = query.eq('tipo_operacion', 'TANQUEO');
-            const [saldosRes, tanqueosRes] = await Promise.all([saldosPromise, query]);
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
+            query = query.eq('tipo_operacion', 'TANQUEO').order('fecha', { ascending: false }).limit(100000);
+            const limitesPromise = (req.supabase || supabase_1.supabase).from('limites_combustible').select('*');
+            const [saldosRes, tanqueosRes, limitesRes] = await Promise.all([saldosPromise, query, limitesPromise]);
             if (tanqueosRes.error)
                 throw tanqueosRes.error;
             if (saldosRes.error)
                 throw saldosRes.error;
-            const data = tanqueosRes.data || [];
+            if (limitesRes.error)
+                throw limitesRes.error;
+            const limitesData = limitesRes.data || [];
+            const meses = req.query.meses;
+            let data = tanqueosRes.data || [];
+            if (meses) {
+                const mesesArr = meses.split(',').map(m => m.trim()).filter(Boolean);
+                if (mesesArr.length > 0) {
+                    data = data.filter(t => {
+                        if (!t.fecha)
+                            return false;
+                        // Support ISO timestamp or YYYY-MM-DD date formats
+                        const datePart = t.fecha.includes('T') ? t.fecha.split('T')[0] : t.fecha;
+                        const parts = datePart.split('-');
+                        const month = parts[1]; // e.g. "05"
+                        return mesesArr.includes(month);
+                    });
+                }
+            }
             const bombas = saldosRes.data || [];
             // --- AGREGACIONES EN MEMORIA (MUCHO MÁS RÁPIDO QUE SQL MÚLTIPLE) ---
             // KPIs & Distribution
@@ -879,7 +942,7 @@ exports.tanqueosDashboardController = {
                 totalGalones += gal;
                 totalValor += val;
                 totalSaldo += t.saldo_disponible || 0;
-                if (!t.horometro)
+                if (!t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM')
                     sinHorometro++;
                 // porCombustible (KPIs)
                 if (!porCombustible[tipo])
@@ -939,12 +1002,7 @@ exports.tanqueosDashboardController = {
             const alerts = [];
             if (sinHorometro > 0)
                 alerts.push({ tipo_alerta: 'SIN_HOROMETRO', mensaje: `${sinHorometro} tanqueo(s) sin registro de horómetro`, cantidad: sinHorometro, severidad: 'warning' });
-            const costsAnormales = data.filter(t => {
-                if (!t.costo_por_galon || !t.tipo_combustible)
-                    return false;
-                const threshold = FUEL_PRICE_THRESHOLDS[t.tipo_combustible];
-                return threshold ? (t.costo_por_galon < threshold.min || t.costo_por_galon > threshold.max) : false;
-            }).length;
+            const costsAnormales = data.filter(t => isCostoAnormal(t, limitesData)).length;
             if (costsAnormales > 0)
                 alerts.push({ tipo_alerta: 'COSTO_ANORMAL', mensaje: `${costsAnormales} tanqueo(s) con costo por galón fuera de rango`, cantidad: costsAnormales, severidad: 'error' });
             // Stats for pumps

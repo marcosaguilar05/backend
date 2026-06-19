@@ -6,7 +6,16 @@ const getVehiculos = async (req, res, next) => {
         console.log('GET /vehiculos request received');
         const empresa_id = req.query.empresa_id;
         const operacion_id = req.query.operacion_id;
+        const asignado_a = req.query.asignado_a;
         const placa = req.query.placa; // Contiene el término general de búsqueda
+        const marca = req.query.marca;
+        const clase = req.query.clase;
+        const tipo = req.query.tipo;
+        const empresa = req.query.empresa;
+        const area_operacion = req.query.area_operacion;
+        const estado_interno = req.query.estado_interno;
+        const sort_by = req.query.sort_by;
+        const sort_order = req.query.sort_order;
         // Pagination setup
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
@@ -23,6 +32,7 @@ const getVehiculos = async (req, res, next) => {
             placa_id,
             empresa_id,
             operacion_id,
+            asignado_a,
             areas_placas ( placa ),
             empresas ( empresa ),
             areas_operacion ( nombre ),
@@ -33,7 +43,8 @@ const getVehiculos = async (req, res, next) => {
                 cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
                 marca_id,
                 cat_marca:cat_marca!vehiculo_caracteristicas_marca_id_fkey ( nombre ),
-                anio:año
+                anio:año,
+                Estado
             )
         `;
         let query = db.from('vehiculo').select(selectStr);
@@ -41,6 +52,8 @@ const getVehiculos = async (req, res, next) => {
             query = query.eq('empresa_id', empresa_id);
         if (operacion_id)
             query = query.eq('operacion_id', operacion_id);
+        if (asignado_a)
+            query = query.eq('asignado_a', asignado_a);
         console.log('Executing query...');
         const { data, error } = await query
             .order('empresa_id', { ascending: false, nullsFirst: false })
@@ -83,6 +96,148 @@ const getVehiculos = async (req, res, next) => {
                 return false;
             });
         }
+        if (marca) {
+            const marcas = marca.split(',');
+            filteredData = filteredData.filter((v) => {
+                const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                return marcas.includes(chars?.cat_marca?.nombre);
+            });
+        }
+        if (clase) {
+            const clases = clase.split(',');
+            filteredData = filteredData.filter((v) => {
+                const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                return clases.includes(chars?.cat_clase_vehiculo?.nombre);
+            });
+        }
+        if (tipo) {
+            const tipos = tipo.split(',');
+            filteredData = filteredData.filter((v) => {
+                const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                return tipos.includes(chars?.cat_tipo_vehiculo?.nombre);
+            });
+        }
+        if (estado_interno) {
+            const estados = estado_interno.split(',');
+            filteredData = filteredData.filter((v) => {
+                const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                const e = chars?.Estado || 'Operativo';
+                return estados.includes(e);
+            });
+        }
+        if (empresa) {
+            const empresas = empresa.split(',');
+            filteredData = filteredData.filter((v) => {
+                const empData = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas;
+                return empresas.includes(empData?.empresa);
+            });
+        }
+        if (area_operacion) {
+            const areas = area_operacion.split(',');
+            filteredData = filteredData.filter((v) => {
+                const areaData = Array.isArray(v.areas_operacion) ? v.areas_operacion[0] : v.areas_operacion;
+                return areas.includes(areaData?.nombre);
+            });
+        }
+        if (sort_by) {
+            filteredData.sort((a, b) => {
+                let valA = '';
+                let valB = '';
+                const getChars = (v) => Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+                if (sort_by === 'placa') {
+                    const pa = Array.isArray(a.areas_placas) ? a.areas_placas[0] : a.areas_placas;
+                    const pb = Array.isArray(b.areas_placas) ? b.areas_placas[0] : b.areas_placas;
+                    valA = (pa?.placa || a.placa || '').toLowerCase();
+                    valB = (pb?.placa || b.placa || '').toLowerCase();
+                }
+                else if (sort_by === 'clase') {
+                    valA = (getChars(a)?.cat_clase_vehiculo?.nombre || '').toLowerCase();
+                    valB = (getChars(b)?.cat_clase_vehiculo?.nombre || '').toLowerCase();
+                }
+                else if (sort_by === 'tipo') {
+                    valA = (getChars(a)?.cat_tipo_vehiculo?.nombre || '').toLowerCase();
+                    valB = (getChars(b)?.cat_tipo_vehiculo?.nombre || '').toLowerCase();
+                }
+                else if (sort_by === 'marca') {
+                    valA = (getChars(a)?.cat_marca?.nombre || '').toLowerCase();
+                    valB = (getChars(b)?.cat_marca?.nombre || '').toLowerCase();
+                }
+                else if (sort_by === 'empresa') {
+                    const ea = Array.isArray(a.empresas) ? a.empresas[0] : a.empresas;
+                    const eb = Array.isArray(b.empresas) ? b.empresas[0] : b.empresas;
+                    valA = (ea?.empresa || '').toLowerCase();
+                    valB = (eb?.empresa || '').toLowerCase();
+                }
+                else if (sort_by === 'area_operacion') {
+                    const aa = Array.isArray(a.areas_operacion) ? a.areas_operacion[0] : a.areas_operacion;
+                    const ab = Array.isArray(b.areas_operacion) ? b.areas_operacion[0] : b.areas_operacion;
+                    valA = (aa?.nombre || '').toLowerCase();
+                    valB = (ab?.nombre || '').toLowerCase();
+                }
+                else if (sort_by === 'asignado_a') {
+                    valA = (a.asignado_a || '').toLowerCase();
+                    valB = (b.asignado_a || '').toLowerCase();
+                }
+                else if (sort_by === 'estado_interno') {
+                    valA = (getChars(a)?.Estado || 'Operativo').toLowerCase();
+                    valB = (getChars(b)?.Estado || 'Operativo').toLowerCase();
+                }
+                if (valA < valB)
+                    return sort_order === 'asc' ? -1 : 1;
+                if (valA > valB)
+                    return sort_order === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        const aggregations = {
+            clase: {},
+            tipo: {},
+            empresa: {},
+            asignado_a: {},
+            estado_interno: {},
+            area_operacion: {}
+        };
+        // Pre-populate keys so they don't disappear when filtered
+        (data || []).forEach((v) => {
+            const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+            const empData = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas;
+            const areaData = Array.isArray(v.areas_operacion) ? v.areas_operacion[0] : v.areas_operacion;
+            const clase = chars?.cat_clase_vehiculo?.nombre || 'Sin Clase';
+            const tipo = chars?.cat_tipo_vehiculo?.nombre || 'Sin Tipo';
+            const empresa = empData?.empresa || 'Sin Empresa';
+            const asignado = v.asignado_a || 'Sin Asignar';
+            const estado = chars?.Estado || 'Operativo';
+            const area = areaData?.nombre || 'Sin Área';
+            if (aggregations.clase[clase] === undefined)
+                aggregations.clase[clase] = 0;
+            if (aggregations.tipo[tipo] === undefined)
+                aggregations.tipo[tipo] = 0;
+            if (aggregations.empresa[empresa] === undefined)
+                aggregations.empresa[empresa] = 0;
+            if (aggregations.asignado_a[asignado] === undefined)
+                aggregations.asignado_a[asignado] = 0;
+            if (aggregations.estado_interno[estado] === undefined)
+                aggregations.estado_interno[estado] = 0;
+            if (aggregations.area_operacion[area] === undefined)
+                aggregations.area_operacion[area] = 0;
+        });
+        filteredData.forEach((v) => {
+            const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
+            const empData = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas;
+            const areaData = Array.isArray(v.areas_operacion) ? v.areas_operacion[0] : v.areas_operacion;
+            const clase = chars?.cat_clase_vehiculo?.nombre || 'Sin Clase';
+            const tipo = chars?.cat_tipo_vehiculo?.nombre || 'Sin Tipo';
+            const empresa = empData?.empresa || 'Sin Empresa';
+            const asignado = v.asignado_a || 'Sin Asignar';
+            const estado = chars?.Estado || 'Operativo';
+            const area = areaData?.nombre || 'Sin Área';
+            aggregations.clase[clase] = (aggregations.clase[clase] || 0) + 1;
+            aggregations.tipo[tipo] = (aggregations.tipo[tipo] || 0) + 1;
+            aggregations.empresa[empresa] = (aggregations.empresa[empresa] || 0) + 1;
+            aggregations.asignado_a[asignado] = (aggregations.asignado_a[asignado] || 0) + 1;
+            aggregations.estado_interno[estado] = (aggregations.estado_interno[estado] || 0) + 1;
+            aggregations.area_operacion[area] = (aggregations.area_operacion[area] || 0) + 1;
+        });
         const total = filteredData.length;
         const paginatedData = filteredData.slice(offset, offset + limit);
         console.log(`Query successful. Returning ${paginatedData.length} records of ${total} total.`);
@@ -93,7 +248,8 @@ const getVehiculos = async (req, res, next) => {
                 page,
                 limit,
                 totalPages: Math.ceil(total / limit)
-            }
+            },
+            aggregations
         });
     }
     catch (error) {
@@ -142,7 +298,7 @@ exports.getVehiculoDetalle = getVehiculoDetalle;
 const getCatalogos = async (req, res, next) => {
     try {
         const db = req.supabase;
-        const [marcas, tipos, clases, combustibles, marcasCompactadora, empresas, operaciones, placas] = await Promise.all([
+        const [marcas, tipos, clases, combustibles, marcasCompactadora, empresas, operaciones, placas, asignadosResult, encargados] = await Promise.all([
             db.from('cat_marca').select('*'),
             db.from('cat_tipo_vehiculo').select('*'),
             db.from('cat_clase_vehiculo').select('*'),
@@ -150,7 +306,9 @@ const getCatalogos = async (req, res, next) => {
             db.from('cat_marca_compactadora').select('*'),
             db.from('empresas').select('id, empresa').order('empresa'),
             db.from('areas_operacion').select('id, nombre').order('nombre'),
-            db.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').order('placa')
+            db.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').order('placa'),
+            db.from('vehiculo').select('asignado_a').not('asignado_a', 'is', null),
+            db.from('encargados').select('*')
         ]);
         // Filter plates that are already in the vehiculo table
         const { data: existingVehicles } = await db.from('vehiculo').select('placa_id');
@@ -158,6 +316,14 @@ const getCatalogos = async (req, res, next) => {
         // Use all placas if you want, but available are those not in vehiculo
         const placasData = placas.data || [];
         const placasDisponibles = placasData.filter(p => !existingPlacaIds.has(p.id));
+        const asignadosSet = new Set();
+        if (asignadosResult?.data) {
+            asignadosResult.data.forEach((v) => {
+                if (v.asignado_a)
+                    asignadosSet.add(v.asignado_a);
+            });
+        }
+        const asignados = Array.from(asignadosSet).sort().map(a => ({ id: a, nombre: a }));
         res.json({
             marcas: marcas.data || [],
             tipos: tipos.data || [],
@@ -167,7 +333,9 @@ const getCatalogos = async (req, res, next) => {
             empresas: empresas.data || [],
             operaciones: operaciones.data || [],
             placas: placasData,
-            placasDisponibles: placasDisponibles
+            placasDisponibles: placasDisponibles,
+            asignados: asignados,
+            encargados: encargados.data || []
         });
     }
     catch (error) {

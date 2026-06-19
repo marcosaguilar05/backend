@@ -24,6 +24,7 @@ const mantenimiento_routes_1 = __importDefault(require("./routes/mantenimiento.r
 const horometro_routes_1 = __importDefault(require("./routes/horometro.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const pagos_routes_1 = __importDefault(require("./routes/pagos.routes"));
+const gps_routes_1 = __importDefault(require("./routes/gps.routes"));
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
 // Middlewares
@@ -53,6 +54,7 @@ app.use('/api/mantenimiento', mantenimiento_routes_1.default);
 app.use('/api/horometro', horometro_routes_1.default);
 app.use('/api/admin', admin_routes_1.default);
 app.use('/api/pagos', pagos_routes_1.default);
+app.use('/api/gps', gps_routes_1.default);
 // Ruta de prueba
 app.get('/api/health', (req, res) => {
     res.json({

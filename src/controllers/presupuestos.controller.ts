@@ -706,8 +706,6 @@ export const presupuestosController = {
                 applyMongoFilter('subRubro', sub_rubro);
 
                 // Filtrado por fecha (Año y Meses) - Usando fechaPago con fallback a fecha
-                const yearNum = anio && anio !== 'undefined' && anio !== '' ? Number(anio) : new Date().getFullYear();
-
                 const getDateQuery = (start: Date, end: Date) => {
                     const dateRange = { $gte: start, $lte: end };
                     return {

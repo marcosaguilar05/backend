@@ -3,7 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const documentos_controller_1 = require("../controllers/documentos.controller");
 const documentos_dashboard_controller_1 = require("../controllers/documentos-dashboard.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
 const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authMiddleware);
 // Dashboard routes (antes de rutas con params)
 router.get('/dashboard/kpis', documentos_dashboard_controller_1.documentosDashboardController.getKPIs);
 router.get('/dashboard/calendar', documentos_dashboard_controller_1.documentosDashboardController.getCalendarEvents);

@@ -9,17 +9,23 @@ exports.documentosController = {
             const pageNum = Number(page);
             const limitNum = Number(limit);
             const offset = (pageNum - 1) * limitNum;
+            const applyFilter = (q, field, value) => {
+                if (!value)
+                    return q;
+                const arr = String(value).split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length === 0)
+                    return q;
+                return q.in(field, arr);
+            };
             // Build query
             let query = (req.supabase || supabase_1.supabase)
                 .from('documentos_vehiculos_relaciones')
                 .select('*', { count: 'exact' });
             // Filters
-            if (placa) {
-                query = query.ilike('placa', `%${placa}%`);
-            }
-            if (area_operacion) {
-                query = query.ilike('area_operacion', `%${area_operacion}%`);
-            }
+            if (placa)
+                query = applyFilter(query, 'placa', placa);
+            if (area_operacion)
+                query = applyFilter(query, 'area_operacion', area_operacion);
             // Sorting
             const ascending = sort_order === 'asc';
             query = query.order(sort_by, { ascending }).order('id', { ascending: false });
