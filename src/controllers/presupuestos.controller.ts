@@ -865,9 +865,10 @@ export const presupuestosController = {
     async update(req: AuthRequest, res: Response): Promise<void> {
         try {
             const { id } = req.params;
-            const { items, ...updateData } = req.body;
+            const { items, ...updateData } = req.body as Presupuesto & { items?: PresupuestoItem[] };
+            const dbClient = req.supabase || supabase;
 
-            const { data, error } = await (req.supabase || supabase)
+            const { data, error } = await dbClient
                 .from('presupuestos')
                 .update(updateData)
                 .eq('id', id)
@@ -877,6 +878,58 @@ export const presupuestosController = {
             if (error) {
                 res.status(400).json({ error: error.message });
                 return;
+            }
+
+            if (items) {
+                const currentItemIds = items.map(i => i.id).filter(Boolean);
+                
+                if (currentItemIds.length > 0) {
+                    await dbClient
+                        .from('presupuesto_items')
+                        .delete()
+                        .eq('presupuesto_id', id)
+                        .not('id', 'in', `(${currentItemIds.join(',')})`);
+                } else {
+                    await dbClient
+                        .from('presupuesto_items')
+                        .delete()
+                        .eq('presupuesto_id', id);
+                }
+
+                const itemsToInsert = items.filter(i => !i.id).map(item => ({
+                    presupuesto_id: Number(id),
+                    tipo_presupuesto_id: item.tipo_presupuesto_id,
+                    concepto_presupuesto_id: item.concepto_presupuesto_id,
+                    frecuencia_mes: item.frecuencia_mes,
+                    meses_aplicables: item.meses_aplicables,
+                    valor_unitario: item.valor_unitario,
+                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length,
+                    nota: item.nota,
+                    ejecutado: item.ejecutado || 'NO',
+                    estado: item.estado || 'BORRADOR'
+                }));
+
+                const itemsToUpdate = items.filter(i => i.id).map(item => ({
+                    id: item.id,
+                    presupuesto_id: Number(id),
+                    tipo_presupuesto_id: item.tipo_presupuesto_id,
+                    concepto_presupuesto_id: item.concepto_presupuesto_id,
+                    frecuencia_mes: item.frecuencia_mes,
+                    meses_aplicables: item.meses_aplicables,
+                    valor_unitario: item.valor_unitario,
+                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length,
+                    nota: item.nota,
+                    ejecutado: item.ejecutado || 'NO',
+                    estado: item.estado || 'BORRADOR'
+                }));
+
+                if (itemsToInsert.length > 0) {
+                    await dbClient.from('presupuesto_items').insert(itemsToInsert);
+                }
+                
+                if (itemsToUpdate.length > 0) {
+                    await dbClient.from('presupuesto_items').upsert(itemsToUpdate);
+                }
             }
 
             res.json(data);
