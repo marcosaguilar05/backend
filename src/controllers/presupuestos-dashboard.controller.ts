@@ -165,19 +165,8 @@ function applyFiltersToQuery(query: any, filters: any, queryParams: any) {
 function getMongoQueryForPagos(queryParams: any, monthNums: number[], dynamicValidacionGrupos: any) {
     const mongoQuery: any = {
         activo: true,
-        $and: [
-            {
-                $or: [
-                    { dependencia: /TRANSPORTES/i },
-                    { dependencia: '67b64d6ec70c84f175463246' }
-                ]
-            }
-        ]
+        ...dynamicValidacionGrupos
     };
-
-    if (dynamicValidacionGrupos && dynamicValidacionGrupos.$or) {
-        mongoQuery.$and.push({ $or: dynamicValidacionGrupos.$or });
-    }
 
     const applyMongoFilter = (field: string, val: any) => {
         if (!val || val === 'undefined') return;
@@ -195,7 +184,11 @@ function getMongoQueryForPagos(queryParams: any, monthNums: number[], dynamicVal
         const arr = String(queryParams.grupo_rubro).split(',').map(s => s.trim()).filter(Boolean);
         if (arr.length > 0) {
             const inRegExp = { $in: arr.map(a => new RegExp(a, 'i')) };
-            mongoQuery.$and.push({ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] });
+            if (mongoQuery.$and) {
+                mongoQuery.$and.push({ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] });
+            } else {
+                mongoQuery.$and = [{ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] }];
+            }
         }
     }
 
@@ -225,12 +218,12 @@ function getMongoQueryForPagos(queryParams: any, monthNums: number[], dynamicVal
             const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
             return getDateQuery(start, end);
         });
-        mongoQuery.$and.push({ $or: ranges });
+        mongoQuery.$and = [{ $or: ranges }];
     } else {
         const start = new Date(Date.UTC(yearNum, 0, 1, 0, 0, 0, 0));
         const end = new Date(Date.UTC(yearNum, 11, 31, 23, 59, 59, 999));
         const baseQuery = getDateQuery(start, end);
-        mongoQuery.$and.push({ $or: baseQuery.$or });
+        mongoQuery.$and = [{ $or: baseQuery.$or }];
     }
 
     return mongoQuery;

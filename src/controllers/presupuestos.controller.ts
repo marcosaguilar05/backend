@@ -674,17 +674,8 @@ export const presupuestosController = {
                         const key = `${g}|${r}`;
                         if (!combos.has(key)) {
                             combos.add(key);
-                            const cond: any = { 
-                                $or: [
-                                    { grupoRubro: new RegExp(`^${g}$`, 'i') },
-                                    { nombreGrupoRubro: new RegExp(`^${g}$`, 'i') }
-                                ]
-                            };
-                            if (r) {
-                                cond.$or.forEach((orCond: any) => {
-                                    orCond.rubro = new RegExp(`^${r}$`, 'i');
-                                });
-                            }
+                            const cond: any = { grupoRubro: new RegExp(`^${g}$`, 'i') };
+                            if (r) cond.rubro = new RegExp(`^${r}$`, 'i');
                             orConditions.push(cond);
                         }
                     });
@@ -694,20 +685,10 @@ export const presupuestosController = {
                 }
 
                 const mongoQuery: any = {
+                    dependencia: /TRANSPORTES/i,
                     activo: true,
-                    $and: [
-                        {
-                            $or: [
-                                { dependencia: /TRANSPORTES/i },
-                                { dependencia: '67b64d6ec70c84f175463246' }
-                            ]
-                        }
-                    ]
+                    ...validacionGrupos
                 };
-
-                if (validacionGrupos && validacionGrupos.$or) {
-                    mongoQuery.$and.push({ $or: validacionGrupos.$or });
-                }
 
                 const applyMongoFilter = (field: string, val: any) => {
                     if (!val || val === 'undefined') return;
@@ -720,15 +701,7 @@ export const presupuestosController = {
                 applyMongoFilter('placa', placa);
                 applyMongoFilter('areaOperacion', area_operacion);
                 applyMongoFilter('empresa', empresa);
-                
-                if (grupo_rubro && grupo_rubro !== 'undefined') {
-                    const arr = String(grupo_rubro).split(',').map(s => s.trim()).filter(Boolean);
-                    if (arr.length > 0) {
-                        const inRegExp = { $in: arr.map(a => new RegExp(a, 'i')) };
-                        mongoQuery.$and.push({ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] });
-                    }
-                }
-
+                applyMongoFilter('grupoRubro', grupo_rubro);
                 applyMongoFilter('rubro', rubro);
                 applyMongoFilter('subRubro', sub_rubro);
 
@@ -754,12 +727,12 @@ export const presupuestosController = {
                         const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
                         return getDateQuery(start, end);
                     });
-                    mongoQuery.$and.push({ $or: ranges });
+                    mongoQuery.$and = [{ $or: ranges }];
                 } else {
                     const start = new Date(Date.UTC(yearNum, 0, 1, 0, 0, 0, 0));
                     const end = new Date(Date.UTC(yearNum, 11, 31, 23, 59, 59, 999));
                     const baseQuery = getDateQuery(start, end);
-                    mongoQuery.$and.push({ $or: baseQuery.$or });
+                    mongoQuery.$and = [{ $or: baseQuery.$or }];
                 }
 
                 const aggregateResult = await PagoModel.aggregate([
