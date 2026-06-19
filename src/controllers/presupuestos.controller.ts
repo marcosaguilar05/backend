@@ -488,16 +488,19 @@ export const presupuestosController = {
                 });
                 
                 if (monthNums.length > 0) {
-                    // Find all presupuesto_items where meses_aplicables overlaps with monthNums
+                    // Fetch all items and filter in memory to ensure compatibility
                     const { data: itemData, error: itemError } = await dbClient
                         .from('presupuesto_items')
-                        .select('presupuesto_id')
-                        .overlaps('meses_aplicables', monthNums);
+                        .select('presupuesto_id, meses_aplicables');
                         
                     if (itemError) {
                         console.error('Error finding budgets for month filter:', itemError);
                     } else if (itemData && itemData.length > 0) {
-                        budgetIdsFromMonth = [...new Set((itemData as any[]).map((d: any) => Number(d.presupuesto_id)))];
+                        const matchingIds = itemData.filter((item: any) => {
+                            if (!item.meses_aplicables || !Array.isArray(item.meses_aplicables)) return false;
+                            return monthNums.some((m: number) => item.meses_aplicables.includes(m));
+                        });
+                        budgetIdsFromMonth = [...new Set(matchingIds.map((d: any) => Number(d.presupuesto_id)))];
                     }
                 }
                 
@@ -746,12 +749,20 @@ export const presupuestosController = {
                         const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
                         return getDateQuery(start, end);
                     });
-                    mongoQuery.$and = [{ $or: ranges }];
+                    if (mongoQuery.$and) {
+                        mongoQuery.$and.push({ $or: ranges });
+                    } else {
+                        mongoQuery.$and = [{ $or: ranges }];
+                    }
                 } else {
                     const start = new Date(Date.UTC(yearNum, 0, 1, 0, 0, 0, 0));
                     const end = new Date(Date.UTC(yearNum, 11, 31, 23, 59, 59, 999));
                     const baseQuery = getDateQuery(start, end);
-                    mongoQuery.$and = [{ $or: baseQuery.$or }];
+                    if (mongoQuery.$and) {
+                        mongoQuery.$and.push({ $or: baseQuery.$or });
+                    } else {
+                        mongoQuery.$and = [{ $or: baseQuery.$or }];
+                    }
                 }
 
                 const aggregateResult = await PagoModel.aggregate([
