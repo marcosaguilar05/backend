@@ -162,44 +162,11 @@ function applyFiltersToQuery(query: any, filters: any, queryParams: any) {
 }
 
 // Helper para generar la consulta a MongoDB de Pagos
-function getMongoQueryForPagos(queryParams: any, monthNums: number[]) {
-    // Definir la restricción de grupos y rubros que aplica a presupuestos
-    const validacionGrupos = {
-        $or: [
-            // Condición 1: Grupos permitidos directamente
-            {
-                grupoRubro: {
-                    $in: [
-                        /INVERSION TRANSPORTES/i,
-                        /MANTENIMIENTO FLOTA Y EQUIPO DE TRANSPORTES/i
-                    ]
-                }
-            },
-            // Condición 2: OTROS COSTOS TRANSPORTES con restricciones de Rubro y SubRubro
-            {
-                $and: [
-                    { grupoRubro: /OTROS COSTOS TRANSPORTES/i },
-                    {
-                        $or: [
-                            {
-                                rubro: /SEGUROS - IMPUESTOS/i,
-                                subRubro: { $in: [/TRAMITES/i, /TECNOMECANICA/i] }
-                            },
-                            {
-                                rubro: /COSTO OPERATIVOS DIVERSOS - TRANSPORTES/i,
-                                subRubro: /MATERIAL PUBLICITARIO VEHICULOS Y CAJAS/i
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    };
-
+function getMongoQueryForPagos(queryParams: any, monthNums: number[], dynamicValidacionGrupos: any) {
     const mongoQuery: any = {
         dependencia: /TRANSPORTES/i,
         activo: true,
-        ...validacionGrupos
+        ...dynamicValidacionGrupos
     };
 
     const applyMongoFilter = (field: string, val: any) => {
@@ -249,6 +216,38 @@ function getMongoQueryForPagos(queryParams: any, monthNums: number[]) {
     }
 
     return mongoQuery;
+}
+
+// Helper para obtener validacionGrupos dinámica basada en los presupuestos del año actual
+async function getValidacionGruposDinamica(dbClient: any, queryParams: any) {
+    const yearNum = queryParams.anio && queryParams.anio !== 'undefined' && queryParams.anio !== '' ? Number(queryParams.anio) : new Date().getFullYear();
+    const { data: presupuestosForValidation } = await dbClient
+        .from('presupuestos')
+        .select('grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre), rubro:maestro_rubros!presupuestos_rubro_id_fkey(nombre)')
+        .eq('anio', yearNum);
+
+    let validacionGrupos: any = { _id: null }; // Fallback para no coincidir nada
+    if (presupuestosForValidation && presupuestosForValidation.length > 0) {
+        const combos = new Set<string>();
+        const orConditions: any[] = [];
+        presupuestosForValidation.forEach((p: any) => {
+            const g = (p.grupo?.nombre || '').trim();
+            const r = (p.rubro?.nombre || '').trim();
+            if (!g) return;
+
+            const key = `${g}|${r}`;
+            if (!combos.has(key)) {
+                combos.add(key);
+                const cond: any = { grupoRubro: new RegExp(`^${g}$`, 'i') };
+                if (r) cond.rubro = new RegExp(`^${r}$`, 'i');
+                orConditions.push(cond);
+            }
+        });
+        if (orConditions.length > 0) {
+            validacionGrupos = { $or: orConditions };
+        }
+    }
+    return validacionGrupos;
 }
 
 export const presupuestosDashboardController = {
@@ -301,7 +300,8 @@ export const presupuestosDashboardController = {
             // Ejecutado real de MongoDB
             let totalEjecutadoReal = 0;
             try {
-                const mongoQuery = getMongoQueryForPagos(req.query, filtersInfo.monthNums);
+                const dynamicValidacion = await getValidacionGruposDinamica(dbClient, req.query);
+                const mongoQuery = getMongoQueryForPagos(req.query, filtersInfo.monthNums, dynamicValidacion);
                 const aggregateResult = await PagoModel.aggregate([
                     { $match: mongoQuery },
                     {
@@ -388,7 +388,8 @@ export const presupuestosDashboardController = {
 
             // Reemplazar Ejecutado con datos de Mongo
             try {
-                const mongoQuery = getMongoQueryForPagos(req.query, filtersInfo.monthNums);
+                const dynamicValidacion = await getValidacionGruposDinamica(dbClient, req.query);
+                const mongoQuery = getMongoQueryForPagos(req.query, filtersInfo.monthNums, dynamicValidacion);
                 const aggregateResult = await PagoModel.aggregate([
                     { $match: mongoQuery },
                     {
@@ -479,7 +480,8 @@ export const presupuestosDashboardController = {
 
             // Reemplazar Ejecutado con datos de Mongo
             try {
-                const mongoQuery = getMongoQueryForPagos(req.query, filtersInfo.monthNums);
+                const dynamicValidacion = await getValidacionGruposDinamica(dbClient, req.query);
+                const mongoQuery = getMongoQueryForPagos(req.query, filtersInfo.monthNums, dynamicValidacion);
                 const aggregateResult = await PagoModel.aggregate([
                     { $match: mongoQuery },
                     {

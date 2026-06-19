@@ -654,38 +654,35 @@ export const presupuestosController = {
             // --- CÁLCULO DE TOTAL EJECUTADO REAL DESDE MONGODB ---
             let totalEjecutadoReal = 0;
             try {
-                // Definir la restricción de grupos y rubros que aplica a presupuestos
-                const validacionGrupos = {
-                    $or: [
-                        // Condición 1: Grupos permitidos directamente
-                        {
-                            grupoRubro: {
-                                $in: [
-                                    /INVERSION TRANSPORTES/i,
-                                    /MANTENIMIENTO FLOTA Y EQUIPO DE TRANSPORTES/i
-                                ]
-                            }
-                        },
-                        // Condición 2: OTROS COSTOS TRANSPORTES con restricciones de Rubro y SubRubro
-                        {
-                            $and: [
-                                { grupoRubro: /OTROS COSTOS TRANSPORTES/i },
-                                {
-                                    $or: [
-                                        {
-                                            rubro: /SEGUROS - IMPUESTOS/i,
-                                            subRubro: { $in: [/TRAMITES/i, /TECNOMECANICA/i] }
-                                        },
-                                        {
-                                            rubro: /COSTO OPERATIVOS DIVERSOS - TRANSPORTES/i,
-                                            subRubro: /MATERIAL PUBLICITARIO VEHICULOS Y CAJAS/i
-                                        }
-                                    ]
-                                }
-                            ]
+                // Obtener validacionGrupos dinámica basada en los presupuestos del año actual
+                const yearNum = anio && anio !== 'undefined' && anio !== '' ? Number(anio) : new Date().getFullYear();
+                
+                const { data: presupuestosForValidation } = await dbClient
+                    .from('presupuestos')
+                    .select('grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre), rubro:maestro_rubros!presupuestos_rubro_id_fkey(nombre)')
+                    .eq('anio', yearNum);
+
+                let validacionGrupos: any = { _id: null }; // Fallback para no coincidir nada
+                if (presupuestosForValidation && presupuestosForValidation.length > 0) {
+                    const combos = new Set<string>();
+                    const orConditions: any[] = [];
+                    presupuestosForValidation.forEach((p: any) => {
+                        const g = (p.grupo?.nombre || '').trim();
+                        const r = (p.rubro?.nombre || '').trim();
+                        if (!g) return;
+
+                        const key = `${g}|${r}`;
+                        if (!combos.has(key)) {
+                            combos.add(key);
+                            const cond: any = { grupoRubro: new RegExp(`^${g}$`, 'i') };
+                            if (r) cond.rubro = new RegExp(`^${r}$`, 'i');
+                            orConditions.push(cond);
                         }
-                    ]
-                };
+                    });
+                    if (orConditions.length > 0) {
+                        validacionGrupos = { $or: orConditions };
+                    }
+                }
 
                 const mongoQuery: any = {
                     dependencia: /TRANSPORTES/i,
