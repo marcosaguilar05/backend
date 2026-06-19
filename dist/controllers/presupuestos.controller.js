@@ -440,8 +440,8 @@ exports.presupuestosController = {
                     ),
                     areas_operacion(id, nombre),
                     empresas(id, empresa),
-                    grupo:maestro_rubros!grupo_rubro_id(id, codigo, nombre),
-                    rubro:maestro_rubros!rubro_id(id, codigo, nombre),
+                    grupo:maestro_rubros!grupo_rubro_id(id, codigo, codigo_concatenado, nombre),
+                    rubro:maestro_rubros!rubro_id(id, codigo, codigo_concatenado, nombre),
                     personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
                     presupuesto_items(id, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre, unidad))
                 `, { count: 'exact' });
@@ -509,7 +509,7 @@ exports.presupuestosController = {
             // 2. Cálculo de estadísticas reales (sin paginación, pero con los mismos filtros base)
             let summaryQuery = dbClient
                 .from('presupuestos')
-                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes)');
+                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, tipo:tipos_presupuesto(id, nombre))');
             if (vehiculo_id)
                 summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
             if (vehiculoIdsFromPlaca.length > 0) {
@@ -564,11 +564,18 @@ exports.presupuestosController = {
             let totalNoEjecutado = 0;
             let totalPresupuesto = 0;
             const rubrosIds = new Set();
+            const subRubroNames = sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '' ?
+                String(sub_rubro).split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
             if (allMatching && allMatching.length > 0) {
                 allMatching.forEach((p) => {
                     rubrosIds.add(p.rubro_id);
                     if (p.presupuesto_items) {
                         p.presupuesto_items.forEach((item) => {
+                            if (subRubroNames.length > 0) {
+                                const iNombre = (item.tipo?.nombre || '').toUpperCase().trim();
+                                if (!subRubroNames.includes(iNombre))
+                                    return; // Skip item not matching sub_rubro filter
+                            }
                             let total = item.valor_total || 0;
                             if (monthNums.length > 0) {
                                 const applicableSelectedMonths = (item.meses_aplicables || []).filter((m) => monthNums.includes(m));
@@ -720,13 +727,25 @@ exports.presupuestosController = {
             catch (mongoError) {
                 console.error('❌ Error al calcular totalEjecutadoReal desde MongoDB:', mongoError);
             }
-            if (data && data.length > 0 && monthNums.length > 0) {
+            if (data && data.length > 0 && (monthNums.length > 0 || subRubroNames.length > 0)) {
                 data.forEach((p) => {
                     if (p.presupuesto_items) {
                         p.presupuesto_items = p.presupuesto_items.filter((item) => {
-                            if (!item.meses_aplicables || !Array.isArray(item.meses_aplicables))
-                                return false;
-                            return monthNums.some(m => item.meses_aplicables.includes(m));
+                            let keep = true;
+                            // 1. Filtrar por mes
+                            if (monthNums.length > 0) {
+                                if (!item.meses_aplicables || !Array.isArray(item.meses_aplicables))
+                                    keep = false;
+                                else if (!monthNums.some(m => item.meses_aplicables.includes(m)))
+                                    keep = false;
+                            }
+                            // 2. Filtrar por sub rubro
+                            if (keep && subRubroNames.length > 0) {
+                                const iNombre = (item.tipo?.nombre || '').toUpperCase().trim();
+                                if (!subRubroNames.includes(iNombre))
+                                    keep = false;
+                            }
+                            return keep;
                         });
                     }
                 });

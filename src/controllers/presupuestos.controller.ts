@@ -579,7 +579,7 @@ export const presupuestosController = {
             // 2. Cálculo de estadísticas reales (sin paginación, pero con los mismos filtros base)
             let summaryQuery = dbClient
                 .from('presupuestos')
-                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes)');
+                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, tipo:tipos_presupuesto(id, nombre))');
 
             if (vehiculo_id) summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
             if (vehiculoIdsFromPlaca.length > 0) {
@@ -624,11 +624,19 @@ export const presupuestosController = {
             let totalPresupuesto = 0;
             const rubrosIds = new Set<number>();
 
+            const subRubroNames = sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '' ? 
+                String(sub_rubro).split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
+
             if (allMatching && allMatching.length > 0) {
                 allMatching.forEach((p: any) => {
                     rubrosIds.add(p.rubro_id);
                     if (p.presupuesto_items) {
                         p.presupuesto_items.forEach((item: any) => {
+                            if (subRubroNames.length > 0) {
+                                const iNombre = (item.tipo?.nombre || '').toUpperCase().trim();
+                                if (!subRubroNames.includes(iNombre)) return; // Skip item not matching sub_rubro filter
+                            }
+
                             let total = item.valor_total || 0;
 
                             if (monthNums.length > 0) {
@@ -790,12 +798,25 @@ export const presupuestosController = {
                 console.error('❌ Error al calcular totalEjecutadoReal desde MongoDB:', mongoError);
             }
 
-            if (data && data.length > 0 && monthNums.length > 0) {
+            if (data && data.length > 0 && (monthNums.length > 0 || subRubroNames.length > 0)) {
                 data.forEach((p: any) => {
                     if (p.presupuesto_items) {
                         p.presupuesto_items = p.presupuesto_items.filter((item: any) => {
-                            if (!item.meses_aplicables || !Array.isArray(item.meses_aplicables)) return false;
-                            return monthNums.some(m => item.meses_aplicables.includes(m));
+                            let keep = true;
+                            
+                            // 1. Filtrar por mes
+                            if (monthNums.length > 0) {
+                                if (!item.meses_aplicables || !Array.isArray(item.meses_aplicables)) keep = false;
+                                else if (!monthNums.some(m => item.meses_aplicables.includes(m))) keep = false;
+                            }
+                            
+                            // 2. Filtrar por sub rubro
+                            if (keep && subRubroNames.length > 0) {
+                                const iNombre = (item.tipo?.nombre || '').toUpperCase().trim();
+                                if (!subRubroNames.includes(iNombre)) keep = false;
+                            }
+
+                            return keep;
                         });
                     }
                 });
