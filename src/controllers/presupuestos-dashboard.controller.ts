@@ -218,12 +218,20 @@ function getMongoQueryForPagos(queryParams: any, monthNums: number[], dynamicVal
             const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
             return getDateQuery(start, end);
         });
-        mongoQuery.$and = [{ $or: ranges }];
+        if (mongoQuery.$and) {
+            mongoQuery.$and.push({ $or: ranges });
+        } else {
+            mongoQuery.$and = [{ $or: ranges }];
+        }
     } else {
         const start = new Date(Date.UTC(yearNum, 0, 1, 0, 0, 0, 0));
         const end = new Date(Date.UTC(yearNum, 11, 31, 23, 59, 59, 999));
         const baseQuery = getDateQuery(start, end);
-        mongoQuery.$and = [{ $or: baseQuery.$or }];
+        if (mongoQuery.$and) {
+            mongoQuery.$and.push({ $or: baseQuery.$or });
+        } else {
+            mongoQuery.$and = [{ $or: baseQuery.$or }];
+        }
     }
 
     return mongoQuery;
