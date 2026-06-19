@@ -654,16 +654,50 @@ export const presupuestosController = {
             // --- CÁLCULO DE TOTAL EJECUTADO REAL DESDE MONGODB ---
             let totalEjecutadoReal = 0;
             try {
+                // Definir la restricción de grupos y rubros que aplica a presupuestos
+                const validacionGrupos = {
+                    $or: [
+                        // Condición 1: Grupos permitidos directamente
+                        {
+                            grupoRubro: {
+                                $in: [
+                                    /INVERSION TRANSPORTES/i,
+                                    /MANTENIMIENTO FLOTA Y EQUIPO DE TRANSPORTES/i
+                                ]
+                            }
+                        },
+                        // Condición 2: OTROS COSTOS TRANSPORTES con restricciones de Rubro y SubRubro
+                        {
+                            $and: [
+                                { grupoRubro: /OTROS COSTOS TRANSPORTES/i },
+                                {
+                                    $or: [
+                                        {
+                                            rubro: /SEGUROS - IMPUESTOS/i,
+                                            subRubro: { $in: [/TRAMITES/i, /TECNOMECANICA/i] }
+                                        },
+                                        {
+                                            rubro: /COSTO OPERATIVOS DIVERSOS - TRANSPORTES/i,
+                                            subRubro: /MATERIAL PUBLICITARIO VEHICULOS Y CAJAS/i
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                };
+
                 const mongoQuery: any = {
-                    dependencia: 'TRANSPORTES',
-                    activo: true
+                    dependencia: /TRANSPORTES/i,
+                    activo: true,
+                    ...validacionGrupos
                 };
 
                 const applyMongoFilter = (field: string, val: any) => {
                     if (!val || val === 'undefined') return;
                     const arr = String(val).split(',').map(s => s.trim()).filter(Boolean);
                     if (arr.length > 0) {
-                        mongoQuery[field] = { $in: arr };
+                        mongoQuery[field] = { $in: arr.map(a => new RegExp(a, 'i')) };
                     }
                 };
 
@@ -698,12 +732,12 @@ export const presupuestosController = {
                         const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
                         return getDateQuery(start, end);
                     });
-                    mongoQuery.$or = ranges;
+                    mongoQuery.$and = [{ $or: ranges }];
                 } else {
                     const start = new Date(Date.UTC(yearNum, 0, 1, 0, 0, 0, 0));
                     const end = new Date(Date.UTC(yearNum, 11, 31, 23, 59, 59, 999));
                     const baseQuery = getDateQuery(start, end);
-                    mongoQuery.$or = baseQuery.$or;
+                    mongoQuery.$and = [{ $or: baseQuery.$or }];
                 }
 
                 const aggregateResult = await PagoModel.aggregate([
