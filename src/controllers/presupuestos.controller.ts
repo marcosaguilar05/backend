@@ -674,8 +674,17 @@ export const presupuestosController = {
                         const key = `${g}|${r}`;
                         if (!combos.has(key)) {
                             combos.add(key);
-                            const cond: any = { grupoRubro: new RegExp(`^${g}$`, 'i') };
-                            if (r) cond.rubro = new RegExp(`^${r}$`, 'i');
+                            const cond: any = { 
+                                $or: [
+                                    { grupoRubro: new RegExp(`^${g}$`, 'i') },
+                                    { nombreGrupoRubro: new RegExp(`^${g}$`, 'i') }
+                                ]
+                            };
+                            if (r) {
+                                cond.$or.forEach((orCond: any) => {
+                                    orCond.rubro = new RegExp(`^${r}$`, 'i');
+                                });
+                            }
                             orConditions.push(cond);
                         }
                     });
@@ -685,7 +694,6 @@ export const presupuestosController = {
                 }
 
                 const mongoQuery: any = {
-                    dependencia: /TRANSPORTES/i,
                     activo: true,
                     ...validacionGrupos
                 };
@@ -701,7 +709,18 @@ export const presupuestosController = {
                 applyMongoFilter('placa', placa);
                 applyMongoFilter('areaOperacion', area_operacion);
                 applyMongoFilter('empresa', empresa);
-                applyMongoFilter('grupoRubro', grupo_rubro);
+
+                if (grupo_rubro && grupo_rubro !== 'undefined') {
+                    const arr = String(grupo_rubro).split(',').map(s => s.trim()).filter(Boolean);
+                    if (arr.length > 0) {
+                        const inRegExp = { $in: arr.map(a => new RegExp(a, 'i')) };
+                        if (mongoQuery.$and) {
+                            mongoQuery.$and.push({ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] });
+                        } else {
+                            mongoQuery.$and = [{ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] }];
+                        }
+                    }
+                }
                 applyMongoFilter('rubro', rubro);
                 applyMongoFilter('subRubro', sub_rubro);
 
