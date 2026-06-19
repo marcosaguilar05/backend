@@ -346,6 +346,7 @@ export const presupuestosDashboardController = {
                     empleado_id,
                     control_flota(id, areas_placas(placa)),
                     personal:Personal!presupuestos_empleado_id_fkey(tipo),
+                    grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre),
                     presupuesto_items(valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes)
                 `);
 
@@ -363,13 +364,23 @@ export const presupuestosDashboardController = {
             data?.forEach((p: any) => {
                 let placa = p.empleado_id ? 'PERSONAL' : (p.control_flota?.areas_placas?.placa || 'S/P');
                 const tipo = p.empleado_id ? (p.personal?.tipo || 'EMPLEADO') : 'VEHICULO';
+                const grupo = (p.grupo?.nombre || 'OTROS COSTOS').toUpperCase().trim();
 
                 if (!grouped[placa]) {
                     grouped[placa] = {
                         placa,
                         tipo,
                         total_presupuesto: 0,
-                        total_ejecutado: 0
+                        total_ejecutado: 0,
+                        detalles: {}
+                    };
+                }
+
+                if (!grouped[placa].detalles[grupo]) {
+                    grouped[placa].detalles[grupo] = {
+                        grupo,
+                        presupuestado: 0,
+                        ejecutado: 0
                     };
                 }
 
@@ -382,6 +393,7 @@ export const presupuestosDashboardController = {
                             total = (item.valor_unitario || 0) * (item.frecuencia_mes || 1) * applicable.length;
                         }
                         grouped[placa].total_presupuesto += total;
+                        grouped[placa].detalles[grupo].presupuestado += total;
                     });
                 }
             });
@@ -394,32 +406,49 @@ export const presupuestosDashboardController = {
                     { $match: mongoQuery },
                     {
                         $group: {
-                            _id: '$placa',
+                            _id: { placa: '$placa', grupoRubro: '$grupoRubro' },
                             totalOperacion: { $sum: '$valorOperacion' }
                         }
                     }
                 ]);
 
                 aggregateResult.forEach((resItem) => {
-                    if (resItem._id) {
-                        const placaMongo = resItem._id;
+                    if (resItem._id && resItem._id.placa) {
+                        const placaMongo = resItem._id.placa;
+                        const grupoMongo = (resItem._id.grupoRubro || 'OTROS COSTOS').toUpperCase().trim();
+
                         if (!grouped[placaMongo]) {
                             grouped[placaMongo] = {
                                 placa: placaMongo,
                                 tipo: 'VEHICULO', // default
                                 total_presupuesto: 0,
-                                total_ejecutado: resItem.totalOperacion || 0
+                                total_ejecutado: 0,
+                                detalles: {}
                             };
-                        } else {
-                            grouped[placaMongo].total_ejecutado = resItem.totalOperacion || 0;
                         }
+
+                        if (!grouped[placaMongo].detalles[grupoMongo]) {
+                            grouped[placaMongo].detalles[grupoMongo] = {
+                                grupo: grupoMongo,
+                                presupuestado: 0,
+                                ejecutado: 0
+                            };
+                        }
+
+                        const executedVal = resItem.totalOperacion || 0;
+                        grouped[placaMongo].total_ejecutado += executedVal;
+                        grouped[placaMongo].detalles[grupoMongo].ejecutado += executedVal;
                     }
                 });
             } catch (mongoError) {
                 console.error('Error calculando ejecutado por placa:', mongoError);
             }
 
-            const result = Object.values(grouped).sort((a: any, b: any) => b.total_presupuesto - a.total_presupuesto);
+            // Convertir detalles de object a array
+            const result = Object.values(grouped).map((g: any) => ({
+                ...g,
+                detalles: Object.values(g.detalles).sort((a: any, b: any) => b.presupuestado - a.presupuestado)
+            })).sort((a: any, b: any) => b.total_presupuesto - a.total_presupuesto);
 
             res.json(result);
         } catch (error) {
