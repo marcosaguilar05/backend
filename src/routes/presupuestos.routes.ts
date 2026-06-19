@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import { presupuestosController } from '../controllers/presupuestos.controller';
+import { presupuestosDashboardController } from '../controllers/presupuestos-dashboard.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 
 // Proteger todas las rutas
 router.use(authMiddleware);
+
+// Dashboard
+router.get('/dashboard/kpis', presupuestosDashboardController.getKPIs);
+router.get('/dashboard/by-placa', presupuestosDashboardController.getByPlaca);
+router.get('/dashboard/by-empresa', presupuestosDashboardController.getByEmpresa);
 
 // Catálogos
 router.get('/rubros', presupuestosController.getRubros);
