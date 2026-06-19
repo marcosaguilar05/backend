@@ -720,6 +720,17 @@ exports.presupuestosController = {
             catch (mongoError) {
                 console.error('❌ Error al calcular totalEjecutadoReal desde MongoDB:', mongoError);
             }
+            if (data && data.length > 0 && monthNums.length > 0) {
+                data.forEach((p) => {
+                    if (p.presupuesto_items) {
+                        p.presupuesto_items = p.presupuesto_items.filter((item) => {
+                            if (!item.meses_aplicables || !Array.isArray(item.meses_aplicables))
+                                return false;
+                            return monthNums.some(m => item.meses_aplicables.includes(m));
+                        });
+                    }
+                });
+            }
             res.json({
                 data: data || [],
                 pagination: {
