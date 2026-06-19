@@ -184,10 +184,26 @@ function getMongoQueryForPagos(queryParams: any, monthNums: number[], dynamicVal
         const arr = String(queryParams.grupo_rubro).split(',').map(s => s.trim()).filter(Boolean);
         if (arr.length > 0) {
             const inRegExp = { $in: arr.map(a => new RegExp(a, 'i')) };
+            
+            const orFilter: any[] = [
+                { grupoRubro: inRegExp },
+                { nombreGrupoRubro: inRegExp }
+            ];
+
+            // Extraer los códigos concatenados de la validación dinámica para agregarlos al filtro
+            if (dynamicValidacionGrupos && dynamicValidacionGrupos.$or && dynamicValidacionGrupos.$or.length > 2) {
+                const codigoObj = dynamicValidacionGrupos.$or[2];
+                if (codigoObj && codigoObj.grupoRubro && codigoObj.grupoRubro.$in) {
+                    const codigos = codigoObj.grupoRubro.$in;
+                    orFilter.push({ grupoRubro: { $in: codigos } });
+                    orFilter.push({ nombreGrupoRubro: { $in: codigos } });
+                }
+            }
+            
             if (mongoQuery.$and) {
-                mongoQuery.$and.push({ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] });
+                mongoQuery.$and.push({ $or: orFilter });
             } else {
-                mongoQuery.$and = [{ $or: [{ grupoRubro: inRegExp }, { nombreGrupoRubro: inRegExp }] }];
+                mongoQuery.$and = [{ $or: orFilter }];
             }
         }
     }

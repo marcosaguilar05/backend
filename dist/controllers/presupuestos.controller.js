@@ -598,32 +598,31 @@ exports.presupuestosController = {
                 const yearNum = anio && anio !== 'undefined' && anio !== '' ? Number(anio) : new Date().getFullYear();
                 const { data: presupuestosForValidation } = await dbClient
                     .from('presupuestos')
-                    .select('grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre), rubro:maestro_rubros!presupuestos_rubro_id_fkey(nombre)')
+                    .select('grupo_rubro_id, grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre, codigo_concatenado)')
                     .eq('anio', yearNum);
                 let validacionGrupos = { _id: null }; // Fallback para no coincidir nada
                 if (presupuestosForValidation && presupuestosForValidation.length > 0) {
-                    const combos = new Set();
-                    const orConditions = [];
+                    const groups = new Set();
+                    const codigos = new Set();
                     presupuestosForValidation.forEach((p) => {
-                        const g = (p.grupo?.nombre || '').trim();
-                        const r = (p.rubro?.nombre || '').trim();
-                        if (!g)
-                            return;
-                        const key = `${g}|${r}`;
-                        if (!combos.has(key)) {
-                            combos.add(key);
-                            const cond = { grupoRubro: new RegExp(`^${g}$`, 'i') };
-                            if (r)
-                                cond.rubro = new RegExp(`^${r}$`, 'i');
-                            orConditions.push(cond);
-                        }
+                        if (p.grupo?.nombre)
+                            groups.add(p.grupo.nombre.trim());
+                        if (p.grupo?.codigo_concatenado)
+                            codigos.add(p.grupo.codigo_concatenado.trim());
                     });
-                    if (orConditions.length > 0) {
-                        validacionGrupos = { $or: orConditions };
+                    const inRegExp = { $in: Array.from(groups).map(g => new RegExp(g, 'i')) };
+                    const orFilters = [
+                        { grupoRubro: inRegExp },
+                        { nombreGrupoRubro: inRegExp }
+                    ];
+                    if (codigos.size > 0) {
+                        const codesArray = Array.from(codigos);
+                        orFilters.push({ grupoRubro: { $in: codesArray } });
+                        orFilters.push({ nombreGrupoRubro: { $in: codesArray } });
                     }
+                    validacionGrupos = { $or: orFilters };
                 }
                 const mongoQuery = {
-                    dependencia: /TRANSPORTES/i,
                     activo: true,
                     ...validacionGrupos
                 };
@@ -638,7 +637,32 @@ exports.presupuestosController = {
                 applyMongoFilter('placa', placa);
                 applyMongoFilter('areaOperacion', area_operacion);
                 applyMongoFilter('empresa', empresa);
-                applyMongoFilter('grupoRubro', grupo_rubro);
+                if (grupo_rubro && grupo_rubro !== 'undefined') {
+                    const arr = String(grupo_rubro).split(',').map(s => s.trim()).filter(Boolean);
+                    if (arr.length > 0) {
+                        const inRegExp = { $in: arr.map(a => new RegExp(a, 'i')) };
+                        // Agregar soporte para los codigos concatenados si se filtra por nombre de grupo
+                        let codigos = [];
+                        if (grupoRubroIds && grupoRubroIds.length > 0) {
+                            const { data: grData } = await dbClient.from('maestro_rubros').select('codigo_concatenado').in('id', grupoRubroIds);
+                            codigos = grData?.map(d => d.codigo_concatenado).filter(Boolean) || [];
+                        }
+                        const orFilter = [
+                            { grupoRubro: inRegExp },
+                            { nombreGrupoRubro: inRegExp }
+                        ];
+                        if (codigos.length > 0) {
+                            orFilter.push({ grupoRubro: { $in: codigos } });
+                            orFilter.push({ nombreGrupoRubro: { $in: codigos } });
+                        }
+                        if (mongoQuery.$and) {
+                            mongoQuery.$and.push({ $or: orFilter });
+                        }
+                        else {
+                            mongoQuery.$and = [{ $or: orFilter }];
+                        }
+                    }
+                }
                 applyMongoFilter('rubro', rubro);
                 applyMongoFilter('subRubro', sub_rubro);
                 // Filtrado por fecha (Año y Meses) - Usando fechaPago con fallback a fecha
@@ -662,13 +686,23 @@ exports.presupuestosController = {
                         const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
                         return getDateQuery(start, end);
                     });
-                    mongoQuery.$and = [{ $or: ranges }];
+                    if (mongoQuery.$and) {
+                        mongoQuery.$and.push({ $or: ranges });
+                    }
+                    else {
+                        mongoQuery.$and = [{ $or: ranges }];
+                    }
                 }
                 else {
                     const start = new Date(Date.UTC(yearNum, 0, 1, 0, 0, 0, 0));
                     const end = new Date(Date.UTC(yearNum, 11, 31, 23, 59, 59, 999));
                     const baseQuery = getDateQuery(start, end);
-                    mongoQuery.$and = [{ $or: baseQuery.$or }];
+                    if (mongoQuery.$and) {
+                        mongoQuery.$and.push({ $or: baseQuery.$or });
+                    }
+                    else {
+                        mongoQuery.$and = [{ $or: baseQuery.$or }];
+                    }
                 }
                 const aggregateResult = await pagos_model_1.PagoModel.aggregate([
                     { $match: mongoQuery },
