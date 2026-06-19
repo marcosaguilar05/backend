@@ -347,7 +347,8 @@ export const presupuestosDashboardController = {
                     control_flota(id, areas_placas(placa)),
                     personal:Personal!presupuestos_empleado_id_fkey(tipo),
                     grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre),
-                    presupuesto_items(valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes)
+                    rubro:maestro_rubros!presupuestos_rubro_id_fkey(nombre),
+                    presupuesto_items(valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(nombre), concepto:conceptos_presupuesto(nombre))
                 `);
 
             query = applyFiltersToQuery(query, filtersInfo, req.query);
@@ -365,23 +366,16 @@ export const presupuestosDashboardController = {
                 let placa = p.empleado_id ? 'PERSONAL' : (p.control_flota?.areas_placas?.placa || 'S/P');
                 const tipo = p.empleado_id ? (p.personal?.tipo || 'EMPLEADO') : 'VEHICULO';
                 const grupo = (p.grupo?.nombre || 'OTROS COSTOS').toUpperCase().trim();
+                const rubro = (p.rubro?.nombre || 'SIN RUBRO').toUpperCase().trim();
 
                 if (!grouped[placa]) {
-                    grouped[placa] = {
-                        placa,
-                        tipo,
-                        total_presupuesto: 0,
-                        total_ejecutado: 0,
-                        detalles: {}
-                    };
+                    grouped[placa] = { placa, tipo, total_presupuesto: 0, total_ejecutado: 0, grupos: {} };
                 }
-
-                if (!grouped[placa].detalles[grupo]) {
-                    grouped[placa].detalles[grupo] = {
-                        grupo,
-                        presupuestado: 0,
-                        ejecutado: 0
-                    };
+                if (!grouped[placa].grupos[grupo]) {
+                    grouped[placa].grupos[grupo] = { nombre: grupo, presupuestado: 0, ejecutado: 0, rubros: {} };
+                }
+                if (!grouped[placa].grupos[grupo].rubros[rubro]) {
+                    grouped[placa].grupos[grupo].rubros[rubro] = { nombre: rubro, presupuestado: 0, ejecutado: 0, subrubros: {} };
                 }
 
                 if (p.presupuesto_items) {
@@ -392,8 +386,26 @@ export const presupuestosDashboardController = {
                             if (applicable.length === 0) return;
                             total = (item.valor_unitario || 0) * (item.frecuencia_mes || 1) * applicable.length;
                         }
+
+                        const subrubro = (item.tipo?.nombre || 'SIN SUBRUBRO').toUpperCase().trim();
+                        const concepto = (item.concepto?.nombre || 'SIN CONCEPTO').toUpperCase().trim();
+                        const nota = (item.nota || '').trim();
+
+                        if (!grouped[placa].grupos[grupo].rubros[rubro].subrubros[subrubro]) {
+                            grouped[placa].grupos[grupo].rubros[rubro].subrubros[subrubro] = { nombre: subrubro, presupuestado: 0, ejecutado: 0, conceptos: [] };
+                        }
+
                         grouped[placa].total_presupuesto += total;
-                        grouped[placa].detalles[grupo].presupuestado += total;
+                        grouped[placa].grupos[grupo].presupuestado += total;
+                        grouped[placa].grupos[grupo].rubros[rubro].presupuestado += total;
+                        grouped[placa].grupos[grupo].rubros[rubro].subrubros[subrubro].presupuestado += total;
+
+                        grouped[placa].grupos[grupo].rubros[rubro].subrubros[subrubro].conceptos.push({
+                            concepto,
+                            nota,
+                            presupuestado: total,
+                            ejecutado: 0
+                        });
                     });
                 }
             });
@@ -406,7 +418,14 @@ export const presupuestosDashboardController = {
                     { $match: mongoQuery },
                     {
                         $group: {
-                            _id: { placa: '$placa', grupoRubro: '$grupoRubro' },
+                            _id: { 
+                                placa: '$placa', 
+                                grupoRubro: '$grupoRubro', 
+                                rubro: '$rubro', 
+                                subRubro: '$subRubro', 
+                                concepto: '$concepto', 
+                                nota: '$observacionesUsuario' 
+                            },
                             totalOperacion: { $sum: '$valorOperacion' }
                         }
                     }
@@ -416,38 +435,59 @@ export const presupuestosDashboardController = {
                     if (resItem._id && resItem._id.placa) {
                         const placaMongo = resItem._id.placa;
                         const grupoMongo = (resItem._id.grupoRubro || 'OTROS COSTOS').toUpperCase().trim();
-
-                        if (!grouped[placaMongo]) {
-                            grouped[placaMongo] = {
-                                placa: placaMongo,
-                                tipo: 'VEHICULO', // default
-                                total_presupuesto: 0,
-                                total_ejecutado: 0,
-                                detalles: {}
-                            };
-                        }
-
-                        if (!grouped[placaMongo].detalles[grupoMongo]) {
-                            grouped[placaMongo].detalles[grupoMongo] = {
-                                grupo: grupoMongo,
-                                presupuestado: 0,
-                                ejecutado: 0
-                            };
-                        }
-
+                        const rubroMongo = (resItem._id.rubro || 'SIN RUBRO').toUpperCase().trim();
+                        const subrubroMongo = (resItem._id.subRubro || 'SIN SUBRUBRO').toUpperCase().trim();
+                        const conceptoMongo = (resItem._id.concepto || 'SIN CONCEPTO').toUpperCase().trim();
+                        const notaMongo = (resItem._id.nota || '').trim();
                         const executedVal = resItem.totalOperacion || 0;
+
+                        if (!grouped[placaMongo]) grouped[placaMongo] = { placa: placaMongo, tipo: 'VEHICULO', total_presupuesto: 0, total_ejecutado: 0, grupos: {} };
+                        if (!grouped[placaMongo].grupos[grupoMongo]) grouped[placaMongo].grupos[grupoMongo] = { nombre: grupoMongo, presupuestado: 0, ejecutado: 0, rubros: {} };
+                        if (!grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo]) grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo] = { nombre: rubroMongo, presupuestado: 0, ejecutado: 0, subrubros: {} };
+                        if (!grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo]) grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo] = { nombre: subrubroMongo, presupuestado: 0, ejecutado: 0, conceptos: [] };
+
                         grouped[placaMongo].total_ejecutado += executedVal;
-                        grouped[placaMongo].detalles[grupoMongo].ejecutado += executedVal;
+                        grouped[placaMongo].grupos[grupoMongo].ejecutado += executedVal;
+                        grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].ejecutado += executedVal;
+                        grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo].ejecutado += executedVal;
+
+                        // Check if we can map it to an existing concepto to update executed, or push new
+                        const conceptoArr = grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo].conceptos;
+                        let found = false;
+                        for (let c of conceptoArr) {
+                            if (c.concepto === conceptoMongo) {
+                                c.ejecutado += executedVal;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            conceptoArr.push({
+                                concepto: conceptoMongo,
+                                nota: notaMongo,
+                                presupuestado: 0,
+                                ejecutado: executedVal
+                            });
+                        }
                     }
                 });
             } catch (mongoError) {
                 console.error('Error calculando ejecutado por placa:', mongoError);
             }
 
-            // Convertir detalles de object a array
-            const result = Object.values(grouped).map((g: any) => ({
-                ...g,
-                detalles: Object.values(g.detalles).sort((a: any, b: any) => b.presupuestado - a.presupuestado)
+            // Convertir objectos a arrays
+            const result = Object.values(grouped).map((p: any) => ({
+                ...p,
+                grupos: Object.values(p.grupos).map((g: any) => ({
+                    ...g,
+                    rubros: Object.values(g.rubros).map((r: any) => ({
+                        ...r,
+                        subrubros: Object.values(r.subrubros).map((s: any) => ({
+                            ...s,
+                            conceptos: s.conceptos.sort((a: any, b: any) => b.presupuestado - a.presupuestado)
+                        })).sort((a: any, b: any) => b.presupuestado - a.presupuestado)
+                    })).sort((a: any, b: any) => b.presupuestado - a.presupuestado)
+                })).sort((a: any, b: any) => b.presupuestado - a.presupuestado)
             })).sort((a: any, b: any) => b.total_presupuesto - a.total_presupuesto);
 
             res.json(result);
