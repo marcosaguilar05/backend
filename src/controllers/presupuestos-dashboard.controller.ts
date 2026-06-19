@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../types';
+import { PagoModel } from '../models/pagos.model';
 
 // Función auxiliar para resolver filtros basados en texto a IDs para la consulta principal
 async function resolveFilters(req: AuthRequest, dbClient: any) {
@@ -160,6 +161,62 @@ function applyFiltersToQuery(query: any, filters: any, queryParams: any) {
     return query;
 }
 
+// Helper para generar la consulta a MongoDB de Pagos
+function getMongoQueryForPagos(queryParams: any, monthNums: number[]) {
+    const mongoQuery: any = {
+        dependencia: 'TRANSPORTES',
+        activo: true
+    };
+
+    const applyMongoFilter = (field: string, val: any) => {
+        if (!val || val === 'undefined') return;
+        const arr = String(val).split(',').map(s => s.trim()).filter(Boolean);
+        if (arr.length > 0) {
+            mongoQuery[field] = { $in: arr };
+        }
+    };
+
+    applyMongoFilter('placa', queryParams.placa);
+    applyMongoFilter('areaOperacion', queryParams.area_operacion);
+    applyMongoFilter('empresa', queryParams.empresa);
+    applyMongoFilter('grupoRubro', queryParams.grupo_rubro);
+    applyMongoFilter('rubro', queryParams.rubro);
+    applyMongoFilter('subRubro', queryParams.sub_rubro);
+
+    const yearNum = queryParams.anio && queryParams.anio !== 'undefined' && queryParams.anio !== '' ? Number(queryParams.anio) : new Date().getFullYear();
+
+    const getDateQuery = (start: Date, end: Date) => {
+        const dateRange = { $gte: start, $lte: end };
+        return {
+            $or: [
+                { fechaPago: dateRange },
+                {
+                    $and: [
+                        { $or: [{ fechaPago: { $exists: false } }, { fechaPago: null }] },
+                        { fecha: dateRange }
+                    ]
+                }
+            ]
+        };
+    };
+
+    if (monthNums.length > 0) {
+        const ranges = monthNums.map(m => {
+            const start = new Date(Date.UTC(yearNum, m - 1, 1, 0, 0, 0, 0));
+            const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
+            return getDateQuery(start, end);
+        });
+        mongoQuery.$or = ranges;
+    } else {
+        const start = new Date(Date.UTC(yearNum, 0, 1, 0, 0, 0, 0));
+        const end = new Date(Date.UTC(yearNum, 11, 31, 23, 59, 59, 999));
+        const baseQuery = getDateQuery(start, end);
+        mongoQuery.$or = baseQuery.$or;
+    }
+
+    return mongoQuery;
+}
+
 export const presupuestosDashboardController = {
     // KPIs Generales del dashboard
     async getKPIs(req: AuthRequest, res: Response): Promise<void> {
@@ -182,8 +239,6 @@ export const presupuestosDashboardController = {
 
             let totalAprobado = 0;
             let totalBorrador = 0;
-            let totalEjecutado = 0;
-            let totalNoEjecutado = 0;
             let totalPresupuesto = 0;
             const rubrosIds = new Set<number>();
 
@@ -204,19 +259,37 @@ export const presupuestosDashboardController = {
 
                             if (item.estado === 'APROBADO') totalAprobado += total;
                             else totalBorrador += total;
-
-                            if (item.ejecutado === 'SI') totalEjecutado += total;
-                            else totalNoEjecutado += total;
                         });
                     }
                 });
             }
 
+            // Ejecutado real de MongoDB
+            let totalEjecutadoReal = 0;
+            try {
+                const mongoQuery = getMongoQueryForPagos(req.query, filtersInfo.monthNums);
+                const aggregateResult = await PagoModel.aggregate([
+                    { $match: mongoQuery },
+                    {
+                        $group: {
+                            _id: null,
+                            totalOperacion: { $sum: '$valorOperacion' }
+                        }
+                    }
+                ]);
+
+                if (aggregateResult && aggregateResult.length > 0) {
+                    totalEjecutadoReal = aggregateResult[0].totalOperacion || 0;
+                }
+            } catch (mongoError) {
+                console.error('Error calculando ejecutado en getKPIs:', mongoError);
+            }
+
             res.json({
                 totalAprobado,
                 totalBorrador,
-                totalEjecutado,
-                totalNoEjecutado,
+                totalEjecutado: totalEjecutadoReal,
+                totalNoEjecutado: totalPresupuesto - totalEjecutadoReal,
                 totalPresupuesto,
                 rubrosUtilizados: rubrosIds.size
             });
@@ -274,14 +347,42 @@ export const presupuestosDashboardController = {
                             if (applicable.length === 0) return;
                             total = (item.valor_unitario || 0) * (item.frecuencia_mes || 1) * applicable.length;
                         }
-                        
                         grouped[placa].total_presupuesto += total;
-                        if (item.ejecutado === 'SI') {
-                            grouped[placa].total_ejecutado += total;
-                        }
                     });
                 }
             });
+
+            // Reemplazar Ejecutado con datos de Mongo
+            try {
+                const mongoQuery = getMongoQueryForPagos(req.query, filtersInfo.monthNums);
+                const aggregateResult = await PagoModel.aggregate([
+                    { $match: mongoQuery },
+                    {
+                        $group: {
+                            _id: '$placa',
+                            totalOperacion: { $sum: '$valorOperacion' }
+                        }
+                    }
+                ]);
+
+                aggregateResult.forEach((resItem) => {
+                    if (resItem._id) {
+                        const placaMongo = resItem._id;
+                        if (!grouped[placaMongo]) {
+                            grouped[placaMongo] = {
+                                placa: placaMongo,
+                                tipo: 'VEHICULO', // default
+                                total_presupuesto: 0,
+                                total_ejecutado: resItem.totalOperacion || 0
+                            };
+                        } else {
+                            grouped[placaMongo].total_ejecutado = resItem.totalOperacion || 0;
+                        }
+                    }
+                });
+            } catch (mongoError) {
+                console.error('Error calculando ejecutado por placa:', mongoError);
+            }
 
             const result = Object.values(grouped).sort((a: any, b: any) => b.total_presupuesto - a.total_presupuesto);
 
@@ -337,14 +438,39 @@ export const presupuestosDashboardController = {
                             if (applicable.length === 0) return;
                             total = (item.valor_unitario || 0) * (item.frecuencia_mes || 1) * applicable.length;
                         }
-                        
                         grouped[empresa].total_presupuesto += total;
-                        if (item.ejecutado === 'SI') {
-                            grouped[empresa].total_ejecutado += total;
-                        }
                     });
                 }
             });
+
+            // Reemplazar Ejecutado con datos de Mongo
+            try {
+                const mongoQuery = getMongoQueryForPagos(req.query, filtersInfo.monthNums);
+                const aggregateResult = await PagoModel.aggregate([
+                    { $match: mongoQuery },
+                    {
+                        $group: {
+                            _id: '$empresa',
+                            totalOperacion: { $sum: '$valorOperacion' }
+                        }
+                    }
+                ]);
+
+                aggregateResult.forEach((resItem) => {
+                    const empresaMongo = resItem._id || 'SIN EMPRESA';
+                    if (!grouped[empresaMongo]) {
+                        grouped[empresaMongo] = {
+                            empresa: empresaMongo,
+                            total_presupuesto: 0,
+                            total_ejecutado: resItem.totalOperacion || 0
+                        };
+                    } else {
+                        grouped[empresaMongo].total_ejecutado = resItem.totalOperacion || 0;
+                    }
+                });
+            } catch (mongoError) {
+                console.error('Error calculando ejecutado por empresa:', mongoError);
+            }
 
             const result = Object.values(grouped).sort((a: any, b: any) => b.total_presupuesto - a.total_presupuesto);
 
