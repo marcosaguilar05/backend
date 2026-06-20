@@ -1028,8 +1028,14 @@ export const presupuestosController = {
                 }
                 
                 if (itemsToUpdate.length > 0) {
-                    const { error: upsertError } = await dbClient.from('presupuesto_items').upsert(itemsToUpdate);
-                    if (upsertError) throw upsertError;
+                    await Promise.all(itemsToUpdate.map(async (item) => {
+                        const { id: itemId, ...updatePayload } = item;
+                        const { error: updateError } = await dbClient
+                            .from('presupuesto_items')
+                            .update(updatePayload)
+                            .eq('id', itemId);
+                        if (updateError) throw updateError;
+                    }));
                 }
             }
 
