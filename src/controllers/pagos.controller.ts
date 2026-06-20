@@ -14,6 +14,8 @@ export const pagosController = {
                 grupoRubro = '',
                 rubro = '',
                 subRubro = '',
+                areaOperacion = '',
+                empresa = '',
                 placa = '',
                 fecha_inicio = '',
                 fecha_fin = '',
@@ -89,6 +91,12 @@ export const pagosController = {
 
             // Filtro por subrubro
             applyMongoFilter('subRubro', subRubro);
+
+            // Filtro por área de operación
+            applyMongoFilter('areaOperacion', areaOperacion);
+
+            // Filtro por empresa
+            applyMongoFilter('empresa', empresa);
 
             // Filtro por placa (vehículo)
             applyMongoFilter('placa', placa);
@@ -197,6 +205,8 @@ export const pagosController = {
                     grupos: [],
                     rubros: [],
                     subRubros: [],
+                    areasOperacion: [],
+                    empresas: [],
                     placas: []
                 });
             }
@@ -210,11 +220,13 @@ export const pagosController = {
             };
 
             // Obtener valores distintos para poblar los filtros
-            const [grupos, gruposNuevos, rubros, subRubros, placas] = await Promise.all([
+            const [grupos, gruposNuevos, rubros, subRubros, areasOperacion, empresas, placas] = await Promise.all([
                 PagoModel.distinct('grupoRubro', query),
                 PagoModel.distinct('nombreGrupoRubro', query),
                 PagoModel.distinct('rubro', query),
                 PagoModel.distinct('subRubro', query),
+                PagoModel.distinct('areaOperacion', query),
+                PagoModel.distinct('empresa', query),
                 PagoModel.distinct('placa', query)
             ]);
 
@@ -228,6 +240,8 @@ export const pagosController = {
                 grupos: cleanAndSort(allGrupos),
                 rubros: cleanAndSort(rubros),
                 subRubros: cleanAndSort(subRubros),
+                areasOperacion: cleanAndSort(areasOperacion),
+                empresas: cleanAndSort(empresas),
                 placas: cleanAndSort(placas)
             });
         } catch (error: any) {
