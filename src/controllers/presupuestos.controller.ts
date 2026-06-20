@@ -995,7 +995,7 @@ export const presupuestosController = {
                         .eq('presupuesto_id', id);
                 }
 
-                const itemsToInsert = items.filter(i => !i.id).map(item => ({
+                const itemsToInsert = items.filter(i => !i.id || i.id < 0).map(item => ({
                     presupuesto_id: Number(id),
                     tipo_presupuesto_id: item.tipo_presupuesto_id,
                     concepto_presupuesto_id: item.concepto_presupuesto_id,
@@ -1008,7 +1008,7 @@ export const presupuestosController = {
                     estado: item.estado || 'BORRADOR'
                 }));
 
-                const itemsToUpdate = items.filter(i => i.id).map(item => ({
+                const itemsToUpdate = items.filter(i => i.id && i.id > 0).map(item => ({
                     id: item.id,
                     presupuesto_id: Number(id),
                     tipo_presupuesto_id: item.tipo_presupuesto_id,
@@ -1023,11 +1023,13 @@ export const presupuestosController = {
                 }));
 
                 if (itemsToInsert.length > 0) {
-                    await dbClient.from('presupuesto_items').insert(itemsToInsert);
+                    const { error: insertError } = await dbClient.from('presupuesto_items').insert(itemsToInsert);
+                    if (insertError) throw insertError;
                 }
                 
                 if (itemsToUpdate.length > 0) {
-                    await dbClient.from('presupuesto_items').upsert(itemsToUpdate);
+                    const { error: upsertError } = await dbClient.from('presupuesto_items').upsert(itemsToUpdate);
+                    if (upsertError) throw upsertError;
                 }
             }
 
