@@ -406,13 +406,13 @@ export const presupuestosDashboardController = {
                 const rubro = (p.rubro?.nombre || 'SIN RUBRO').toUpperCase().trim();
 
                 if (!grouped[placa]) {
-                    grouped[placa] = { placa, tipo, total_presupuesto: 0, total_ejecutado: 0, grupos: {} };
+                    grouped[placa] = { placa, tipo, total_presupuesto: 0, total_ejecutado: 0, grupos: {}, meses_aplicables: new Set() };
                 }
                 if (!grouped[placa].grupos[grupo]) {
-                    grouped[placa].grupos[grupo] = { nombre: grupo, presupuestado: 0, ejecutado: 0, rubros: {} };
+                    grouped[placa].grupos[grupo] = { nombre: grupo, presupuestado: 0, ejecutado: 0, rubros: {}, meses_aplicables: new Set() };
                 }
                 if (!grouped[placa].grupos[grupo].rubros[rubro]) {
-                    grouped[placa].grupos[grupo].rubros[rubro] = { nombre: rubro, presupuestado: 0, ejecutado: 0, subrubros: {} };
+                    grouped[placa].grupos[grupo].rubros[rubro] = { nombre: rubro, presupuestado: 0, ejecutado: 0, subrubros: {}, meses_aplicables: new Set() };
                 }
 
                 if (p.presupuesto_items) {
@@ -427,10 +427,18 @@ export const presupuestosDashboardController = {
                         const subrubro = (item.tipo?.nombre || 'SIN SUBRUBRO').toUpperCase().trim();
                         const concepto = (item.concepto?.nombre || 'SIN CONCEPTO').toUpperCase().trim();
                         const nota = (item.nota || '').trim();
+                        const meses = item.meses_aplicables || [];
 
                         if (!grouped[placa].grupos[grupo].rubros[rubro].subrubros[subrubro]) {
-                            grouped[placa].grupos[grupo].rubros[rubro].subrubros[subrubro] = { nombre: subrubro, presupuestado: 0, ejecutado: 0, conceptos: [] };
+                            grouped[placa].grupos[grupo].rubros[rubro].subrubros[subrubro] = { nombre: subrubro, presupuestado: 0, ejecutado: 0, conceptos: [], meses_aplicables: new Set() };
                         }
+
+                        meses.forEach((m: number) => {
+                            grouped[placa].meses_aplicables.add(m);
+                            grouped[placa].grupos[grupo].meses_aplicables.add(m);
+                            grouped[placa].grupos[grupo].rubros[rubro].meses_aplicables.add(m);
+                            grouped[placa].grupos[grupo].rubros[rubro].subrubros[subrubro].meses_aplicables.add(m);
+                        });
 
                         grouped[placa].total_presupuesto += total;
                         grouped[placa].grupos[grupo].presupuestado += total;
@@ -477,24 +485,24 @@ export const presupuestosDashboardController = {
                         const subrubroMongo = (resItem._id.subRubro || 'SIN SUBRUBRO').toUpperCase().trim();
                         const conceptoMongo = (resItem._id.concepto || 'SIN CONCEPTO').toUpperCase().trim();
                         const notaMongo = (resItem._id.nota || '').trim();
-                        const executedVal = resItem.totalOperacion || 0;
+                        const ejecutadoVal = resItem.totalOperacion || 0;
 
-                        if (!grouped[placaMongo]) grouped[placaMongo] = { placa: placaMongo, tipo: 'VEHICULO', total_presupuesto: 0, total_ejecutado: 0, grupos: {} };
-                        if (!grouped[placaMongo].grupos[grupoMongo]) grouped[placaMongo].grupos[grupoMongo] = { nombre: grupoMongo, presupuestado: 0, ejecutado: 0, rubros: {} };
-                        if (!grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo]) grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo] = { nombre: rubroMongo, presupuestado: 0, ejecutado: 0, subrubros: {} };
-                        if (!grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo]) grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo] = { nombre: subrubroMongo, presupuestado: 0, ejecutado: 0, conceptos: [] };
+                        if (!grouped[placaMongo]) grouped[placaMongo] = { placa: placaMongo, tipo: 'VEHICULO', total_presupuesto: 0, total_ejecutado: 0, grupos: {}, meses_aplicables: new Set() };
+                        if (!grouped[placaMongo].grupos[grupoMongo]) grouped[placaMongo].grupos[grupoMongo] = { nombre: grupoMongo, presupuestado: 0, ejecutado: 0, rubros: {}, meses_aplicables: new Set() };
+                        if (!grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo]) grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo] = { nombre: rubroMongo, presupuestado: 0, ejecutado: 0, subrubros: {}, meses_aplicables: new Set() };
+                        if (!grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo]) grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo] = { nombre: subrubroMongo, presupuestado: 0, ejecutado: 0, conceptos: [], meses_aplicables: new Set() };
 
-                        grouped[placaMongo].total_ejecutado += executedVal;
-                        grouped[placaMongo].grupos[grupoMongo].ejecutado += executedVal;
-                        grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].ejecutado += executedVal;
-                        grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo].ejecutado += executedVal;
+                        grouped[placaMongo].total_ejecutado += ejecutadoVal;
+                        grouped[placaMongo].grupos[grupoMongo].ejecutado += ejecutadoVal;
+                        grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].ejecutado += ejecutadoVal;
+                        grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo].ejecutado += ejecutadoVal;
 
                         // Check if we can map it to an existing concepto to update executed, or push new
                         const conceptoArr = grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo].conceptos;
                         let found = false;
                         for (let c of conceptoArr) {
                             if (c.concepto === conceptoMongo) {
-                                c.ejecutado += executedVal;
+                                c.ejecutado += ejecutadoVal;
                                 found = true;
                                 break;
                             }
@@ -505,7 +513,7 @@ export const presupuestosDashboardController = {
                                 nota: notaMongo,
                                 meses_aplicables: [],
                                 presupuestado: 0,
-                                ejecutado: executedVal
+                                ejecutado: ejecutadoVal
                             });
                         }
                     }
@@ -517,12 +525,16 @@ export const presupuestosDashboardController = {
             // Convertir objectos a arrays
             const result = Object.values(grouped).map((p: any) => ({
                 ...p,
+                meses_aplicables: Array.from(p.meses_aplicables).sort((a: any, b: any) => a - b),
                 grupos: Object.values(p.grupos).map((g: any) => ({
                     ...g,
+                    meses_aplicables: Array.from(g.meses_aplicables).sort((a: any, b: any) => a - b),
                     rubros: Object.values(g.rubros).map((r: any) => ({
                         ...r,
+                        meses_aplicables: Array.from(r.meses_aplicables).sort((a: any, b: any) => a - b),
                         subrubros: Object.values(r.subrubros).map((s: any) => ({
                             ...s,
+                            meses_aplicables: Array.from(s.meses_aplicables).sort((a: any, b: any) => a - b),
                             conceptos: s.conceptos.sort((a: any, b: any) => b.presupuestado - a.presupuestado)
                         })).sort((a: any, b: any) => b.presupuestado - a.presupuestado)
                     })).sort((a: any, b: any) => b.presupuestado - a.presupuestado)
