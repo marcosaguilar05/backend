@@ -14,6 +14,7 @@ router.get('/dashboard/expiring-list', documentosDashboardController.getExpiring
 router.get('/dashboard/by-area', documentosDashboardController.getByArea);
 
 router.get('/', documentosController.getAll);
+router.get('/export-zip', documentosController.exportZip);
 router.get('/filters', documentosController.getFilterOptions);
 router.get('/:id', documentosController.getById);
 router.post('/', documentosController.create);
