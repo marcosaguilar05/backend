@@ -446,6 +446,53 @@ export const presupuestosController = {
                 console.log(`[Presupuestos Filter] Sub Rubro (L3): "${sub_rubro}" -> BudgetIDsWithTipoCount: ${budgetIdsFromTipo.length}`);
             }
 
+            const q = req.query.q as string;
+            let budgetIdsFromQ: number[] = [];
+            if (q && q !== 'undefined' && q !== '') {
+                const searchTerm = `%${q.trim()}%`;
+                
+                // 1. Placas
+                const { data: placaData } = await dbClient.from('areas_placas').select('id').ilike('placa', searchTerm);
+                const placaIdsQ = placaData?.map(p => p.id) || [];
+                let vehiculoIdsQ: number[] = [];
+                if (placaIdsQ.length > 0) {
+                    const { data: vData } = await dbClient.from('control_flota').select('id').in('placa_id', placaIdsQ);
+                    vehiculoIdsQ = vData?.map(v => v.id) || [];
+                }
+
+                // 2. Areas y Empresas
+                const { data: areaData } = await dbClient.from('areas_operacion').select('id').ilike('nombre', searchTerm);
+                const areaIdsQ = areaData?.map(a => a.id) || [];
+                const { data: empData } = await dbClient.from('empresas').select('id').ilike('empresa', searchTerm);
+                const empresaIdsQ = empData?.map(e => e.id) || [];
+
+                // 3. Items (concepto, nota)
+                const { data: conceptos } = await dbClient.from('conceptos_presupuesto').select('id').ilike('nombre', searchTerm);
+                const { data: tipos } = await dbClient.from('tipos_presupuesto').select('id').ilike('nombre', searchTerm);
+                
+                let orConditionsItems = [];
+                if (conceptos && conceptos.length > 0) orConditionsItems.push(`concepto_id.in.(${conceptos.map(c => c.id).join(',')})`);
+                if (tipos && tipos.length > 0) orConditionsItems.push(`tipo_presupuesto_id.in.(${tipos.map(t => t.id).join(',')})`);
+                orConditionsItems.push(`nota.ilike.${searchTerm}`);
+                
+                const { data: itemData } = await dbClient.from('presupuesto_items').select('presupuesto_id').or(orConditionsItems.join(','));
+                const itemBudgetIds = itemData?.map(i => i.presupuesto_id) || [];
+
+                // Combine matching Budgets directly
+                let orConditionsBudgets = [];
+                if (vehiculoIdsQ.length > 0) orConditionsBudgets.push(`vehiculo_id.in.(${vehiculoIdsQ.join(',')})`);
+                if (areaIdsQ.length > 0) orConditionsBudgets.push(`area_operacion_id.in.(${areaIdsQ.join(',')})`);
+                if (empresaIdsQ.length > 0) orConditionsBudgets.push(`empresa_id.in.(${empresaIdsQ.join(',')})`);
+                
+                let directBudgetIds: number[] = [];
+                if (orConditionsBudgets.length > 0) {
+                    const { data: budgetData } = await dbClient.from('presupuestos').select('id').or(orConditionsBudgets.join(','));
+                    directBudgetIds = budgetData?.map(b => b.id) || [];
+                }
+
+                budgetIdsFromQ = [...new Set([...directBudgetIds, ...itemBudgetIds])];
+            }
+
             // Resolve placa to vehiculo ID
             let vehiculoIdsFromPlaca: number[] = [];
             if (placa && placa !== 'undefined' && placa !== '') {
@@ -520,12 +567,17 @@ export const presupuestosController = {
                     grupo:maestro_rubros!grupo_rubro_id(id, codigo, codigo_concatenado, nombre),
                     rubro:maestro_rubros!rubro_id(id, codigo, codigo_concatenado, nombre),
                     personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
-                    presupuesto_items(id, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre, unidad))
+                    presupuesto_items(id, estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre, unidad))
                 `, { count: 'exact' });
 
             // Filtros directos por ID
             if (vehiculo_id) query = query.eq('vehiculo_id', Number(vehiculo_id));
             if (anio && anio !== 'undefined' && anio !== '') query = query.eq('anio', Number(anio));
+            
+            if (q && q !== 'undefined' && q !== '') {
+                if (budgetIdsFromQ.length > 0) query = query.in('id', budgetIdsFromQ);
+                else query = query.eq('id', -1);
+            }
 
             // Filtros por IDs resueltos (si se proporcionó un nombre pero no se encontró un ID, forzamos -1 para 0 resultados)
             if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
@@ -588,6 +640,11 @@ export const presupuestosController = {
                 summaryQuery = summaryQuery.eq('vehiculo_id', -1);
             }
             if (anio && anio !== 'undefined' && anio !== '') summaryQuery = summaryQuery.eq('anio', Number(anio));
+            
+            if (q && q !== 'undefined' && q !== '') {
+                if (budgetIdsFromQ.length > 0) summaryQuery = summaryQuery.in('id', budgetIdsFromQ);
+                else summaryQuery = summaryQuery.eq('id', -1);
+            }
 
             // Sync filters with the table results
             if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
