@@ -472,6 +472,15 @@ export const presupuestosDashboardController = {
                                 concepto: '$concepto', 
                                 nota: '$observacionesUsuario' 
                             },
+                            meses_aplicables: {
+                                $addToSet: {
+                                    $cond: {
+                                        if: { $or: [{ $ifNull: ['$fechaPago', false] }, { $ifNull: ['$fecha', false] }] },
+                                        then: { $month: { $toDate: { $ifNull: ['$fechaPago', '$fecha'] } } },
+                                        else: null
+                                    }
+                                }
+                            },
                             totalOperacion: { $sum: '$valorOperacion' }
                         }
                     }
@@ -497,12 +506,22 @@ export const presupuestosDashboardController = {
                         grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].ejecutado += ejecutadoVal;
                         grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo].ejecutado += ejecutadoVal;
 
+                        const mesesMongo = (resItem.meses_aplicables || []).filter((m: any) => m !== null);
+                        mesesMongo.forEach((m: number) => {
+                            grouped[placaMongo].meses_aplicables.add(m);
+                            grouped[placaMongo].grupos[grupoMongo].meses_aplicables.add(m);
+                            grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].meses_aplicables.add(m);
+                            grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo].meses_aplicables.add(m);
+                        });
+
                         // Check if we can map it to an existing concepto to update executed, or push new
                         const conceptoArr = grouped[placaMongo].grupos[grupoMongo].rubros[rubroMongo].subrubros[subrubroMongo].conceptos;
                         let found = false;
                         for (let c of conceptoArr) {
                             if (c.concepto === conceptoMongo) {
                                 c.ejecutado += ejecutadoVal;
+                                const uniqueMeses = new Set([...c.meses_aplicables, ...mesesMongo]);
+                                c.meses_aplicables = Array.from(uniqueMeses);
                                 found = true;
                                 break;
                             }
@@ -511,7 +530,7 @@ export const presupuestosDashboardController = {
                             conceptoArr.push({
                                 concepto: conceptoMongo,
                                 nota: notaMongo,
-                                meses_aplicables: [],
+                                meses_aplicables: mesesMongo,
                                 presupuestado: 0,
                                 ejecutado: ejecutadoVal
                             });
