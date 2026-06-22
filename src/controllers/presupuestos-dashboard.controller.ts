@@ -440,6 +440,7 @@ export const presupuestosDashboardController = {
                         grouped[placa].grupos[grupo].rubros[rubro].subrubros[subrubro].conceptos.push({
                             concepto,
                             nota,
+                            meses_aplicables: item.meses_aplicables || [],
                             presupuestado: total,
                             ejecutado: 0
                         });
@@ -502,6 +503,7 @@ export const presupuestosDashboardController = {
                             conceptoArr.push({
                                 concepto: conceptoMongo,
                                 nota: notaMongo,
+                                meses_aplicables: [],
                                 presupuestado: 0,
                                 ejecutado: executedVal
                             });
