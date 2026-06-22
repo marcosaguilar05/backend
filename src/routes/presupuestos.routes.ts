@@ -10,6 +10,7 @@ router.use(authMiddleware);
 
 // Dashboard
 router.get('/dashboard/kpis', presupuestosDashboardController.getKPIs);
+router.get('/dashboard/matrix', presupuestosDashboardController.getMatrix);
 router.get('/dashboard/by-placa', presupuestosDashboardController.getByPlaca);
 router.get('/dashboard/by-empresa', presupuestosDashboardController.getByEmpresa);
 

@@ -654,5 +654,147 @@ export const presupuestosDashboardController = {
             console.error('Error en getByEmpresa presupuestos:', error);
             res.status(500).json({ error: 'Error en el servidor' });
         }
+    },
+
+    // Datos Matriciales: Placa vs Meses
+    async getMatrix(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const dbClient = req.supabase || supabase;
+            const filtersInfo = await resolveFilters(req, dbClient);
+
+            let query = dbClient
+                .from('presupuestos')
+                .select(`
+                    id, 
+                    empleado_id,
+                    control_flota(id, areas_placas(placa)),
+                    personal:Personal!presupuestos_empleado_id_fkey(tipo),
+                    grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre),
+                    rubro:maestro_rubros!presupuestos_rubro_id_fkey(nombre),
+                    presupuesto_items(valor_total, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(nombre), concepto:conceptos_presupuesto(nombre))
+                `);
+
+            query = applyFiltersToQuery(query, filtersInfo, req.query);
+            const { data, error } = await query;
+
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            const matrix: any = {};
+
+            data?.forEach((p: any) => {
+                let placa = p.empleado_id ? 'PERSONAL' : (p.control_flota?.areas_placas?.placa || 'S/P');
+                const tipo = p.empleado_id ? (p.personal?.tipo || 'EMPLEADO') : 'VEHICULO';
+                const grupo = (p.grupo?.nombre || 'OTROS COSTOS').toUpperCase().trim();
+                const rubro = (p.rubro?.nombre || 'SIN RUBRO').toUpperCase().trim();
+
+                if (!matrix[placa]) {
+                    matrix[placa] = { placa, tipo, meses: {} };
+                    for (let i = 1; i <= 12; i++) {
+                        matrix[placa].meses[i] = { presupuestado: 0, ejecutado: 0, detalles: [] };
+                    }
+                }
+
+                if (p.presupuesto_items) {
+                    p.presupuesto_items.forEach((item: any) => {
+                        const meses = item.meses_aplicables || [];
+                        const mensualTotal = (item.valor_unitario || 0) * (item.frecuencia_mes || 1);
+                        const subrubro = (item.tipo?.nombre || 'SIN SUBRUBRO').toUpperCase().trim();
+                        const concepto = (item.concepto?.nombre || 'SIN CONCEPTO').toUpperCase().trim();
+
+                        meses.forEach((m: number) => {
+                            if (filtersInfo.monthNums.length > 0 && !filtersInfo.monthNums.includes(m)) return;
+                            
+                            matrix[placa].meses[m].presupuestado += mensualTotal;
+                            matrix[placa].meses[m].detalles.push({
+                                tipo: 'PRESUPUESTADO',
+                                grupo,
+                                rubro,
+                                subrubro,
+                                concepto,
+                                nota: item.nota,
+                                valor: mensualTotal
+                            });
+                        });
+                    });
+                }
+            });
+
+            // Reemplazar Ejecutado con datos de Mongo por mes
+            try {
+                const dynamicValidacion = await getValidacionGruposDinamica(dbClient, req.query);
+                const mongoQuery = getMongoQueryForPagos(req.query, filtersInfo.monthNums, dynamicValidacion);
+                const aggregateResult = await PagoModel.aggregate([
+                    { $match: mongoQuery },
+                    {
+                        $group: {
+                            _id: { 
+                                placa: '$placa', 
+                                mes: {
+                                    $cond: {
+                                        if: { $or: [{ $ifNull: ['$fechaPago', false] }, { $ifNull: ['$fecha', false] }] },
+                                        then: { $month: { $toDate: { $ifNull: ['$fechaPago', '$fecha'] } } },
+                                        else: null
+                                    }
+                                },
+                                grupoRubro: { $ifNull: ['$grupoRubro', '$nombreGrupoRubro'] }, 
+                                rubro: '$rubro', 
+                                subRubro: '$subRubro', 
+                                concepto: '$concepto',
+                                nota: '$observacionesUsuario'
+                            },
+                            totalOperacion: { $sum: '$valorOperacion' }
+                        }
+                    }
+                ]);
+
+                aggregateResult.forEach((resItem) => {
+                    const mesMongo = resItem._id.mes;
+                    if (!mesMongo) return; // Si no hay mes, se ignora en la matriz o se pone en un global
+                    if (filtersInfo.monthNums.length > 0 && !filtersInfo.monthNums.includes(mesMongo)) return;
+
+                    const placaMongo = resItem._id.placa || 'SIN PLACA';
+                    const grupoMongo = (resItem._id.grupoRubro || 'OTROS COSTOS').toUpperCase().trim();
+                    const rubroMongo = (resItem._id.rubro || 'SIN RUBRO').toUpperCase().trim();
+                    const subrubroMongo = (resItem._id.subRubro || 'SIN SUBRUBRO').toUpperCase().trim();
+                    const conceptoMongo = (resItem._id.concepto || 'SIN CONCEPTO').toUpperCase().trim();
+                    const ejecutadoVal = resItem.totalOperacion || 0;
+
+                    if (!matrix[placaMongo]) {
+                        matrix[placaMongo] = { placa: placaMongo, tipo: 'VEHICULO', meses: {} };
+                        for (let i = 1; i <= 12; i++) {
+                            matrix[placaMongo].meses[i] = { presupuestado: 0, ejecutado: 0, detalles: [] };
+                        }
+                    }
+
+                    matrix[placaMongo].meses[mesMongo].ejecutado += ejecutadoVal;
+                    matrix[placaMongo].meses[mesMongo].detalles.push({
+                        tipo: 'EJECUTADO',
+                        grupo: grupoMongo,
+                        rubro: rubroMongo,
+                        subrubro: subrubroMongo,
+                        concepto: conceptoMongo,
+                        nota: resItem._id.nota || '',
+                        valor: ejecutadoVal
+                    });
+                });
+            } catch (mongoError) {
+                console.error('Error calculando ejecutado matricial por placa:', mongoError);
+            }
+
+            // Convertir objectos a arrays
+            const result = Object.values(matrix).map((p: any) => {
+                let totalPresupuesto = 0;
+                Object.values(p.meses).forEach((m: any) => totalPresupuesto += m.presupuestado);
+                return { ...p, total_presupuesto: totalPresupuesto };
+            }).sort((a: any, b: any) => b.total_presupuesto - a.total_presupuesto);
+
+            res.json(result);
+        } catch (error) {
+            console.error('Error en getMatrix presupuestos:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
     }
 };
