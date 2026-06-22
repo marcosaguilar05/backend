@@ -187,7 +187,7 @@ export const documentosController = {
 
     async exportZip(req: AuthRequest, res: Response) {
         try {
-            const archiver = require('archiver');
+            const { ZipArchive } = require('archiver');
             const { Readable } = require('stream');
 
             const {
@@ -217,7 +217,7 @@ export const documentosController = {
                 return res.status(404).json({ error: 'No hay documentos para exportar con estos filtros' });
             }
 
-            const archive = archiver('zip', {
+            const archive = new ZipArchive({
                 zlib: { level: 5 } // Nivel de compresión balanceado
             });
 
