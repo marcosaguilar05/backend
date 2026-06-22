@@ -471,7 +471,7 @@ export const presupuestosController = {
                 const { data: tipos } = await dbClient.from('tipos_presupuesto').select('id').ilike('nombre', searchTerm);
                 
                 let orConditionsItems = [];
-                if (conceptos && conceptos.length > 0) orConditionsItems.push(`concepto_id.in.(${conceptos.map(c => c.id).join(',')})`);
+                if (conceptos && conceptos.length > 0) orConditionsItems.push(`concepto_presupuesto_id.in.(${conceptos.map(c => c.id).join(',')})`);
                 if (tipos && tipos.length > 0) orConditionsItems.push(`tipo_presupuesto_id.in.(${tipos.map(t => t.id).join(',')})`);
                 orConditionsItems.push(`nota.ilike.${searchTerm}`);
                 
