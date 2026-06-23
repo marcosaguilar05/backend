@@ -551,83 +551,6 @@ export const presupuestosController = {
                 console.log(`[Presupuestos Filter] Mes: "${mes}" (Indices: ${monthNums}) -> BudgetIDsWithMonthCount: ${budgetIdsFromMonth.length}`);
             }
 
-            // 1. Consulta principal para la tabla (paginada)
-            let query = dbClient
-                .from('presupuestos')
-                .select(`
-                    *,
-                    control_flota(
-                        id, 
-                        placa_id,
-                        clase_vehiculo,
-                        areas_placas(id, placa)
-                    ),
-                    areas_operacion(id, nombre),
-                    empresas(id, empresa),
-                    grupo:maestro_rubros!grupo_rubro_id(id, codigo, codigo_concatenado, nombre),
-                    rubro:maestro_rubros!rubro_id(id, codigo, codigo_concatenado, nombre),
-                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
-                    presupuesto_items(id, estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre, unidad))
-                `, { count: 'exact' });
-
-            // Filtros directos por ID
-            if (vehiculo_id) query = query.eq('vehiculo_id', Number(vehiculo_id));
-            if (anio && anio !== 'undefined' && anio !== '') query = query.eq('anio', Number(anio));
-            
-            if (q && q !== 'undefined' && q !== '') {
-                if (budgetIdsFromQ.length > 0) query = query.in('id', budgetIdsFromQ);
-                else query = query.eq('id', -1);
-            }
-
-            // Filtros por IDs resueltos (si se proporcionó un nombre pero no se encontró un ID, forzamos -1 para 0 resultados)
-            if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
-                if (areaIds.length > 0) query = query.in('area_operacion_id', areaIds);
-                else query = query.eq('area_operacion_id', -1);
-            }
-            if (empresa && empresa !== '' && empresa !== 'undefined') {
-                if (empresaIds.length > 0) query = query.in('empresa_id', empresaIds);
-                else query = query.eq('empresa_id', -1);
-            }
-            if (grupo_rubro && grupo_rubro !== '' && grupo_rubro !== 'undefined') {
-                if (grupoRubroIds.length > 0) query = query.in('grupo_rubro_id', grupoRubroIds);
-                else query = query.eq('grupo_rubro_id', -1);
-            }
-            if (rubro && rubro !== '' && rubro !== 'undefined') {
-                if (rubroIds.length > 0) query = query.in('rubro_id', rubroIds);
-                else query = query.eq('rubro_id', -1);
-            }
-            if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
-                if (budgetIdsFromTipo.length > 0) {
-                    query = query.in('id', budgetIdsFromTipo);
-                } else {
-                    query = query.eq('id', -1);
-                }
-            }
-            if (mes && mes !== '' && mes !== 'undefined') {
-                if (budgetIdsFromMonth.length > 0) {
-                    query = query.in('id', budgetIdsFromMonth);
-                } else {
-                    query = query.eq('id', -1);
-                }
-            }
-            if (vehiculoIdsFromPlaca.length > 0) {
-                query = query.in('vehiculo_id', vehiculoIdsFromPlaca);
-            } else if (placa && placa !== 'undefined' && placa !== '') {
-                query = query.eq('vehiculo_id', -1);
-            }
-
-            const ascending = sort_order === 'asc';
-            query = query.order(sort_by as string, { ascending });
-            query = query.range(offset, offset + limitNum - 1);
-
-            const { data, error, count } = await query;
-
-            if (error) {
-                console.error('❌ Error de Supabase en getAll Presupuestos:', error);
-                res.status(400).json({ error: error.message });
-                return;
-            }
-
             // 2. Cálculo de estadísticas reales (sin paginación, pero con los mismos filtros base)
             let summaryQuery = dbClient
                 .from('presupuestos')
@@ -717,6 +640,83 @@ export const presupuestosController = {
             }
 
             // --- CÁLCULO DE TOTAL EJECUTADO REAL DESDE MONGODB ---
+            // 1. Consulta principal para la tabla (paginada)
+            let query = dbClient
+                .from('presupuestos')
+                .select(`
+                    *,
+                    control_flota(
+                        id, 
+                        placa_id,
+                        clase_vehiculo,
+                        areas_placas(id, placa)
+                    ),
+                    areas_operacion(id, nombre),
+                    empresas(id, empresa),
+                    grupo:maestro_rubros!grupo_rubro_id(id, codigo, codigo_concatenado, nombre),
+                    rubro:maestro_rubros!rubro_id(id, codigo, codigo_concatenado, nombre),
+                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
+                    presupuesto_items(id, estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre, unidad))
+                `, { count: 'exact' });
+
+            // Filtros directos por ID
+            if (vehiculo_id) query = query.eq('vehiculo_id', Number(vehiculo_id));
+            if (anio && anio !== 'undefined' && anio !== '') query = query.eq('anio', Number(anio));
+            
+            if (q && q !== 'undefined' && q !== '') {
+                if (budgetIdsFromQ.length > 0) query = query.in('id', budgetIdsFromQ);
+                else query = query.eq('id', -1);
+            }
+
+            // Filtros por IDs resueltos (si se proporcionó un nombre pero no se encontró un ID, forzamos -1 para 0 resultados)
+            if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
+                if (areaIds.length > 0) query = query.in('area_operacion_id', areaIds);
+                else query = query.eq('area_operacion_id', -1);
+            }
+            if (empresa && empresa !== '' && empresa !== 'undefined') {
+                if (empresaIds.length > 0) query = query.in('empresa_id', empresaIds);
+                else query = query.eq('empresa_id', -1);
+            }
+            if (grupo_rubro && grupo_rubro !== '' && grupo_rubro !== 'undefined') {
+                if (grupoRubroIds.length > 0) query = query.in('grupo_rubro_id', grupoRubroIds);
+                else query = query.eq('grupo_rubro_id', -1);
+            }
+            if (rubro && rubro !== '' && rubro !== 'undefined') {
+                if (rubroIds.length > 0) query = query.in('rubro_id', rubroIds);
+                else query = query.eq('rubro_id', -1);
+            }
+            if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
+                if (budgetIdsFromTipo.length > 0) {
+                    query = query.in('id', budgetIdsFromTipo);
+                } else {
+                    query = query.eq('id', -1);
+                }
+            }
+            if (mes && mes !== '' && mes !== 'undefined') {
+                if (budgetIdsFromMonth.length > 0) {
+                    query = query.in('id', budgetIdsFromMonth);
+                } else {
+                    query = query.eq('id', -1);
+                }
+            }
+            if (vehiculoIdsFromPlaca.length > 0) {
+                query = query.in('vehiculo_id', vehiculoIdsFromPlaca);
+            } else if (placa && placa !== 'undefined' && placa !== '') {
+                query = query.eq('vehiculo_id', -1);
+            }
+
+            const ascending = sort_order === 'asc';
+            query = query.order(sort_by as string, { ascending });
+            query = query.range(offset, offset + limitNum - 1);
+
+            const { data, error, count } = await query;
+
+            if (error) {
+                console.error('❌ Error de Supabase en getAll Presupuestos:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
             let totalEjecutadoReal = 0;
             try {
                 // Obtener validacionGrupos dinámica basada en los presupuestos del año actual
