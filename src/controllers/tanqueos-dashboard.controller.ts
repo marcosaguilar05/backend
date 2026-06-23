@@ -713,7 +713,7 @@ export const tanqueosDashboardController = {
             const alerts: any[] = [];
 
             // 1. Tanqueos sin horómetro
-            const sinHorometro = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM').length || 0;
+            const sinHorometro = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM' && t.conductor !== 'TANQUEO ADMINISTRATIVO').length || 0;
             if (sinHorometro > 0) {
                 alerts.push({
                     tipo_alerta: 'SIN_HOROMETRO',
@@ -805,7 +805,7 @@ export const tanqueosDashboardController = {
                 return {
                     ...t,
                     flags: {
-                        sin_horometro: !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM',
+                        sin_horometro: !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM' && t.conductor !== 'TANQUEO ADMINISTRATIVO',
                         costo_anormal: isCostoAnormal(t, limitesData || [])
                     }
                 };
@@ -862,7 +862,7 @@ export const tanqueosDashboardController = {
 
             switch (alertType) {
                 case 'SIN_HOROMETRO':
-                    filteredRecords = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM') || [];
+                    filteredRecords = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM' && t.conductor !== 'TANQUEO ADMINISTRATIVO') || [];
                     break;
 
                 case 'COSTO_ANORMAL':
@@ -1004,7 +1004,7 @@ export const tanqueosDashboardController = {
                 totalGalones += gal;
                 totalValor += val;
                 totalSaldo += t.saldo_disponible || 0;
-                if (!t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM') sinHorometro++;
+                if (!t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM' && t.conductor !== 'TANQUEO ADMINISTRATIVO') sinHorometro++;
 
                 // porCombustible (KPIs)
                 if (!porCombustible[tipo]) porCombustible[tipo] = { galones: 0, valor: 0, cantidad: 0 };
