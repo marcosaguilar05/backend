@@ -342,6 +342,9 @@ export const presupuestosController = {
                 rubro,
                 sub_rubro,
                 mes,
+                f_estado,
+                f_ejecucion,
+                f_valor,
                 sort_by = 'id',
                 sort_order = 'desc'
             } = req.query;
@@ -551,6 +554,49 @@ export const presupuestosController = {
                 console.log(`[Presupuestos Filter] Mes: "${mes}" (Indices: ${monthNums}) -> BudgetIDsWithMonthCount: ${budgetIdsFromMonth.length}`);
             }
 
+            // Resolve independent filters
+            let budgetIdsFromIndependentFilters: number[] = [];
+            const hasIndependentFilters = (f_estado && f_estado !== 'undefined' && f_estado !== '') || 
+                                          (f_ejecucion && f_ejecucion !== 'undefined' && f_ejecucion !== '') || 
+                                          (f_valor && f_valor !== 'undefined' && f_valor !== '');
+            
+            if (hasIndependentFilters) {
+                let queryItems = dbClient.from('presupuesto_items').select('presupuesto_id');
+                
+                if (f_estado && f_estado !== 'undefined' && f_estado !== '') {
+                    if (f_estado === 'APROBADO') {
+                        queryItems = queryItems.eq('estado', 'APROBADO');
+                    } else if (f_estado === 'BORRADOR') {
+                        queryItems = queryItems.or('estado.eq.BORRADOR,estado.is.null');
+                    }
+                }
+                
+                if (f_ejecucion && f_ejecucion !== 'undefined' && f_ejecucion !== '') {
+                    if (f_ejecucion === 'EJECUTADO') {
+                        queryItems = queryItems.eq('ejecutado', 'SI');
+                    } else if (f_ejecucion === 'NO_EJECUTADO') {
+                        queryItems = queryItems.or('ejecutado.neq.SI,ejecutado.is.null');
+                    }
+                }
+                
+                if (f_valor && f_valor !== 'undefined' && f_valor !== '') {
+                    if (f_valor === 'CON_VALOR') {
+                        queryItems = queryItems.gt('valor_total', 0);
+                    } else if (f_valor === 'SIN_VALOR') {
+                        queryItems = queryItems.or('valor_total.is.null,valor_total.lte.0');
+                    }
+                }
+                
+                const { data: itemData, error: itemError } = await queryItems;
+                if (itemError) {
+                    console.error('Error finding budgets for independent filters:', itemError);
+                } else if (itemData && itemData.length > 0) {
+                    budgetIdsFromIndependentFilters = [...new Set((itemData as any[]).map((d: any) => Number(d.presupuesto_id)))];
+                }
+                
+                console.log(`[Presupuestos Filter] IndependentFilters -> BudgetIDsCount: ${budgetIdsFromIndependentFilters.length}`);
+            }
+
             // 2. Cálculo de estadísticas reales (sin paginación, pero con los mismos filtros base)
             let summaryQuery = dbClient
                 .from('presupuestos')
@@ -592,6 +638,10 @@ export const presupuestosController = {
             }
             if (mes && mes !== '' && mes !== 'undefined') {
                 if (budgetIdsFromMonth.length > 0) summaryQuery = summaryQuery.in('id', budgetIdsFromMonth);
+                else summaryQuery = summaryQuery.eq('id', -1);
+            }
+            if (hasIndependentFilters) {
+                if (budgetIdsFromIndependentFilters.length > 0) summaryQuery = summaryQuery.in('id', budgetIdsFromIndependentFilters);
                 else summaryQuery = summaryQuery.eq('id', -1);
             }
 
@@ -695,6 +745,13 @@ export const presupuestosController = {
             if (mes && mes !== '' && mes !== 'undefined') {
                 if (budgetIdsFromMonth.length > 0) {
                     query = query.in('id', budgetIdsFromMonth);
+                } else {
+                    query = query.eq('id', -1);
+                }
+            }
+            if (hasIndependentFilters) {
+                if (budgetIdsFromIndependentFilters.length > 0) {
+                    query = query.in('id', budgetIdsFromIndependentFilters);
                 } else {
                     query = query.eq('id', -1);
                 }
