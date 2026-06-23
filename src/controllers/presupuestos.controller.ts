@@ -344,7 +344,6 @@ export const presupuestosController = {
                 mes,
                 f_estado,
                 f_ejecucion,
-                f_valor,
                 sort_by = 'id',
                 sort_order = 'desc'
             } = req.query;
@@ -557,8 +556,7 @@ export const presupuestosController = {
             // Resolve independent filters
             let budgetIdsFromIndependentFilters: number[] = [];
             const hasIndependentFilters = (f_estado && f_estado !== 'undefined' && f_estado !== '') || 
-                                          (f_ejecucion && f_ejecucion !== 'undefined' && f_ejecucion !== '') || 
-                                          (f_valor && f_valor !== 'undefined' && f_valor !== '');
+                                          (f_ejecucion && f_ejecucion !== 'undefined' && f_ejecucion !== '');
             
             if (hasIndependentFilters) {
                 let queryItems = dbClient.from('presupuesto_items').select('presupuesto_id');
@@ -576,14 +574,6 @@ export const presupuestosController = {
                         queryItems = queryItems.eq('ejecutado', 'SI');
                     } else if (f_ejecucion === 'NO_EJECUTADO') {
                         queryItems = queryItems.or('ejecutado.neq.SI,ejecutado.is.null');
-                    }
-                }
-                
-                if (f_valor && f_valor !== 'undefined' && f_valor !== '') {
-                    if (f_valor === 'CON_VALOR') {
-                        queryItems = queryItems.gt('valor_total', 0);
-                    } else if (f_valor === 'SIN_VALOR') {
-                        queryItems = queryItems.or('valor_total.is.null,valor_total.lte.0');
                     }
                 }
                 
