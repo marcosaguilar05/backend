@@ -422,7 +422,11 @@ export const updateVehiculoCaracteristicas = async (req: AuthRequest, res: Respo
         const allowedFields = [
             'marca_id', 'tipo_vehiculo_id', 'clase_vehiculo_id',
             'combustible_id', 'marca_compactadora_id',
-            'nro_ejes', 'nro_llantas', 'año', 'linea', 'nro_serie', 'Estado'
+            'nro_ejes', 'nro_llantas', 'año', 'linea', 'nro_serie', 'Estado',
+            'tipo_motor', 'cilindraje', 'nro_motor', 'tecnologia', 'tipo_caja_velocidad',
+            'tipo_combustible', 'sistema_urea', 'color', 'capacidad_yardas', 'codigo_caja',
+            'tiene_filter', 'capacidad_carga_kg', 'peso_vehiculo_sin_carga_kg',
+            'alto_mm', 'ancho_mm', 'largo_mm'
         ];
 
         for (const field of allowedFields) {

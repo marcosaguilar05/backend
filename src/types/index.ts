@@ -324,6 +324,22 @@ export interface VehiculoCaracteristicas {
     linea: string | null;
     nro_serie: string | null;
     Estado: string | null;
+    tipo_motor: string | null;
+    cilindraje: string | null;
+    nro_motor: string | null;
+    tecnologia: string | null;
+    tipo_caja_velocidad: string | null;
+    tipo_combustible: string | null;
+    sistema_urea: string | null;
+    color: string | null;
+    capacidad_yardas: string | null;
+    codigo_caja: string | null;
+    tiene_filter: string | null;
+    capacidad_carga_kg: string | null;
+    peso_vehiculo_sin_carga_kg: string | null;
+    alto_mm: string | null;
+    ancho_mm: string | null;
+    largo_mm: string | null;
     // Relations
     cat_marca?: CatMarca;
     cat_tipo_vehiculo?: CatTipoVehiculo;
