@@ -40,13 +40,13 @@ export const getVehiculos = async (req: AuthRequest, res: Response, next: NextFu
             empresas ( empresa ),
             areas_operacion ( nombre ),
             vehiculo_caracteristicas (
-                clase_vehiculo_id,
-                cat_clase_vehiculo ( nombre ),
-                tipo_vehiculo_id,
-                cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
-                marca_id,
-                cat_marca:cat_marca!vehiculo_caracteristicas_marca_id_fkey ( nombre ),
+                *,
                 anio:año,
+                cat_marca:cat_marca!vehiculo_caracteristicas_marca_id_fkey ( nombre ),
+                cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
+                cat_clase_vehiculo:cat_clase_vehiculo!vehiculo_caracteristicas_clase_vehiculo_id_fkey ( nombre ),
+                cat_combustible:cat_combustible!vehiculo_caracteristicas_combustible_id_fkey ( nombre ),
+                cat_marca_compactadora ( nombre ),
                 Estado
             )
         `;
