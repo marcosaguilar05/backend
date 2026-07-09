@@ -60,6 +60,62 @@ const isCostoAnormal = (t: any, limitesData?: any[]) => {
 };
 
 export const tanqueosDashboardController = {
+    // Area x Mes Matrix
+    async getAreaMonthMatrix(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            const fecha_inicio = req.query.fecha_inicio as string;
+            const fecha_fin = req.query.fecha_fin as string;
+            const area_operacion = req.query.area_operacion as string;
+            const tipo_combustible = req.query.tipo_combustible as string;
+            const conductor = req.query.conductor as string;
+            const placa = req.query.placa as string;
+            const bomba = req.query.bomba as string;
+
+            let query = (req.supabase || supabase)
+                .from('tanqueo_relaciones')
+                .select('*');
+
+            if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
+            if (fecha_fin) query = query.lte('fecha', fecha_fin);
+            if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
+            if (conductor) query = applyFilter(query, 'conductor', conductor);
+            if (placa) query = applyFilter(query, 'placa', placa);
+            if (bomba) query = applyFilter(query, 'bomba', bomba);
+
+            query = query.eq('tipo_operacion', 'TANQUEO').order('fecha', { ascending: false });
+
+            const { data, error } = await query;
+
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
+            const matrix: Record<string, Record<string, { valor: number, galones: number, tanqueos: any[] }>> = {};
+
+            data?.forEach(t => {
+                const area = t.area_operacion || 'SIN ÁREA';
+                // get YYYY-MM
+                const mes = t.fecha ? t.fecha.substring(0, 7) : 'DESCONOCIDO';
+
+                if (!matrix[area]) matrix[area] = {};
+                if (!matrix[area][mes]) {
+                    matrix[area][mes] = { valor: 0, galones: 0, tanqueos: [] };
+                }
+
+                matrix[area][mes].valor += t.valor_tanqueo || 0;
+                matrix[area][mes].galones += t.cantidad_galones || 0;
+                matrix[area][mes].tanqueos.push(t);
+            });
+
+            res.json(matrix);
+        } catch (error) {
+            console.error('Error en getAreaMonthMatrix:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
     // KPIs Ejecutivos
     async getKPIs(req: AuthRequest, res: Response): Promise<void> {
         try {
