@@ -1,5 +1,11 @@
 import { Router } from 'express';
-import { getEventos, createEvento, updateEvento, deleteEvento, getPlanes, createPlan, updatePlan, getTiposMantenimiento, createTipoMantenimiento, getTalleres, getTiposCondicion, getProximosMantenimientos } from '../controllers/mantenimiento.controller';
+import { 
+    getEventos, createEvento, updateEvento, deleteEvento, 
+    getPlanes, createPlan, updatePlan, 
+    getTiposMantenimiento, createTipoMantenimiento, 
+    getTalleres, createTaller, updateTaller, deleteTaller,
+    getTiposCondicion, getProximosMantenimientos 
+} from '../controllers/mantenimiento.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -19,6 +25,10 @@ router.get('/tipos', getTiposMantenimiento);
 router.post('/tipos', createTipoMantenimiento);
 router.get('/condiciones', getTiposCondicion);
 router.get('/proximos', getProximosMantenimientos);
+
 router.get('/talleres', getTalleres);
+router.post('/talleres', createTaller);
+router.put('/talleres/:id', updateTaller);
+router.delete('/talleres/:id', deleteTaller);
 
 export default router;
