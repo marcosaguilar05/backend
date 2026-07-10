@@ -1453,9 +1453,20 @@ export const presupuestosController = {
                     if (ids.length > 0) query = query.in('rubro_id', ids);
                 }
 
-                const { data: filteredBudgets, error: budgetError } = await query;
+                const { data: rawFilteredBudgets, error: budgetError } = await query;
 
-                if (!budgetError && filteredBudgets) {
+                if (!budgetError && rawFilteredBudgets) {
+                    let filteredBudgets = rawFilteredBudgets;
+                    
+                    if (sub_rubro) {
+                        const names = String(sub_rubro).split(',').map(s => s.trim());
+                        const ids = finalTipos.filter(t => names.includes(t.nombre)).map(t => t.id);
+                        if (ids.length > 0) {
+                            filteredBudgets = filteredBudgets.filter((b: any) => 
+                                b.presupuesto_items && b.presupuesto_items.some((i: any) => ids.includes(i.tipo_presupuesto_id))
+                            );
+                        }
+                    }
                     const validAnios = new Set();
                     const validAreas = new Set();
                     const validEmpresas = new Set();
@@ -1489,13 +1500,13 @@ export const presupuestosController = {
                     const filteredTipos = finalTipos.filter(t => validTipos.has(t.id));
 
                     responseData = {
-                        anios: anio ? anios : (filteredAnios.length > 0 ? filteredAnios : anios),
-                        areas: area_operacion ? finalAreas : (filteredAreas.length > 0 ? filteredAreas : finalAreas),
-                        empresas: empresa ? finalEmpresas : (filteredEmpresas.length > 0 ? filteredEmpresas : finalEmpresas),
-                        vehiculos: placa ? vehiculos : (filteredVehiculos.length > 0 ? filteredVehiculos : vehiculos),
-                        grupos_rubro: grupo_rubro ? finalGrupos : (filteredGrupos.length > 0 ? filteredGrupos : finalGrupos),
-                        sub_rubros: rubro ? finalSubRubros : (filteredRubros.length > 0 ? filteredRubros : finalSubRubros),
-                        tipos_presupuesto: sub_rubro ? finalTipos : (filteredTipos.length > 0 ? filteredTipos : finalTipos),
+                        anios: anio ? anios : filteredAnios,
+                        areas: area_operacion ? finalAreas : filteredAreas,
+                        empresas: empresa ? finalEmpresas : filteredEmpresas,
+                        vehiculos: placa ? vehiculos : filteredVehiculos,
+                        grupos_rubro: grupo_rubro ? finalGrupos : filteredGrupos,
+                        sub_rubros: rubro ? finalSubRubros : filteredRubros,
+                        tipos_presupuesto: sub_rubro ? finalTipos : filteredTipos,
                         personal: personalData || []
                     };
                 }

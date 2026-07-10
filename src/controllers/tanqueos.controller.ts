@@ -207,13 +207,13 @@ export const tanqueosController = {
                     // Si un filtro está activo, devolver las opciones base para ese filtro para permitir facet search (cambiar opción)
                     // Si no está activo, devolver las opciones dinámicas calculadas desde los datos filtrados
                     const responseData = {
-                        conductores: conductor ? baseOptions.conductores : (filteredOptions.conductores.length > 0 ? filteredOptions.conductores : baseOptions.conductores),
-                        placas: placa ? baseOptions.placas : (filteredOptions.placas.length > 0 ? filteredOptions.placas : baseOptions.placas),
-                        bombas: bomba ? baseOptions.bombas : (filteredOptions.bombas.length > 0 ? filteredOptions.bombas : baseOptions.bombas),
-                        areas_operacion: area_operacion ? baseOptions.areas_operacion : (filteredOptions.areas_operacion.length > 0 ? filteredOptions.areas_operacion : baseOptions.areas_operacion),
-                        tipos_combustible: tipo_combustible ? baseOptions.tipos_combustible : (filteredOptions.tipos_combustible.length > 0 ? filteredOptions.tipos_combustible : baseOptions.tipos_combustible),
-                        conceptos: concepto ? baseOptions.conceptos : (filteredOptions.conceptos.length > 0 ? filteredOptions.conceptos : baseOptions.conceptos),
-                        tipos_operacion: tipo_operacion ? baseOptions.tipos_operacion : (filteredOptions.tipos_operacion.length > 0 ? filteredOptions.tipos_operacion : baseOptions.tipos_operacion)
+                        conductores: conductor ? baseOptions.conductores : filteredOptions.conductores,
+                        placas: placa ? baseOptions.placas : filteredOptions.placas,
+                        bombas: bomba ? baseOptions.bombas : filteredOptions.bombas,
+                        areas_operacion: area_operacion ? baseOptions.areas_operacion : filteredOptions.areas_operacion,
+                        tipos_combustible: tipo_combustible ? baseOptions.tipos_combustible : filteredOptions.tipos_combustible,
+                        conceptos: concepto ? baseOptions.conceptos : filteredOptions.conceptos,
+                        tipos_operacion: tipo_operacion ? baseOptions.tipos_operacion : filteredOptions.tipos_operacion
                     };
 
                     res.json(responseData);
