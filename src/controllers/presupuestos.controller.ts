@@ -1407,7 +1407,10 @@ export const presupuestosController = {
             const finalSubRubros = uniqueNamedFilter(rubrosRaw || [], 'nombre');
             const finalTipos = uniqueNamedFilter(tiposPresupuestoData || [], 'nombre');
 
-            res.json({
+            const { anio, empresa, area_operacion, placa, grupo_rubro, rubro, sub_rubro } = req.query;
+            const hasFilters = anio || empresa || area_operacion || placa || grupo_rubro || rubro || sub_rubro;
+
+            let responseData = {
                 anios,
                 areas: finalAreas,
                 empresas: finalEmpresas,
@@ -1416,7 +1419,89 @@ export const presupuestosController = {
                 sub_rubros: finalSubRubros,
                 tipos_presupuesto: finalTipos,
                 personal: personalData || []
-            });
+            };
+
+            if (hasFilters) {
+                let query = dbClient.from('presupuestos').select('anio, area_operacion_id, empresa_id, vehiculo_id, grupo_rubro_id, rubro_id, presupuesto_items(tipo_presupuesto_id)');
+
+                if (anio) {
+                    query = query.in('anio', String(anio).split(',').map(s => Number(s.trim())));
+                }
+                if (area_operacion) {
+                    const names = String(area_operacion).split(',').map(s => s.trim());
+                    const ids = finalAreas.filter(a => names.includes(a.nombre)).map(a => a.id);
+                    if (ids.length > 0) query = query.in('area_operacion_id', ids);
+                }
+                if (empresa) {
+                    const names = String(empresa).split(',').map(s => s.trim());
+                    const ids = finalEmpresas.filter(e => names.includes(e.empresa)).map(e => e.id);
+                    if (ids.length > 0) query = query.in('empresa_id', ids);
+                }
+                if (placa) {
+                    const names = String(placa).split(',').map(s => s.trim());
+                    const ids = vehiculos.filter((v: any) => names.includes(v.placa)).map((v: any) => v.id);
+                    if (ids.length > 0) query = query.in('vehiculo_id', ids);
+                }
+                if (grupo_rubro) {
+                    const names = String(grupo_rubro).split(',').map(s => s.trim());
+                    const ids = finalGrupos.filter(g => names.includes(g.nombre)).map(g => g.id);
+                    if (ids.length > 0) query = query.in('grupo_rubro_id', ids);
+                }
+                if (rubro) {
+                    const names = String(rubro).split(',').map(s => s.trim());
+                    const ids = finalSubRubros.filter(r => names.includes(r.nombre)).map(r => r.id);
+                    if (ids.length > 0) query = query.in('rubro_id', ids);
+                }
+
+                const { data: filteredBudgets, error: budgetError } = await query;
+
+                if (!budgetError && filteredBudgets) {
+                    const validAnios = new Set();
+                    const validAreas = new Set();
+                    const validEmpresas = new Set();
+                    const validVehiculos = new Set();
+                    const validGrupos = new Set();
+                    const validRubros = new Set();
+                    const validTipos = new Set();
+
+                    filteredBudgets.forEach((b: any) => {
+                        if (b.anio) validAnios.add(b.anio);
+                        if (b.area_operacion_id) validAreas.add(b.area_operacion_id);
+                        if (b.empresa_id) validEmpresas.add(b.empresa_id);
+                        if (b.vehiculo_id) validVehiculos.add(b.vehiculo_id);
+                        if (b.grupo_rubro_id) validGrupos.add(b.grupo_rubro_id);
+                        if (b.rubro_id) validRubros.add(b.rubro_id);
+                        if (b.presupuesto_items) {
+                            b.presupuesto_items.forEach((i: any) => {
+                                if (i.tipo_presupuesto_id) validTipos.add(i.tipo_presupuesto_id);
+                            });
+                        }
+                    });
+
+                    // Subrubro (tipo_presupuesto) filtering logic: since we didn't filter the budgets by sub_rubro above (to simplify),
+                    // if sub_rubro is active, we just use its base options.
+                    const filteredAnios = anios.filter(a => validAnios.has(a));
+                    const filteredAreas = finalAreas.filter(a => validAreas.has(a.id));
+                    const filteredEmpresas = finalEmpresas.filter(e => validEmpresas.has(e.id));
+                    const filteredVehiculos = vehiculos.filter((v: any) => validVehiculos.has(v.id));
+                    const filteredGrupos = finalGrupos.filter(g => validGrupos.has(g.id));
+                    const filteredRubros = finalSubRubros.filter(r => validRubros.has(r.id));
+                    const filteredTipos = finalTipos.filter(t => validTipos.has(t.id));
+
+                    responseData = {
+                        anios: anio ? anios : (filteredAnios.length > 0 ? filteredAnios : anios),
+                        areas: area_operacion ? finalAreas : (filteredAreas.length > 0 ? filteredAreas : finalAreas),
+                        empresas: empresa ? finalEmpresas : (filteredEmpresas.length > 0 ? filteredEmpresas : finalEmpresas),
+                        vehiculos: placa ? vehiculos : (filteredVehiculos.length > 0 ? filteredVehiculos : vehiculos),
+                        grupos_rubro: grupo_rubro ? finalGrupos : (filteredGrupos.length > 0 ? filteredGrupos : finalGrupos),
+                        sub_rubros: rubro ? finalSubRubros : (filteredRubros.length > 0 ? filteredRubros : finalSubRubros),
+                        tipos_presupuesto: sub_rubro ? finalTipos : (filteredTipos.length > 0 ? filteredTipos : finalTipos),
+                        personal: personalData || []
+                    };
+                }
+            }
+
+            res.json(responseData);
         } catch (error) {
             console.error('Error en getFilterOptions:', error);
             res.status(500).json({ error: 'Error en el servidor' });
