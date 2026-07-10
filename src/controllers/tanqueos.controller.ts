@@ -128,12 +128,75 @@ export const tanqueosController = {
         }
     },
 
-    // Obtener valores únicos para los filtros - Con RLS aplicado
+    // Obtener valores únicos para los filtros - Con RLS aplicado y dependencias de filtros
     async getFilterOptions(req: AuthRequest, res: Response): Promise<void> {
         try {
             // Usar cliente autenticado para que RLS aplique automáticamente
             const dbClient = req.supabase || supabase;
 
+            const conductor = req.query.conductor as string;
+            const placa = req.query.placa as string;
+            const bomba = req.query.bomba as string;
+            const area_operacion = req.query.area_operacion as string;
+            const tipo_combustible = req.query.tipo_combustible as string;
+            const concepto = req.query.concepto as string;
+            const tipo_operacion = req.query.tipo_operacion as string;
+            const fecha_inicio = req.query.fecha_inicio as string;
+            const fecha_fin = req.query.fecha_fin as string;
+
+            const hasFilters = conductor || placa || bomba || area_operacion || tipo_combustible || concepto || tipo_operacion || fecha_inicio || fecha_fin;
+
+            if (hasFilters) {
+                const applyFilter = (q: any, field: string, value: string) => {
+                    if (!value) return q;
+                    const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+                    if (arr.length === 0) return q;
+                    return q.in(field, arr);
+                };
+
+                // Query from view/table with limit to prevent overload but get a good sample for distinct values
+                // It is better to rely on actual data when filters are applied
+                let query = dbClient.from('tanqueo_relaciones').select('conductor, placa, bomba, area_operacion, tipo_combustible, concepto, tipo_operacion');
+
+                if (conductor) query = applyFilter(query, 'conductor', conductor);
+                if (placa) query = applyFilter(query, 'placa', placa);
+                if (bomba) query = applyFilter(query, 'bomba', bomba);
+                if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion);
+                if (tipo_combustible) query = applyFilter(query, 'tipo_combustible', tipo_combustible);
+                if (concepto) query = applyFilter(query, 'concepto', concepto);
+                if (tipo_operacion) query = applyFilter(query, 'tipo_operacion', tipo_operacion);
+                if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
+                if (fecha_fin) query = query.lte('fecha', fecha_fin);
+
+                const { data, error } = await query.limit(5000);
+
+                if (!error && data) {
+                    const tipos_combustible = ['ACPM', 'GASOLINA', 'EXTRA', 'GAS'];
+                    const tipos_operacion = ['TANQUEO', 'ANTICIPO'];
+                    const conceptos = ['OPERATIVO', 'ADMINISTRATIVO'];
+
+                    const responseData = {
+                        conductores: [...new Set(data.map((t: any) => t.conductor))].filter(Boolean).sort(),
+                        placas: [...new Set(data.map((t: any) => t.placa))].filter(Boolean).sort(),
+                        bombas: [...new Set(data.map((t: any) => t.bomba))].filter(Boolean).sort(),
+                        areas_operacion: [...new Set(data.map((t: any) => t.area_operacion))].filter(Boolean).sort(),
+                        // Always include standard options even if filtered, to avoid breaking selects, or intersect them
+                        tipos_combustible: [...new Set(data.map((t: any) => t.tipo_combustible))].filter(Boolean).sort(),
+                        conceptos: [...new Set(data.map((t: any) => t.concepto))].filter(Boolean).sort(),
+                        tipos_operacion: [...new Set(data.map((t: any) => t.tipo_operacion))].filter(Boolean).sort()
+                    };
+                    
+                    // Fallbacks for empty arrays but with active filters
+                    if(responseData.tipos_combustible.length === 0) responseData.tipos_combustible = tipos_combustible;
+                    if(responseData.conceptos.length === 0) responseData.conceptos = conceptos;
+                    if(responseData.tipos_operacion.length === 0) responseData.tipos_operacion = tipos_operacion;
+
+                    res.json(responseData);
+                    return;
+                }
+            }
+
+            // Fallback original query si no hay filtros o hubo error en el filtrado
             // Ejecutar queries en paralelo para mejorar rendimiento
             // Usamos las tablas maestras para los filtros principales, lo cual es MUCHO más rápido
             const [
