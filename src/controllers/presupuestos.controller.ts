@@ -1334,19 +1334,15 @@ export const presupuestosController = {
                 console.error('Error fetching vehiculos from control_flota table:', controlFlotaError);
             }
 
-            // Formatear vehículos para el frontend usando el control_flota.id correspondientes a la misma placa_id
+            // Formatear vehículos para el frontend
             const vehiculos = (vehiculosData || []).map((v: any) => {
                 const placaData = Array.isArray(v.areas_placas) ? v.areas_placas[0] : v.areas_placas;
                 const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
                 const catClase = chars?.cat_clase_vehiculo;
                 const clase_vehiculo = (Array.isArray(catClase) ? catClase[0] : catClase)?.nombre || '';
 
-                // Buscamos la fila correspondiente en control_flota con el mismo placa_id para usar su ID real
-                const matchFlota = (controlFlotaData || []).find((cf: any) => cf.placa_id === v.placa_id);
-                const dbVehiculoId = matchFlota ? matchFlota.id : v.id;
-
                 return {
-                    id: dbVehiculoId,             // El ID de control_flota para que la base de datos lo guarde con la placa correcta
+                    id: v.id,                     // ID real de vehiculos
                     placa_id: v.placa_id,
                     operación_id: v.operacion_id, // Compatible con la interfaz frontend
                     area_id: v.operacion_id,      // Compatible con la interfaz frontend
