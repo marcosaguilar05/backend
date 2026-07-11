@@ -1258,8 +1258,23 @@ export const presupuestosController = {
     async deleteItem(req: AuthRequest, res: Response): Promise<void> {
         try {
             const { itemId } = req.params;
+            const dbClient = req.supabase || supabase;
 
-            const { error } = await (req.supabase || supabase)
+            // Fetch the item first to get its presupuesto_id
+            const { data: itemData, error: findError } = await dbClient
+                .from('presupuesto_items')
+                .select('presupuesto_id')
+                .eq('id', itemId)
+                .single();
+
+            if (findError) {
+                res.status(400).json({ error: findError.message });
+                return;
+            }
+
+            const presupuestoId = itemData?.presupuesto_id;
+
+            const { error } = await dbClient
                 .from('presupuesto_items')
                 .delete()
                 .eq('id', itemId);
@@ -1267,6 +1282,22 @@ export const presupuestosController = {
             if (error) {
                 res.status(400).json({ error: error.message });
                 return;
+            }
+
+            // Check if there are any remaining items for this budget
+            if (presupuestoId) {
+                const { count, error: countError } = await dbClient
+                    .from('presupuesto_items')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('presupuesto_id', presupuestoId);
+                
+                if (!countError && count === 0) {
+                    // Delete the parent budget if it has no items left
+                    await dbClient
+                        .from('presupuestos')
+                        .delete()
+                        .eq('id', presupuestoId);
+                }
             }
 
             res.status(204).send();
