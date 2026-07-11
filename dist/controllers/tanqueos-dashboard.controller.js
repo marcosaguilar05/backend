@@ -52,6 +52,60 @@ const isCostoAnormal = (t, limitesData) => {
     return costo < min || costo > max;
 };
 exports.tanqueosDashboardController = {
+    // Area x Mes Matrix
+    async getAreaMonthMatrix(req, res) {
+        try {
+            const fecha_inicio = req.query.fecha_inicio;
+            const fecha_fin = req.query.fecha_fin;
+            const area_operacion = req.query.area_operacion;
+            const tipo_combustible = req.query.tipo_combustible;
+            const conductor = req.query.conductor;
+            const placa = req.query.placa;
+            const bomba = req.query.bomba;
+            let query = (req.supabase || supabase_1.supabase)
+                .from('tanqueo_relaciones')
+                .select('*');
+            if (fecha_inicio)
+                query = query.gte('fecha', fecha_inicio);
+            if (fecha_fin)
+                query = query.lte('fecha', fecha_fin);
+            if (area_operacion)
+                query = applyFilter(query, 'area_operacion', area_operacion);
+            if (tipo_combustible)
+                query = applyFilter(query, 'tipo_combustible', tipo_combustible);
+            if (conductor)
+                query = applyFilter(query, 'conductor', conductor);
+            if (placa)
+                query = applyFilter(query, 'placa', placa);
+            if (bomba)
+                query = applyFilter(query, 'bomba', bomba);
+            query = query.eq('tipo_operacion', 'TANQUEO').order('fecha', { ascending: false });
+            const { data, error } = await query;
+            if (error) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            const matrix = {};
+            data?.forEach(t => {
+                const area = t.area_operacion || 'SIN ÁREA';
+                // get YYYY-MM
+                const mes = t.fecha ? t.fecha.substring(0, 7) : 'DESCONOCIDO';
+                if (!matrix[area])
+                    matrix[area] = {};
+                if (!matrix[area][mes]) {
+                    matrix[area][mes] = { valor: 0, galones: 0, tanqueos: [] };
+                }
+                matrix[area][mes].valor += t.valor_tanqueo || 0;
+                matrix[area][mes].galones += t.cantidad_galones || 0;
+                matrix[area][mes].tanqueos.push(t);
+            });
+            res.json(matrix);
+        }
+        catch (error) {
+            console.error('Error en getAreaMonthMatrix:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
     // KPIs Ejecutivos
     async getKPIs(req, res) {
         try {
@@ -666,7 +720,7 @@ exports.tanqueosDashboardController = {
             }
             const alerts = [];
             // 1. Tanqueos sin horómetro
-            const sinHorometro = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM').length || 0;
+            const sinHorometro = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM' && t.conductor !== 'TANQUEO ADMINISTRATIVO').length || 0;
             if (sinHorometro > 0) {
                 alerts.push({
                     tipo_alerta: 'SIN_HOROMETRO',
@@ -751,7 +805,7 @@ exports.tanqueosDashboardController = {
                 return {
                     ...t,
                     flags: {
-                        sin_horometro: !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM',
+                        sin_horometro: !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM' && t.conductor !== 'TANQUEO ADMINISTRATIVO',
                         costo_anormal: isCostoAnormal(t, limitesData || [])
                     }
                 };
@@ -807,7 +861,7 @@ exports.tanqueosDashboardController = {
             let filteredRecords = [];
             switch (alertType) {
                 case 'SIN_HOROMETRO':
-                    filteredRecords = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM') || [];
+                    filteredRecords = data?.filter(t => !t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM' && t.conductor !== 'TANQUEO ADMINISTRATIVO') || [];
                     break;
                 case 'COSTO_ANORMAL':
                     filteredRecords = data?.filter(t => isCostoAnormal(t, limitesData || [])) || [];
@@ -942,7 +996,7 @@ exports.tanqueosDashboardController = {
                 totalGalones += gal;
                 totalValor += val;
                 totalSaldo += t.saldo_disponible || 0;
-                if (!t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM')
+                if (!t.horometro && t.fecha && new Date(t.fecha).getFullYear() >= 2026 && t.tipo_combustible === 'ACPM' && t.conductor !== 'TANQUEO ADMINISTRATIVO')
                     sinHorometro++;
                 // porCombustible (KPIs)
                 if (!porCombustible[tipo])

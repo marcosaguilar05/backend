@@ -75,7 +75,7 @@ async function resolveFilters(req: AuthRequest, dbClient: any) {
             const { data: placaData } = await dbClient.from('areas_placas').select('id').in('placa', placas);
             if (placaData && placaData.length > 0) {
                 const placaIds = placaData.map((p: any) => p.id);
-                const { data: vData } = await dbClient.from('control_flota').select('id').in('placa_id', placaIds);
+                const { data: vData } = await dbClient.from('vehiculo').select('id').in('placa_id', placaIds);
                 if (vData && vData.length > 0) {
                     vehiculoIdsFromPlaca = vData.map((d: any) => d.id);
                 }
@@ -381,7 +381,7 @@ export const presupuestosDashboardController = {
                 .select(`
                     id, 
                     empleado_id,
-                    control_flota(id, areas_placas(placa)),
+                    vehiculo(id, areas_placas(placa)),
                     personal:Personal!presupuestos_empleado_id_fkey(tipo),
                     grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre),
                     rubro:maestro_rubros!presupuestos_rubro_id_fkey(nombre),
@@ -400,7 +400,7 @@ export const presupuestosDashboardController = {
             const grouped: any = {};
 
             data?.forEach((p: any) => {
-                let placa = p.empleado_id ? 'PERSONAL' : (p.control_flota?.areas_placas?.placa || 'S/P');
+                let placa = p.empleado_id ? 'PERSONAL' : (p.vehiculo?.areas_placas?.placa || 'S/P');
                 const tipo = p.empleado_id ? (p.personal?.tipo || 'EMPLEADO') : 'VEHICULO';
                 const grupo = (p.grupo?.nombre || 'OTROS COSTOS').toUpperCase().trim();
                 const rubro = (p.rubro?.nombre || 'SIN RUBRO').toUpperCase().trim();
@@ -667,7 +667,7 @@ export const presupuestosDashboardController = {
                 .select(`
                     id, 
                     empleado_id,
-                    control_flota(id, areas_placas(placa)),
+                    vehiculo(id, areas_placas(placa)),
                     personal:Personal!presupuestos_empleado_id_fkey(tipo),
                     grupo:maestro_rubros!presupuestos_grupo_rubro_id_fkey(nombre),
                     rubro:maestro_rubros!presupuestos_rubro_id_fkey(nombre),
@@ -685,7 +685,7 @@ export const presupuestosDashboardController = {
             const matrix: any = {};
 
             data?.forEach((p: any) => {
-                let placa = p.empleado_id ? 'PERSONAL' : (p.control_flota?.areas_placas?.placa || 'S/P');
+                let placa = p.empleado_id ? 'PERSONAL' : (p.vehiculo?.areas_placas?.placa || 'S/P');
                 const tipo = p.empleado_id ? (p.personal?.tipo || 'EMPLEADO') : 'VEHICULO';
                 const grupo = (p.grupo?.nombre || 'OTROS COSTOS').toUpperCase().trim();
                 const rubro = (p.rubro?.nombre || 'SIN RUBRO').toUpperCase().trim();

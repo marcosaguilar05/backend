@@ -508,9 +508,9 @@ export const presupuestosController = {
 
                     if (placaData && placaData.length > 0) {
                         const placaIds = placaData.map(p => p.id);
-                        // Find vehiculo_ids from control_flota using placa_ids
+                        // Find vehiculo_ids from vehiculo table using placa_ids
                         const { data: vData } = await dbClient
-                            .from('control_flota')
+                            .from('vehiculo')
                             .select('id')
                             .in('placa_id', placaIds);
 
@@ -685,10 +685,9 @@ export const presupuestosController = {
                 .from('presupuestos')
                 .select(`
                     *,
-                    control_flota(
+                    vehiculo(
                         id, 
                         placa_id,
-                        clase_vehiculo,
                         areas_placas(id, placa)
                     ),
                     areas_operacion(id, nombre),
@@ -962,10 +961,9 @@ export const presupuestosController = {
                 .from('presupuestos')
                 .select(`
                     *,
-                    vehiculo:control_flota(
+                    vehiculo(
                         id, 
                         placa_id,
-                        clase_vehiculo,
                         areas_placas(placa)
                     ),
                     area:areas_operacion(id, nombre),
@@ -1334,18 +1332,18 @@ export const presupuestosController = {
                 console.error('Error fetching vehiculos from control_flota table:', controlFlotaError);
             }
 
-            // Formatear vehículos para el frontend
+            // Formatear vehículos para el frontend usando directamente el id de la tabla vehiculo
             const vehiculos = (vehiculosData || []).map((v: any) => {
                 const placaData = Array.isArray(v.areas_placas) ? v.areas_placas[0] : v.areas_placas;
                 const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
                 const catClase = chars?.cat_clase_vehiculo;
                 const clase_vehiculo = (Array.isArray(catClase) ? catClase[0] : catClase)?.nombre || '';
-
+                
                 return {
-                    id: v.id,                     // ID real de vehiculos
+                    id: v.id, // ID directo de la tabla vehiculo
                     placa_id: v.placa_id,
-                    operación_id: v.operacion_id, // Compatible con la interfaz frontend
-                    area_id: v.operacion_id,      // Compatible con la interfaz frontend
+                    operación_id: v.operacion_id, 
+                    area_id: v.operacion_id,      
                     clase_vehiculo: clase_vehiculo,
                     placa: placaData?.placa || ''
                 };

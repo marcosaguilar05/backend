@@ -12,6 +12,7 @@ router.get('/dashboard/calendar', documentos_dashboard_controller_1.documentosDa
 router.get('/dashboard/expiring-list', documentos_dashboard_controller_1.documentosDashboardController.getExpiringList);
 router.get('/dashboard/by-area', documentos_dashboard_controller_1.documentosDashboardController.getByArea);
 router.get('/', documentos_controller_1.documentosController.getAll);
+router.get('/export-zip', documentos_controller_1.documentosController.exportZip);
 router.get('/filters', documentos_controller_1.documentosController.getFilterOptions);
 router.get('/:id', documentos_controller_1.documentosController.getById);
 router.post('/', documentos_controller_1.documentosController.create);

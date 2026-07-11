@@ -160,5 +160,100 @@ exports.documentosController = {
             console.error('Error deleting batch documentos:', error);
             res.status(500).json({ error: error.message });
         }
+    },
+    async exportZip(req, res) {
+        try {
+            const { ZipArchive } = require('archiver');
+            const { Readable } = require('stream');
+            const { placa, area_operacion } = req.query;
+            const applyFilter = (q, field, value) => {
+                if (!value)
+                    return q;
+                const arr = String(value).split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length === 0)
+                    return q;
+                return q.in(field, arr);
+            };
+            // Build query for ALL matching records (no pagination)
+            let query = (req.supabase || supabase_1.supabase)
+                .from('documentos_vehiculos_relaciones')
+                .select('*');
+            if (placa)
+                query = applyFilter(query, 'placa', placa);
+            if (area_operacion)
+                query = applyFilter(query, 'area_operacion', area_operacion);
+            const { data, error } = await query;
+            if (error)
+                throw error;
+            if (!data || data.length === 0) {
+                return res.status(404).json({ error: 'No hay documentos para exportar con estos filtros' });
+            }
+            const archive = new ZipArchive({
+                zlib: { level: 5 } // Nivel de compresión balanceado
+            });
+            // Set headers para descargar ZIP
+            const date = new Date().toISOString().split('T')[0];
+            res.attachment(`Documentacion_Vehiculos_${date}.zip`);
+            // Log warning si hay error, no romper flujo
+            archive.on('warning', function (err) {
+                if (err.code === 'ENOENT') {
+                    console.warn(err);
+                }
+                else {
+                    throw err;
+                }
+            });
+            archive.on('error', function (err) {
+                console.error('Archiver error:', err);
+                if (!res.headersSent) {
+                    res.status(500).json({ error: err.message });
+                }
+            });
+            // Pipe archive a la respuesta
+            archive.pipe(res);
+            const supabaseUrl = 'https://tbljsnqsjjapdeydokwh.supabase.co';
+            const getFileStream = async (url) => {
+                try {
+                    const fullUrl = url.startsWith('http') ? url : `${supabaseUrl}/storage/v1/object/public/vehiculos_docs/${url}`;
+                    const response = await fetch(fullUrl);
+                    if (response.ok && response.body) {
+                        return Readable.fromWeb(response.body);
+                    }
+                }
+                catch (e) {
+                    console.error('Error fetching file', url, e);
+                }
+                return null;
+            };
+            const sanitizeName = (name) => name.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+            // Procesar documentos secuencialmente (o con un pool limitado)
+            for (const doc of data) {
+                const area = sanitizeName(doc.area_operacion || 'SIN_ASIGNAR');
+                const placaFolder = sanitizeName(doc.placa || 'SIN_PLACA');
+                const docsType = [
+                    { key: 'pdf_soat', name: 'SOAT.pdf' },
+                    { key: 'pdf_rtm', name: 'RTM.pdf' },
+                    { key: 'pdf_poliza', name: 'POLIZA.pdf' },
+                    { key: 'tarjeta_propiedad', name: 'TARJETA_PROPIEDAD.pdf' }
+                ];
+                for (const dt of docsType) {
+                    const url = doc[dt.key];
+                    if (url) {
+                        const stream = await getFileStream(url);
+                        if (stream) {
+                            archive.append(stream, { name: `${area}/${placaFolder}/${dt.name}` });
+                        }
+                    }
+                }
+            }
+            // Finalizar ZIP
+            await archive.finalize();
+        }
+        catch (error) {
+            console.error('Error exportando zip:', error);
+            if (!res.headersSent) {
+                res.status(500).json({ error: error.message });
+            }
+        }
     }
 };

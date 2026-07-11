@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getTalleres = exports.getProximosMantenimientos = exports.getTiposCondicion = exports.createTipoMantenimiento = exports.getTiposMantenimiento = exports.createPlan = exports.updatePlan = exports.getPlanes = exports.deleteEvento = exports.updateEvento = exports.createEvento = exports.getEventos = void 0;
+exports.deleteTaller = exports.updateTaller = exports.createTaller = exports.getTalleres = exports.getProximosMantenimientos = exports.getTiposCondicion = exports.createTipoMantenimiento = exports.getTiposMantenimiento = exports.createPlan = exports.updatePlan = exports.getPlanes = exports.deleteEvento = exports.updateEvento = exports.createEvento = exports.getEventos = void 0;
 // ==================== EVENTOS ====================
 const getEventos = async (req, res, next) => {
     try {
@@ -425,3 +425,59 @@ const getTalleres = async (req, res, next) => {
     }
 };
 exports.getTalleres = getTalleres;
+const createTaller = async (req, res, next) => {
+    try {
+        const db = req.supabase;
+        if (!db)
+            return res.status(500).json({ error: 'Supabase client missing' });
+        const { data, error } = await db.from('talleres').insert(req.body).select().single();
+        if (error) {
+            console.error('Error creating taller:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.status(201).json(data);
+    }
+    catch (error) {
+        console.error('Unexpected error in createTaller:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+exports.createTaller = createTaller;
+const updateTaller = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const db = req.supabase;
+        if (!db)
+            return res.status(500).json({ error: 'Supabase client missing' });
+        const { data, error } = await db.from('talleres').update(req.body).eq('id', id).select().single();
+        if (error) {
+            console.error('Error updating taller:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.json(data);
+    }
+    catch (error) {
+        console.error('Unexpected error in updateTaller:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+exports.updateTaller = updateTaller;
+const deleteTaller = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const db = req.supabase;
+        if (!db)
+            return res.status(500).json({ error: 'Supabase client missing' });
+        const { error } = await db.from('talleres').delete().eq('id', id);
+        if (error) {
+            console.error('Error deleting taller:', error);
+            return res.status(500).json({ error: 'Database error', message: error.message });
+        }
+        res.status(204).send();
+    }
+    catch (error) {
+        console.error('Unexpected error in deleteTaller:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+exports.deleteTaller = deleteTaller;

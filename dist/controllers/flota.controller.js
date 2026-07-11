@@ -37,13 +37,13 @@ const getVehiculos = async (req, res, next) => {
             empresas ( empresa ),
             areas_operacion ( nombre ),
             vehiculo_caracteristicas (
-                clase_vehiculo_id,
-                cat_clase_vehiculo ( nombre ),
-                tipo_vehiculo_id,
-                cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
-                marca_id,
-                cat_marca:cat_marca!vehiculo_caracteristicas_marca_id_fkey ( nombre ),
+                *,
                 anio:año,
+                cat_marca:cat_marca!vehiculo_caracteristicas_marca_id_fkey ( nombre ),
+                cat_tipo_vehiculo:cat_tipo_vehiculo!vehiculo_caracteristicas_tipo_vehiculo_id_fkey ( nombre ),
+                cat_clase_vehiculo:cat_clase_vehiculo!vehiculo_caracteristicas_clase_vehiculo_id_fkey ( nombre ),
+                cat_combustible:cat_combustible!vehiculo_caracteristicas_combustible_id_fkey ( nombre ),
+                cat_marca_compactadora ( nombre ),
                 Estado
             )
         `;
@@ -407,7 +407,11 @@ const updateVehiculoCaracteristicas = async (req, res, next) => {
         const allowedFields = [
             'marca_id', 'tipo_vehiculo_id', 'clase_vehiculo_id',
             'combustible_id', 'marca_compactadora_id',
-            'nro_ejes', 'nro_llantas', 'año', 'linea', 'nro_serie', 'Estado'
+            'nro_ejes', 'nro_llantas', 'año', 'linea', 'nro_serie', 'Estado',
+            'tipo_motor', 'cilindraje', 'nro_motor', 'tecnologia', 'tipo_caja_velocidad',
+            'tipo_combustible', 'sistema_urea', 'color', 'capacidad_yardas', 'codigo_caja',
+            'tiene_filter', 'capacidad_carga_kg', 'peso_vehiculo_sin_carga_kg',
+            'alto_mm', 'ancho_mm', 'largo_mm'
         ];
         for (const field of allowedFields) {
             if (field in body) {

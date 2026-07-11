@@ -284,7 +284,7 @@ exports.presupuestosController = {
     async getAll(req, res) {
         try {
             const dbClient = req.supabase || supabase_1.supabase;
-            const { page = 1, limit = 20, empresa, vehiculo_id, placa, area_operacion, anio, grupo_rubro, rubro, sub_rubro, mes, sort_by = 'id', sort_order = 'desc' } = req.query;
+            const { page = 1, limit = 20, empresa, vehiculo_id, placa, area_operacion, anio, grupo_rubro, rubro, sub_rubro, mes, f_estado, f_ejecucion, sort_by = 'id', sort_order = 'desc' } = req.query;
             const pageNum = Number(page);
             const limitNum = Number(limit);
             const offset = (pageNum - 1) * limitNum;
@@ -376,6 +376,49 @@ exports.presupuestosController = {
                 }
                 console.log(`[Presupuestos Filter] Sub Rubro (L3): "${sub_rubro}" -> BudgetIDsWithTipoCount: ${budgetIdsFromTipo.length}`);
             }
+            const q = req.query.q;
+            let budgetIdsFromQ = [];
+            if (q && q !== 'undefined' && q !== '') {
+                const searchTerm = `%${q.trim()}%`;
+                // 1. Placas
+                const { data: placaData } = await dbClient.from('areas_placas').select('id').ilike('placa', searchTerm);
+                const placaIdsQ = placaData?.map(p => p.id) || [];
+                let vehiculoIdsQ = [];
+                if (placaIdsQ.length > 0) {
+                    const { data: vData } = await dbClient.from('control_flota').select('id').in('placa_id', placaIdsQ);
+                    vehiculoIdsQ = vData?.map(v => v.id) || [];
+                }
+                // 2. Areas y Empresas
+                const { data: areaData } = await dbClient.from('areas_operacion').select('id').ilike('nombre', searchTerm);
+                const areaIdsQ = areaData?.map(a => a.id) || [];
+                const { data: empData } = await dbClient.from('empresas').select('id').ilike('empresa', searchTerm);
+                const empresaIdsQ = empData?.map(e => e.id) || [];
+                // 3. Items (concepto, nota)
+                const { data: conceptos } = await dbClient.from('conceptos_presupuesto').select('id').ilike('nombre', searchTerm);
+                const { data: tipos } = await dbClient.from('tipos_presupuesto').select('id').ilike('nombre', searchTerm);
+                let orConditionsItems = [];
+                if (conceptos && conceptos.length > 0)
+                    orConditionsItems.push(`concepto_presupuesto_id.in.(${conceptos.map(c => c.id).join(',')})`);
+                if (tipos && tipos.length > 0)
+                    orConditionsItems.push(`tipo_presupuesto_id.in.(${tipos.map(t => t.id).join(',')})`);
+                orConditionsItems.push(`nota.ilike.${searchTerm}`);
+                const { data: itemData } = await dbClient.from('presupuesto_items').select('presupuesto_id').or(orConditionsItems.join(','));
+                const itemBudgetIds = itemData?.map(i => i.presupuesto_id) || [];
+                // Combine matching Budgets directly
+                let orConditionsBudgets = [];
+                if (vehiculoIdsQ.length > 0)
+                    orConditionsBudgets.push(`vehiculo_id.in.(${vehiculoIdsQ.join(',')})`);
+                if (areaIdsQ.length > 0)
+                    orConditionsBudgets.push(`area_operacion_id.in.(${areaIdsQ.join(',')})`);
+                if (empresaIdsQ.length > 0)
+                    orConditionsBudgets.push(`empresa_id.in.(${empresaIdsQ.join(',')})`);
+                let directBudgetIds = [];
+                if (orConditionsBudgets.length > 0) {
+                    const { data: budgetData } = await dbClient.from('presupuestos').select('id').or(orConditionsBudgets.join(','));
+                    directBudgetIds = budgetData?.map(b => b.id) || [];
+                }
+                budgetIdsFromQ = [...new Set([...directBudgetIds, ...itemBudgetIds])];
+            }
             // Resolve placa to vehiculo ID
             let vehiculoIdsFromPlaca = [];
             if (placa && placa !== 'undefined' && placa !== '') {
@@ -427,84 +470,36 @@ exports.presupuestosController = {
                 }
                 console.log(`[Presupuestos Filter] Mes: "${mes}" (Indices: ${monthNums}) -> BudgetIDsWithMonthCount: ${budgetIdsFromMonth.length}`);
             }
-            // 1. Consulta principal para la tabla (paginada)
-            let query = dbClient
-                .from('presupuestos')
-                .select(`
-                    *,
-                    control_flota(
-                        id, 
-                        placa_id,
-                        clase_vehiculo,
-                        areas_placas(id, placa)
-                    ),
-                    areas_operacion(id, nombre),
-                    empresas(id, empresa),
-                    grupo:maestro_rubros!grupo_rubro_id(id, codigo, codigo_concatenado, nombre),
-                    rubro:maestro_rubros!rubro_id(id, codigo, codigo_concatenado, nombre),
-                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
-                    presupuesto_items(id, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre, unidad))
-                `, { count: 'exact' });
-            // Filtros directos por ID
-            if (vehiculo_id)
-                query = query.eq('vehiculo_id', Number(vehiculo_id));
-            if (anio && anio !== 'undefined' && anio !== '')
-                query = query.eq('anio', Number(anio));
-            // Filtros por IDs resueltos (si se proporcionó un nombre pero no se encontró un ID, forzamos -1 para 0 resultados)
-            if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
-                if (areaIds.length > 0)
-                    query = query.in('area_operacion_id', areaIds);
-                else
-                    query = query.eq('area_operacion_id', -1);
-            }
-            if (empresa && empresa !== '' && empresa !== 'undefined') {
-                if (empresaIds.length > 0)
-                    query = query.in('empresa_id', empresaIds);
-                else
-                    query = query.eq('empresa_id', -1);
-            }
-            if (grupo_rubro && grupo_rubro !== '' && grupo_rubro !== 'undefined') {
-                if (grupoRubroIds.length > 0)
-                    query = query.in('grupo_rubro_id', grupoRubroIds);
-                else
-                    query = query.eq('grupo_rubro_id', -1);
-            }
-            if (rubro && rubro !== '' && rubro !== 'undefined') {
-                if (rubroIds.length > 0)
-                    query = query.in('rubro_id', rubroIds);
-                else
-                    query = query.eq('rubro_id', -1);
-            }
-            if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
-                if (budgetIdsFromTipo.length > 0) {
-                    query = query.in('id', budgetIdsFromTipo);
+            // Resolve independent filters
+            let budgetIdsFromIndependentFilters = [];
+            const hasIndependentFilters = (f_estado && f_estado !== 'undefined' && f_estado !== '') ||
+                (f_ejecucion && f_ejecucion !== 'undefined' && f_ejecucion !== '');
+            if (hasIndependentFilters) {
+                let queryItems = dbClient.from('presupuesto_items').select('presupuesto_id');
+                if (f_estado && f_estado !== 'undefined' && f_estado !== '') {
+                    if (f_estado === 'APROBADO') {
+                        queryItems = queryItems.eq('estado', 'APROBADO');
+                    }
+                    else if (f_estado === 'BORRADOR') {
+                        queryItems = queryItems.or('estado.eq.BORRADOR,estado.is.null');
+                    }
                 }
-                else {
-                    query = query.eq('id', -1);
+                if (f_ejecucion && f_ejecucion !== 'undefined' && f_ejecucion !== '') {
+                    if (f_ejecucion === 'EJECUTADO') {
+                        queryItems = queryItems.eq('ejecutado', 'SI');
+                    }
+                    else if (f_ejecucion === 'NO_EJECUTADO') {
+                        queryItems = queryItems.or('ejecutado.neq.SI,ejecutado.is.null');
+                    }
                 }
-            }
-            if (mes && mes !== '' && mes !== 'undefined') {
-                if (budgetIdsFromMonth.length > 0) {
-                    query = query.in('id', budgetIdsFromMonth);
+                const { data: itemData, error: itemError } = await queryItems;
+                if (itemError) {
+                    console.error('Error finding budgets for independent filters:', itemError);
                 }
-                else {
-                    query = query.eq('id', -1);
+                else if (itemData && itemData.length > 0) {
+                    budgetIdsFromIndependentFilters = [...new Set(itemData.map((d) => Number(d.presupuesto_id)))];
                 }
-            }
-            if (vehiculoIdsFromPlaca.length > 0) {
-                query = query.in('vehiculo_id', vehiculoIdsFromPlaca);
-            }
-            else if (placa && placa !== 'undefined' && placa !== '') {
-                query = query.eq('vehiculo_id', -1);
-            }
-            const ascending = sort_order === 'asc';
-            query = query.order(sort_by, { ascending });
-            query = query.range(offset, offset + limitNum - 1);
-            const { data, error, count } = await query;
-            if (error) {
-                console.error('❌ Error de Supabase en getAll Presupuestos:', error);
-                res.status(400).json({ error: error.message });
-                return;
+                console.log(`[Presupuestos Filter] IndependentFilters -> BudgetIDsCount: ${budgetIdsFromIndependentFilters.length}`);
             }
             // 2. Cálculo de estadísticas reales (sin paginación, pero con los mismos filtros base)
             let summaryQuery = dbClient
@@ -520,6 +515,12 @@ exports.presupuestosController = {
             }
             if (anio && anio !== 'undefined' && anio !== '')
                 summaryQuery = summaryQuery.eq('anio', Number(anio));
+            if (q && q !== 'undefined' && q !== '') {
+                if (budgetIdsFromQ.length > 0)
+                    summaryQuery = summaryQuery.in('id', budgetIdsFromQ);
+                else
+                    summaryQuery = summaryQuery.eq('id', -1);
+            }
             // Sync filters with the table results
             if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
                 if (areaIds.length > 0)
@@ -554,6 +555,12 @@ exports.presupuestosController = {
             if (mes && mes !== '' && mes !== 'undefined') {
                 if (budgetIdsFromMonth.length > 0)
                     summaryQuery = summaryQuery.in('id', budgetIdsFromMonth);
+                else
+                    summaryQuery = summaryQuery.eq('id', -1);
+            }
+            if (hasIndependentFilters) {
+                if (budgetIdsFromIndependentFilters.length > 0)
+                    summaryQuery = summaryQuery.in('id', budgetIdsFromIndependentFilters);
                 else
                     summaryQuery = summaryQuery.eq('id', -1);
             }
@@ -599,6 +606,99 @@ exports.presupuestosController = {
                 });
             }
             // --- CÁLCULO DE TOTAL EJECUTADO REAL DESDE MONGODB ---
+            // 1. Consulta principal para la tabla (paginada)
+            let query = dbClient
+                .from('presupuestos')
+                .select(`
+                    *,
+                    control_flota(
+                        id, 
+                        placa_id,
+                        clase_vehiculo,
+                        areas_placas(id, placa)
+                    ),
+                    areas_operacion(id, nombre),
+                    empresas(id, empresa),
+                    grupo:maestro_rubros!grupo_rubro_id(id, codigo, codigo_concatenado, nombre),
+                    rubro:maestro_rubros!rubro_id(id, codigo, codigo_concatenado, nombre),
+                    personal:Personal!presupuestos_empleado_id_fkey(id, tipo),
+                    presupuesto_items(id, estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre, unidad))
+                `, { count: 'exact' });
+            // Filtros directos por ID
+            if (vehiculo_id)
+                query = query.eq('vehiculo_id', Number(vehiculo_id));
+            if (anio && anio !== 'undefined' && anio !== '')
+                query = query.eq('anio', Number(anio));
+            if (q && q !== 'undefined' && q !== '') {
+                if (budgetIdsFromQ.length > 0)
+                    query = query.in('id', budgetIdsFromQ);
+                else
+                    query = query.eq('id', -1);
+            }
+            // Filtros por IDs resueltos (si se proporcionó un nombre pero no se encontró un ID, forzamos -1 para 0 resultados)
+            if (area_operacion && area_operacion !== '' && area_operacion !== 'undefined') {
+                if (areaIds.length > 0)
+                    query = query.in('area_operacion_id', areaIds);
+                else
+                    query = query.eq('area_operacion_id', -1);
+            }
+            if (empresa && empresa !== '' && empresa !== 'undefined') {
+                if (empresaIds.length > 0)
+                    query = query.in('empresa_id', empresaIds);
+                else
+                    query = query.eq('empresa_id', -1);
+            }
+            if (grupo_rubro && grupo_rubro !== '' && grupo_rubro !== 'undefined') {
+                if (grupoRubroIds.length > 0)
+                    query = query.in('grupo_rubro_id', grupoRubroIds);
+                else
+                    query = query.eq('grupo_rubro_id', -1);
+            }
+            if (rubro && rubro !== '' && rubro !== 'undefined') {
+                if (rubroIds.length > 0)
+                    query = query.in('rubro_id', rubroIds);
+                else
+                    query = query.eq('rubro_id', -1);
+            }
+            if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
+                if (budgetIdsFromTipo.length > 0) {
+                    query = query.in('id', budgetIdsFromTipo);
+                }
+                else {
+                    query = query.eq('id', -1);
+                }
+            }
+            if (mes && mes !== '' && mes !== 'undefined') {
+                if (budgetIdsFromMonth.length > 0) {
+                    query = query.in('id', budgetIdsFromMonth);
+                }
+                else {
+                    query = query.eq('id', -1);
+                }
+            }
+            if (hasIndependentFilters) {
+                if (budgetIdsFromIndependentFilters.length > 0) {
+                    query = query.in('id', budgetIdsFromIndependentFilters);
+                }
+                else {
+                    query = query.eq('id', -1);
+                }
+            }
+            if (vehiculoIdsFromPlaca.length > 0) {
+                query = query.in('vehiculo_id', vehiculoIdsFromPlaca);
+            }
+            else if (placa && placa !== 'undefined' && placa !== '') {
+                query = query.eq('vehiculo_id', -1);
+            }
+            const ascending = sort_order === 'asc';
+            query = query.order(sort_by, { ascending });
+            query = query.range(offset, offset + limitNum - 1);
+            const { data, error, count } = await query;
+            if (error) {
+                console.error('❌ Error de Supabase en getAll Presupuestos:', error);
+                res.status(400).json({ error: error.message });
+                return;
+            }
             let totalEjecutadoReal = 0;
             try {
                 // Obtener validacionGrupos dinámica basada en los presupuestos del año actual
@@ -908,7 +1008,7 @@ exports.presupuestosController = {
                         .delete()
                         .eq('presupuesto_id', id);
                 }
-                const itemsToInsert = items.filter(i => !i.id).map(item => ({
+                const itemsToInsert = items.filter(i => !i.id || i.id < 0).map(item => ({
                     presupuesto_id: Number(id),
                     tipo_presupuesto_id: item.tipo_presupuesto_id,
                     concepto_presupuesto_id: item.concepto_presupuesto_id,
@@ -920,7 +1020,7 @@ exports.presupuestosController = {
                     ejecutado: item.ejecutado || 'NO',
                     estado: item.estado || 'BORRADOR'
                 }));
-                const itemsToUpdate = items.filter(i => i.id).map(item => ({
+                const itemsToUpdate = items.filter(i => i.id && i.id > 0).map(item => ({
                     id: item.id,
                     presupuesto_id: Number(id),
                     tipo_presupuesto_id: item.tipo_presupuesto_id,
@@ -934,10 +1034,20 @@ exports.presupuestosController = {
                     estado: item.estado || 'BORRADOR'
                 }));
                 if (itemsToInsert.length > 0) {
-                    await dbClient.from('presupuesto_items').insert(itemsToInsert);
+                    const { error: insertError } = await dbClient.from('presupuesto_items').insert(itemsToInsert);
+                    if (insertError)
+                        throw insertError;
                 }
                 if (itemsToUpdate.length > 0) {
-                    await dbClient.from('presupuesto_items').upsert(itemsToUpdate);
+                    await Promise.all(itemsToUpdate.map(async (item) => {
+                        const { id: itemId, ...updatePayload } = item;
+                        const { error: updateError } = await dbClient
+                            .from('presupuesto_items')
+                            .update(updatePayload)
+                            .eq('id', itemId);
+                        if (updateError)
+                            throw updateError;
+                    }));
                 }
             }
             res.json(data);
@@ -1104,17 +1214,14 @@ exports.presupuestosController = {
             if (controlFlotaError) {
                 console.error('Error fetching vehiculos from control_flota table:', controlFlotaError);
             }
-            // Formatear vehículos para el frontend usando el control_flota.id correspondientes a la misma placa_id
+            // Formatear vehículos para el frontend
             const vehiculos = (vehiculosData || []).map((v) => {
                 const placaData = Array.isArray(v.areas_placas) ? v.areas_placas[0] : v.areas_placas;
                 const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
                 const catClase = chars?.cat_clase_vehiculo;
                 const clase_vehiculo = (Array.isArray(catClase) ? catClase[0] : catClase)?.nombre || '';
-                // Buscamos la fila correspondiente en control_flota con el mismo placa_id para usar su ID real
-                const matchFlota = (controlFlotaData || []).find((cf) => cf.placa_id === v.placa_id);
-                const dbVehiculoId = matchFlota ? matchFlota.id : v.id;
                 return {
-                    id: dbVehiculoId, // El ID de control_flota para que la base de datos lo guarde con la placa correcta
+                    id: v.id, // ID real de vehiculos
                     placa_id: v.placa_id,
                     operación_id: v.operacion_id, // Compatible con la interfaz frontend
                     area_id: v.operacion_id, // Compatible con la interfaz frontend
@@ -1166,7 +1273,9 @@ exports.presupuestosController = {
             const finalGrupos = uniqueNamedFilter(groupsRaw || [], 'nombre');
             const finalSubRubros = uniqueNamedFilter(rubrosRaw || [], 'nombre');
             const finalTipos = uniqueNamedFilter(tiposPresupuestoData || [], 'nombre');
-            res.json({
+            const { anio, empresa, area_operacion, placa, grupo_rubro, rubro, sub_rubro } = req.query;
+            const hasFilters = anio || empresa || area_operacion || placa || grupo_rubro || rubro || sub_rubro;
+            let responseData = {
                 anios,
                 areas: finalAreas,
                 empresas: finalEmpresas,
@@ -1175,7 +1284,101 @@ exports.presupuestosController = {
                 sub_rubros: finalSubRubros,
                 tipos_presupuesto: finalTipos,
                 personal: personalData || []
-            });
+            };
+            if (hasFilters) {
+                let query = dbClient.from('presupuestos').select('anio, area_operacion_id, empresa_id, vehiculo_id, grupo_rubro_id, rubro_id, presupuesto_items(tipo_presupuesto_id)');
+                if (anio) {
+                    query = query.in('anio', String(anio).split(',').map(s => Number(s.trim())));
+                }
+                if (area_operacion) {
+                    const names = String(area_operacion).split(',').map(s => s.trim());
+                    const ids = finalAreas.filter(a => names.includes(a.nombre)).map(a => a.id);
+                    if (ids.length > 0)
+                        query = query.in('area_operacion_id', ids);
+                }
+                if (empresa) {
+                    const names = String(empresa).split(',').map(s => s.trim());
+                    const ids = finalEmpresas.filter(e => names.includes(e.empresa)).map(e => e.id);
+                    if (ids.length > 0)
+                        query = query.in('empresa_id', ids);
+                }
+                if (placa) {
+                    const names = String(placa).split(',').map(s => s.trim());
+                    const ids = vehiculos.filter((v) => names.includes(v.placa)).map((v) => v.id);
+                    if (ids.length > 0)
+                        query = query.in('vehiculo_id', ids);
+                }
+                if (grupo_rubro) {
+                    const names = String(grupo_rubro).split(',').map(s => s.trim());
+                    const ids = finalGrupos.filter(g => names.includes(g.nombre)).map(g => g.id);
+                    if (ids.length > 0)
+                        query = query.in('grupo_rubro_id', ids);
+                }
+                if (rubro) {
+                    const names = String(rubro).split(',').map(s => s.trim());
+                    const ids = finalSubRubros.filter(r => names.includes(r.nombre)).map(r => r.id);
+                    if (ids.length > 0)
+                        query = query.in('rubro_id', ids);
+                }
+                const { data: rawFilteredBudgets, error: budgetError } = await query;
+                if (!budgetError && rawFilteredBudgets) {
+                    let filteredBudgets = rawFilteredBudgets;
+                    if (sub_rubro) {
+                        const names = String(sub_rubro).split(',').map(s => s.trim());
+                        const ids = finalTipos.filter(t => names.includes(t.nombre)).map(t => t.id);
+                        if (ids.length > 0) {
+                            filteredBudgets = filteredBudgets.filter((b) => b.presupuesto_items && b.presupuesto_items.some((i) => ids.includes(i.tipo_presupuesto_id)));
+                        }
+                    }
+                    const validAnios = new Set();
+                    const validAreas = new Set();
+                    const validEmpresas = new Set();
+                    const validVehiculos = new Set();
+                    const validGrupos = new Set();
+                    const validRubros = new Set();
+                    const validTipos = new Set();
+                    filteredBudgets.forEach((b) => {
+                        if (b.anio)
+                            validAnios.add(b.anio);
+                        if (b.area_operacion_id)
+                            validAreas.add(b.area_operacion_id);
+                        if (b.empresa_id)
+                            validEmpresas.add(b.empresa_id);
+                        if (b.vehiculo_id)
+                            validVehiculos.add(b.vehiculo_id);
+                        if (b.grupo_rubro_id)
+                            validGrupos.add(b.grupo_rubro_id);
+                        if (b.rubro_id)
+                            validRubros.add(b.rubro_id);
+                        if (b.presupuesto_items) {
+                            b.presupuesto_items.forEach((i) => {
+                                if (i.tipo_presupuesto_id)
+                                    validTipos.add(i.tipo_presupuesto_id);
+                            });
+                        }
+                    });
+                    // Subrubro (tipo_presupuesto) filtering logic: since we didn't filter the budgets by sub_rubro above (to simplify),
+                    // if sub_rubro is active, we just use its base options.
+                    const filteredAnios = anios.filter(a => validAnios.has(a));
+                    const filteredAreas = finalAreas.filter(a => validAreas.has(a.id));
+                    const filteredEmpresas = finalEmpresas.filter(e => validEmpresas.has(e.id));
+                    const filteredVehiculos = vehiculos.filter((v) => validVehiculos.has(v.id));
+                    const filteredGrupos = finalGrupos.filter(g => validGrupos.has(g.id));
+                    const filteredRubros = finalSubRubros.filter(r => validRubros.has(r.id));
+                    const filteredTipos = finalTipos.filter(t => validTipos.has(t.id));
+                    responseData = {
+                        anios: anio ? anios : filteredAnios,
+                        areas: area_operacion ? finalAreas : filteredAreas,
+                        empresas: empresa ? finalEmpresas : filteredEmpresas,
+                        vehiculos: placa ? vehiculos : filteredVehiculos,
+                        grupos_rubro: grupo_rubro ? finalGrupos : filteredGrupos,
+                        sub_rubros: rubro ? finalSubRubros : filteredRubros,
+                        tipos_presupuesto: sub_rubro ? finalTipos : filteredTipos,
+                        personal: personalData || []
+                    };
+                }
+            }
+            res.json(responseData);
         }
         catch (error) {
             console.error('Error en getFilterOptions:', error);

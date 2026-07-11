@@ -132,32 +132,95 @@ exports.tanqueosController = {
             res.status(500).json({ error: 'Error en el servidor' });
         }
     },
-    // Obtener valores únicos para los filtros - Con RLS aplicado
+    // Obtener valores únicos para los filtros - Con RLS aplicado y dependencias de filtros
     async getFilterOptions(req, res) {
         try {
             // Usar cliente autenticado para que RLS aplique automáticamente
             const dbClient = req.supabase || supabase_1.supabase;
-            // Ejecutar queries en paralelo para mejorar rendimiento
-            // Usamos las tablas maestras para los filtros principales, lo cual es MUCHO más rápido
+            const conductor = req.query.conductor;
+            const placa = req.query.placa;
+            const bomba = req.query.bomba;
+            const area_operacion = req.query.area_operacion;
+            const tipo_combustible = req.query.tipo_combustible;
+            const concepto = req.query.concepto;
+            const tipo_operacion = req.query.tipo_operacion;
+            const fecha_inicio = req.query.fecha_inicio;
+            const fecha_fin = req.query.fecha_fin;
+            const hasFilters = conductor || placa || bomba || area_operacion || tipo_combustible || concepto || tipo_operacion || fecha_inicio || fecha_fin;
+            // Ejecutar queries en paralelo para obtener las opciones base (maestros)
             const [conductoresRes, placasRes, bombasRes, areasRes] = await Promise.all([
                 dbClient.from('areas_conductores').select('conductor').order('conductor'),
                 dbClient.from('areas_placas').select('placa').eq('estado', 'ACTIVADA').order('placa'),
                 dbClient.from('areas_bombas').select('bomba').eq('estado', 'ACTIVADA').order('bomba'),
                 dbClient.from('areas_operacion').select('nombre').order('nombre')
             ]);
-            // Tipos de combustible y operación se definen como constantes para evitar consultas masivas innecesarias
-            const tipos_combustible = ['ACPM', 'GASOLINA', 'EXTRA', 'GAS'];
-            const tipos_operacion = ['TANQUEO', 'ANTICIPO'];
-            const responseData = {
+            const baseOptions = {
                 conductores: [...new Set(conductoresRes.data?.map(t => t.conductor))].filter(Boolean).sort(),
                 placas: [...new Set(placasRes.data?.map(t => t.placa))].filter(Boolean).sort(),
                 bombas: [...new Set(bombasRes.data?.map(t => t.bomba))].filter(Boolean).sort(),
                 areas_operacion: [...new Set(areasRes.data?.map(t => t.nombre))].filter(Boolean).sort(),
-                tipos_combustible,
+                tipos_combustible: ['ACPM', 'GASOLINA', 'EXTRA', 'GAS'],
                 conceptos: ['OPERATIVO', 'ADMINISTRATIVO'],
-                tipos_operacion
+                tipos_operacion: ['TANQUEO', 'ANTICIPO']
             };
-            res.json(responseData);
+            if (hasFilters) {
+                const applyFilter = (q, field, value) => {
+                    if (!value)
+                        return q;
+                    const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+                    if (arr.length === 0)
+                        return q;
+                    return q.in(field, arr);
+                };
+                // Query from view/table with limit to prevent overload but get a good sample for distinct values
+                // It is better to rely on actual data when filters are applied
+                let query = dbClient.from('tanqueo_relaciones').select('conductor, placa, bomba, area_operacion, tipo_combustible, concepto, tipo_operacion');
+                if (conductor)
+                    query = applyFilter(query, 'conductor', conductor);
+                if (placa)
+                    query = applyFilter(query, 'placa', placa);
+                if (bomba)
+                    query = applyFilter(query, 'bomba', bomba);
+                if (area_operacion)
+                    query = applyFilter(query, 'area_operacion', area_operacion);
+                if (tipo_combustible)
+                    query = applyFilter(query, 'tipo_combustible', tipo_combustible);
+                if (concepto)
+                    query = applyFilter(query, 'concepto', concepto);
+                if (tipo_operacion)
+                    query = applyFilter(query, 'tipo_operacion', tipo_operacion);
+                if (fecha_inicio)
+                    query = query.gte('fecha', fecha_inicio);
+                if (fecha_fin)
+                    query = query.lte('fecha', fecha_fin);
+                const { data, error } = await query.limit(5000);
+                if (!error && data) {
+                    const filteredOptions = {
+                        conductores: [...new Set(data.map((t) => t.conductor))].filter(Boolean).sort(),
+                        placas: [...new Set(data.map((t) => t.placa))].filter(Boolean).sort(),
+                        bombas: [...new Set(data.map((t) => t.bomba))].filter(Boolean).sort(),
+                        areas_operacion: [...new Set(data.map((t) => t.area_operacion))].filter(Boolean).sort(),
+                        tipos_combustible: [...new Set(data.map((t) => t.tipo_combustible))].filter(Boolean).sort(),
+                        conceptos: [...new Set(data.map((t) => t.concepto))].filter(Boolean).sort(),
+                        tipos_operacion: [...new Set(data.map((t) => t.tipo_operacion))].filter(Boolean).sort()
+                    };
+                    // Si un filtro está activo, devolver las opciones base para ese filtro para permitir facet search (cambiar opción)
+                    // Si no está activo, devolver las opciones dinámicas calculadas desde los datos filtrados
+                    const responseData = {
+                        conductores: conductor ? baseOptions.conductores : filteredOptions.conductores,
+                        placas: placa ? baseOptions.placas : filteredOptions.placas,
+                        bombas: bomba ? baseOptions.bombas : filteredOptions.bombas,
+                        areas_operacion: area_operacion ? baseOptions.areas_operacion : filteredOptions.areas_operacion,
+                        tipos_combustible: tipo_combustible ? baseOptions.tipos_combustible : filteredOptions.tipos_combustible,
+                        conceptos: concepto ? baseOptions.conceptos : filteredOptions.conceptos,
+                        tipos_operacion: tipo_operacion ? baseOptions.tipos_operacion : filteredOptions.tipos_operacion
+                    };
+                    res.json(responseData);
+                    return;
+                }
+            }
+            // Fallback si no hay filtros o hubo error
+            res.json(baseOptions);
         }
         catch (error) {
             console.error('Error obteniendo opciones de filtros:', error);

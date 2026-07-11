@@ -9,6 +9,7 @@ const router = (0, express_1.Router)();
 router.use(auth_middleware_1.authMiddleware);
 // Dashboard
 router.get('/dashboard/kpis', presupuestos_dashboard_controller_1.presupuestosDashboardController.getKPIs);
+router.get('/dashboard/matrix', presupuestos_dashboard_controller_1.presupuestosDashboardController.getMatrix);
 router.get('/dashboard/by-placa', presupuestos_dashboard_controller_1.presupuestosDashboardController.getByPlaca);
 router.get('/dashboard/by-empresa', presupuestos_dashboard_controller_1.presupuestosDashboardController.getByEmpresa);
 // Catálogos

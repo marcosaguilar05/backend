@@ -17,4 +17,7 @@ router.post('/tipos', mantenimiento_controller_1.createTipoMantenimiento);
 router.get('/condiciones', mantenimiento_controller_1.getTiposCondicion);
 router.get('/proximos', mantenimiento_controller_1.getProximosMantenimientos);
 router.get('/talleres', mantenimiento_controller_1.getTalleres);
+router.post('/talleres', mantenimiento_controller_1.createTaller);
+router.put('/talleres/:id', mantenimiento_controller_1.updateTaller);
+router.delete('/talleres/:id', mantenimiento_controller_1.deleteTaller);
 exports.default = router;

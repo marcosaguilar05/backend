@@ -16,6 +16,7 @@ router.get('/dashboard/consumption-over-time', tanqueos_dashboard_controller_1.t
 router.get('/dashboard/fuel-distribution', tanqueos_dashboard_controller_1.tanqueosDashboardController.getFuelDistribution);
 router.get('/dashboard/by-area', tanqueos_dashboard_controller_1.tanqueosDashboardController.getByArea);
 router.get('/dashboard/top-vehicles', tanqueos_dashboard_controller_1.tanqueosDashboardController.getTopVehicles);
+router.get('/dashboard/area-month-matrix', tanqueos_dashboard_controller_1.tanqueosDashboardController.getAreaMonthMatrix);
 router.get('/dashboard/vehicles-by-area', tanqueos_dashboard_controller_1.tanqueosDashboardController.getVehiclesByArea);
 router.get('/dashboard/by-driver', tanqueos_dashboard_controller_1.tanqueosDashboardController.getByDriver);
 router.get('/dashboard/by-pump', tanqueos_dashboard_controller_1.tanqueosDashboardController.getByPump);
