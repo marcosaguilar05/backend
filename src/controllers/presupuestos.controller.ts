@@ -458,7 +458,7 @@ export const presupuestosController = {
                 const placaIdsQ = placaData?.map(p => p.id) || [];
                 let vehiculoIdsQ: number[] = [];
                 if (placaIdsQ.length > 0) {
-                    const { data: vData } = await dbClient.from('control_flota').select('id').in('placa_id', placaIdsQ);
+                    const { data: vData } = await dbClient.from('vehiculo').select('id').in('placa_id', placaIdsQ);
                     vehiculoIdsQ = vData?.map(v => v.id) || [];
                 }
 
