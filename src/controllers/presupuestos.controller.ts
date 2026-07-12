@@ -1479,25 +1479,25 @@ export const presupuestosController = {
                 .select('id, nombre')
                 .order('nombre');
 
-            const finalAreas = uniqueNamedFilter(areasData || [], 'nombre');
-            const finalEmpresas = uniqueNamedFilter(empresasData || [], 'empresa');
-            const finalGrupos = uniqueNamedFilter(groupsRaw || [], 'nombre');
-            const finalSubRubros = uniqueNamedFilter(rubrosRaw || [], 'nombre');
-            const finalTipos = uniqueNamedFilter(tiposPresupuestoData || [], 'nombre');
-            const finalConceptos = uniqueNamedFilter(conceptosData || [], 'nombre');
+            const finalAreas = areasData || [];
+            const finalEmpresas = empresasData || [];
+            const finalGrupos = groupsRaw || [];
+            const finalSubRubros = rubrosRaw || [];
+            const finalTipos = tiposPresupuestoData || [];
+            const finalConceptos = conceptosData || [];
 
             const { anio, empresa, area_operacion, placa, grupo_rubro, rubro, sub_rubro, concepto } = req.query;
             const hasFilters = anio || empresa || area_operacion || placa || grupo_rubro || rubro || sub_rubro || concepto;
 
             let responseData = {
                 anios,
-                areas: finalAreas,
-                empresas: finalEmpresas,
+                areas: uniqueNamedFilter(finalAreas, 'nombre'),
+                empresas: uniqueNamedFilter(finalEmpresas, 'empresa'),
                 vehiculos,
-                grupos_rubro: finalGrupos,
-                sub_rubros: finalSubRubros,
-                tipos_presupuesto: finalTipos,
-                conceptos: finalConceptos,
+                grupos_rubro: uniqueNamedFilter(finalGrupos, 'nombre'),
+                sub_rubros: uniqueNamedFilter(finalSubRubros, 'nombre'),
+                tipos_presupuesto: uniqueNamedFilter(finalTipos, 'nombre'),
+                conceptos: uniqueNamedFilter(finalConceptos, 'nombre'),
                 personal: personalData || []
             };
 
@@ -1592,13 +1592,13 @@ export const presupuestosController = {
 
                     responseData = {
                         anios: anio ? anios : filteredAnios,
-                        areas: area_operacion ? finalAreas : filteredAreas,
-                        empresas: empresa ? finalEmpresas : filteredEmpresas,
+                        areas: uniqueNamedFilter(area_operacion ? finalAreas : filteredAreas, 'nombre'),
+                        empresas: uniqueNamedFilter(empresa ? finalEmpresas : filteredEmpresas, 'empresa'),
                         vehiculos: placa ? vehiculos : filteredVehiculos,
-                        grupos_rubro: grupo_rubro ? finalGrupos : filteredGrupos,
-                        sub_rubros: rubro ? finalSubRubros : filteredRubros,
-                        tipos_presupuesto: filteredTipos,
-                        conceptos: filteredConceptos,
+                        grupos_rubro: uniqueNamedFilter(grupo_rubro ? finalGrupos : filteredGrupos, 'nombre'),
+                        sub_rubros: uniqueNamedFilter(rubro ? finalSubRubros : filteredRubros, 'nombre'),
+                        tipos_presupuesto: uniqueNamedFilter(filteredTipos, 'nombre'),
+                        conceptos: uniqueNamedFilter(filteredConceptos, 'nombre'),
                         personal: personalData || []
                     };
                 }
