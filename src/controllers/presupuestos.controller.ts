@@ -1538,15 +1538,16 @@ export const presupuestosController = {
                 if (!budgetError && rawFilteredBudgets) {
                     let filteredBudgets = rawFilteredBudgets;
                     
-                    if (sub_rubro) {
-                        const names = String(sub_rubro).split(',').map(s => s.trim());
-                        const ids = finalTipos.filter(t => names.includes(t.nombre)).map(t => t.id);
-                        if (ids.length > 0) {
-                            filteredBudgets = filteredBudgets.filter((b: any) => 
-                                b.presupuesto_items && b.presupuesto_items.some((i: any) => ids.includes(i.tipo_presupuesto_id))
-                            );
-                        }
+                    const subRubroIds = sub_rubro ? finalTipos.filter(t => String(sub_rubro).split(',').map(s => s.trim()).includes(t.nombre)).map(t => t.id) : [];
+                    const conceptoIds = concepto ? finalConceptos.filter(c => String(concepto).split(',').map(s => s.trim()).includes(c.nombre)).map(c => c.id) : [];
+
+                    if (subRubroIds.length > 0) {
+                        filteredBudgets = filteredBudgets.filter((b: any) => b.presupuesto_items && b.presupuesto_items.some((i: any) => subRubroIds.includes(i.tipo_presupuesto_id)));
                     }
+                    if (conceptoIds.length > 0) {
+                        filteredBudgets = filteredBudgets.filter((b: any) => b.presupuesto_items && b.presupuesto_items.some((i: any) => conceptoIds.includes(i.concepto_presupuesto_id)));
+                    }
+
                     const validAnios = new Set();
                     const validAreas = new Set();
                     const validEmpresas = new Set();
@@ -1565,14 +1566,21 @@ export const presupuestosController = {
                         if (b.rubro_id) validRubros.add(b.rubro_id);
                         if (b.presupuesto_items) {
                             b.presupuesto_items.forEach((i: any) => {
-                                if (i.tipo_presupuesto_id) validTipos.add(i.tipo_presupuesto_id);
-                                if (i.concepto_presupuesto_id) validConceptos.add(i.concepto_presupuesto_id);
+                                const matchSubRubro = subRubroIds.length === 0 || subRubroIds.includes(i.tipo_presupuesto_id);
+                                const matchConcepto = conceptoIds.length === 0 || conceptoIds.includes(i.concepto_presupuesto_id);
+                                
+                                // For the sub_rubro dropdown, we want all sub_rubros that match the OTHER filters (i.e. concepto)
+                                if (matchConcepto && i.tipo_presupuesto_id) {
+                                    validTipos.add(i.tipo_presupuesto_id);
+                                }
+                                // For the concepto dropdown, we want all conceptos that match the OTHER filters (i.e. sub_rubro)
+                                if (matchSubRubro && i.concepto_presupuesto_id) {
+                                    validConceptos.add(i.concepto_presupuesto_id);
+                                }
                             });
                         }
                     });
 
-                    // Subrubro (tipo_presupuesto) filtering logic: since we didn't filter the budgets by sub_rubro above (to simplify),
-                    // if sub_rubro is active, we just use its base options.
                     const filteredAnios = anios.filter(a => validAnios.has(a));
                     const filteredAreas = finalAreas.filter(a => validAreas.has(a.id));
                     const filteredEmpresas = finalEmpresas.filter(e => validEmpresas.has(e.id));
@@ -1589,8 +1597,8 @@ export const presupuestosController = {
                         vehiculos: placa ? vehiculos : filteredVehiculos,
                         grupos_rubro: grupo_rubro ? finalGrupos : filteredGrupos,
                         sub_rubros: rubro ? finalSubRubros : filteredRubros,
-                        tipos_presupuesto: sub_rubro ? finalTipos : filteredTipos,
-                        conceptos: concepto ? finalConceptos : filteredConceptos,
+                        tipos_presupuesto: filteredTipos,
+                        conceptos: filteredConceptos,
                         personal: personalData || []
                     };
                 }
