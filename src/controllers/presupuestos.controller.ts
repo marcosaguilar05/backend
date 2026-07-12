@@ -681,23 +681,21 @@ export const presupuestosController = {
             let totalPresupuesto = 0;
             const rubrosIds = new Set<number>();
 
-            const subRubroNames = sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '' ? 
-                String(sub_rubro).split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
-            const conceptoNamesList = conceptoStr && conceptoStr !== 'undefined' && conceptoStr !== '' ? 
-                String(conceptoStr).split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
+            const subRubroNamesUpper = subRubroNames.map(s => s.toUpperCase());
+            const conceptoNamesUpper = conceptoNames.map(s => s.toUpperCase());
 
             if (allMatching && allMatching.length > 0) {
                 allMatching.forEach((p: any) => {
                     rubrosIds.add(p.rubro_id);
                     if (p.presupuesto_items) {
                         p.presupuesto_items.forEach((item: any) => {
-                            if (subRubroNames.length > 0) {
+                            if (subRubroNamesUpper.length > 0) {
                                 const iNombre = (item.tipo?.nombre || '').toUpperCase().trim();
-                                if (!subRubroNames.includes(iNombre)) return; // Skip item not matching sub_rubro filter
+                                if (!subRubroNamesUpper.includes(iNombre)) return; // Skip item not matching sub_rubro filter
                             }
-                            if (conceptoNamesList.length > 0) {
+                            if (conceptoNamesUpper.length > 0) {
                                 const cNombre = (item.concepto?.nombre || '').toUpperCase().trim();
-                                if (!conceptoNamesList.includes(cNombre)) return; // Skip item not matching concepto filter
+                                if (!conceptoNamesUpper.includes(cNombre)) return; // Skip item not matching concepto filter
                             }
 
                             let total = item.valor_total || 0;

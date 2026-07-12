@@ -284,7 +284,7 @@ exports.presupuestosController = {
     async getAll(req, res) {
         try {
             const dbClient = req.supabase || supabase_1.supabase;
-            const { page = 1, limit = 20, empresa, vehiculo_id, placa, area_operacion, anio, grupo_rubro, rubro, sub_rubro, mes, f_estado, f_ejecucion, sort_by = 'id', sort_order = 'desc' } = req.query;
+            const { page = 1, limit = 20, empresa, vehiculo_id, placa, area_operacion, anio, grupo_rubro, rubro, sub_rubro, concepto, mes, f_estado, f_ejecucion, sort_by = 'id', sort_order = 'desc' } = req.query;
             const pageNum = Number(page);
             const limitNum = Number(limit);
             const offset = (pageNum - 1) * limitNum;
@@ -350,8 +350,9 @@ exports.presupuestosController = {
             }
             // Resolve sub_rubro names STRICTLY to item types (Level 3) to avoid collision with Rubro (Level 2)
             let budgetIdsFromTipo = [];
+            let subRubroNames = [];
             if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') {
-                const subRubroNames = String(sub_rubro).split(',').map(s => s.trim()).filter(Boolean);
+                subRubroNames = String(sub_rubro).split(',').map(s => s.trim()).filter(Boolean);
                 if (subRubroNames.length > 0) {
                     // Resolve all matches from tipos_presupuesto (the item-level definition)
                     const { data: tipoData, error: tipoError } = await dbClient
@@ -376,6 +377,34 @@ exports.presupuestosController = {
                 }
                 console.log(`[Presupuestos Filter] Sub Rubro (L3): "${sub_rubro}" -> BudgetIDsWithTipoCount: ${budgetIdsFromTipo.length}`);
             }
+            // Resolve concepto names to IDs
+            let budgetIdsFromConcepto = [];
+            const conceptoStr = req.query.concepto;
+            let conceptoNames = [];
+            if (conceptoStr && conceptoStr !== 'undefined' && conceptoStr !== '') {
+                conceptoNames = String(conceptoStr).split(',').map(s => s.trim()).filter(Boolean);
+                if (conceptoNames.length > 0) {
+                    const { data: conceptoData, error: conceptoError } = await dbClient
+                        .from('conceptos_presupuesto')
+                        .select('id')
+                        .in('nombre', conceptoNames);
+                    if (conceptoError)
+                        console.error('Error resolving concepto:', conceptoError);
+                    if (conceptoData && conceptoData.length > 0) {
+                        const conceptoIds = conceptoData.map(c => c.id);
+                        const { data: itemData, error: itemError } = await dbClient
+                            .from('presupuesto_items')
+                            .select('presupuesto_id')
+                            .in('concepto_presupuesto_id', conceptoIds);
+                        if (itemError)
+                            console.error('Error finding budgets for concepto:', itemError);
+                        if (itemData && itemData.length > 0) {
+                            budgetIdsFromConcepto = [...new Set(itemData.map((d) => Number(d.presupuesto_id)))];
+                        }
+                    }
+                }
+                console.log(`[Presupuestos Filter] Concepto: "${conceptoStr}" -> BudgetIDsCount: ${budgetIdsFromConcepto.length}`);
+            }
             const q = req.query.q;
             let budgetIdsFromQ = [];
             if (q && q !== 'undefined' && q !== '') {
@@ -385,7 +414,7 @@ exports.presupuestosController = {
                 const placaIdsQ = placaData?.map(p => p.id) || [];
                 let vehiculoIdsQ = [];
                 if (placaIdsQ.length > 0) {
-                    const { data: vData } = await dbClient.from('control_flota').select('id').in('placa_id', placaIdsQ);
+                    const { data: vData } = await dbClient.from('vehiculo').select('id').in('placa_id', placaIdsQ);
                     vehiculoIdsQ = vData?.map(v => v.id) || [];
                 }
                 // 2. Areas y Empresas
@@ -431,9 +460,9 @@ exports.presupuestosController = {
                         .in('placa', placas);
                     if (placaData && placaData.length > 0) {
                         const placaIds = placaData.map(p => p.id);
-                        // Find vehiculo_ids from control_flota using placa_ids
+                        // Find vehiculo_ids from vehiculo table using placa_ids
                         const { data: vData } = await dbClient
-                            .from('control_flota')
+                            .from('vehiculo')
                             .select('id')
                             .in('placa_id', placaIds);
                         if (vData && vData.length > 0) {
@@ -504,7 +533,7 @@ exports.presupuestosController = {
             // 2. Cálculo de estadísticas reales (sin paginación, pero con los mismos filtros base)
             let summaryQuery = dbClient
                 .from('presupuestos')
-                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, tipo:tipos_presupuesto(id, nombre))');
+                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre))');
             if (vehiculo_id)
                 summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
             if (vehiculoIdsFromPlaca.length > 0) {
@@ -552,6 +581,12 @@ exports.presupuestosController = {
                 else
                     summaryQuery = summaryQuery.eq('id', -1);
             }
+            if (conceptoStr && conceptoStr !== '' && conceptoStr !== 'undefined') {
+                if (budgetIdsFromConcepto.length > 0)
+                    summaryQuery = summaryQuery.in('id', budgetIdsFromConcepto);
+                else
+                    summaryQuery = summaryQuery.eq('id', -1);
+            }
             if (mes && mes !== '' && mes !== 'undefined') {
                 if (budgetIdsFromMonth.length > 0)
                     summaryQuery = summaryQuery.in('id', budgetIdsFromMonth);
@@ -571,17 +606,22 @@ exports.presupuestosController = {
             let totalNoEjecutado = 0;
             let totalPresupuesto = 0;
             const rubrosIds = new Set();
-            const subRubroNames = sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '' ?
-                String(sub_rubro).split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
+            const subRubroNamesUpper = subRubroNames.map(s => s.toUpperCase());
+            const conceptoNamesUpper = conceptoNames.map(s => s.toUpperCase());
             if (allMatching && allMatching.length > 0) {
                 allMatching.forEach((p) => {
                     rubrosIds.add(p.rubro_id);
                     if (p.presupuesto_items) {
                         p.presupuesto_items.forEach((item) => {
-                            if (subRubroNames.length > 0) {
+                            if (subRubroNamesUpper.length > 0) {
                                 const iNombre = (item.tipo?.nombre || '').toUpperCase().trim();
-                                if (!subRubroNames.includes(iNombre))
+                                if (!subRubroNamesUpper.includes(iNombre))
                                     return; // Skip item not matching sub_rubro filter
+                            }
+                            if (conceptoNamesUpper.length > 0) {
+                                const cNombre = (item.concepto?.nombre || '').toUpperCase().trim();
+                                if (!conceptoNamesUpper.includes(cNombre))
+                                    return; // Skip item not matching concepto filter
                             }
                             let total = item.valor_total || 0;
                             if (monthNums.length > 0) {
@@ -611,10 +651,9 @@ exports.presupuestosController = {
                 .from('presupuestos')
                 .select(`
                     *,
-                    control_flota(
+                    vehiculo(
                         id, 
                         placa_id,
-                        clase_vehiculo,
                         areas_placas(id, placa)
                     ),
                     areas_operacion(id, nombre),
@@ -663,6 +702,14 @@ exports.presupuestosController = {
             if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
                 if (budgetIdsFromTipo.length > 0) {
                     query = query.in('id', budgetIdsFromTipo);
+                }
+                else {
+                    query = query.eq('id', -1);
+                }
+            }
+            if (conceptoStr && conceptoStr !== '' && conceptoStr !== 'undefined') {
+                if (budgetIdsFromConcepto.length > 0) {
+                    query = query.in('id', budgetIdsFromConcepto);
                 }
                 else {
                     query = query.eq('id', -1);
@@ -827,7 +874,7 @@ exports.presupuestosController = {
             catch (mongoError) {
                 console.error('❌ Error al calcular totalEjecutadoReal desde MongoDB:', mongoError);
             }
-            if (data && data.length > 0 && (monthNums.length > 0 || subRubroNames.length > 0)) {
+            if (data && data.length > 0 && (monthNums.length > 0 || subRubroNames.length > 0 || conceptoNames.length > 0)) {
                 data.forEach((p) => {
                     if (p.presupuesto_items) {
                         p.presupuesto_items = p.presupuesto_items.filter((item) => {
@@ -842,7 +889,13 @@ exports.presupuestosController = {
                             // 2. Filtrar por sub rubro
                             if (keep && subRubroNames.length > 0) {
                                 const iNombre = (item.tipo?.nombre || '').toUpperCase().trim();
-                                if (!subRubroNames.includes(iNombre))
+                                if (!subRubroNames.map(n => n.toUpperCase().trim()).includes(iNombre))
+                                    keep = false;
+                            }
+                            // 3. Filtrar por concepto
+                            if (keep && conceptoNames.length > 0) {
+                                const iNombre = (item.concepto?.nombre || '').toUpperCase().trim();
+                                if (!conceptoNames.map(n => n.toUpperCase().trim()).includes(iNombre))
                                     keep = false;
                             }
                             return keep;
@@ -885,10 +938,9 @@ exports.presupuestosController = {
                 .from('presupuestos')
                 .select(`
                     *,
-                    vehiculo:control_flota(
+                    vehiculo(
                         id, 
                         placa_id,
-                        clase_vehiculo,
                         areas_placas(placa)
                     ),
                     area:areas_operacion(id, nombre),
@@ -1153,13 +1205,39 @@ exports.presupuestosController = {
     async deleteItem(req, res) {
         try {
             const { itemId } = req.params;
-            const { error } = await (req.supabase || supabase_1.supabase)
+            const dbClient = req.supabase || supabase_1.supabase;
+            // Fetch the item first to get its presupuesto_id
+            const { data: itemData, error: findError } = await dbClient
+                .from('presupuesto_items')
+                .select('presupuesto_id')
+                .eq('id', itemId)
+                .single();
+            if (findError) {
+                res.status(400).json({ error: findError.message });
+                return;
+            }
+            const presupuestoId = itemData?.presupuesto_id;
+            const { error } = await dbClient
                 .from('presupuesto_items')
                 .delete()
                 .eq('id', itemId);
             if (error) {
                 res.status(400).json({ error: error.message });
                 return;
+            }
+            // Check if there are any remaining items for this budget
+            if (presupuestoId) {
+                const { count, error: countError } = await dbClient
+                    .from('presupuesto_items')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('presupuesto_id', presupuestoId);
+                if (!countError && count === 0) {
+                    // Delete the parent budget if it has no items left
+                    await dbClient
+                        .from('presupuestos')
+                        .delete()
+                        .eq('id', presupuestoId);
+                }
             }
             res.status(204).send();
         }
@@ -1214,17 +1292,17 @@ exports.presupuestosController = {
             if (controlFlotaError) {
                 console.error('Error fetching vehiculos from control_flota table:', controlFlotaError);
             }
-            // Formatear vehículos para el frontend
+            // Formatear vehículos para el frontend usando directamente el id de la tabla vehiculo
             const vehiculos = (vehiculosData || []).map((v) => {
                 const placaData = Array.isArray(v.areas_placas) ? v.areas_placas[0] : v.areas_placas;
                 const chars = Array.isArray(v.vehiculo_caracteristicas) ? v.vehiculo_caracteristicas[0] : v.vehiculo_caracteristicas;
                 const catClase = chars?.cat_clase_vehiculo;
                 const clase_vehiculo = (Array.isArray(catClase) ? catClase[0] : catClase)?.nombre || '';
                 return {
-                    id: v.id, // ID real de vehiculos
+                    id: v.id, // ID directo de la tabla vehiculo
                     placa_id: v.placa_id,
-                    operación_id: v.operacion_id, // Compatible con la interfaz frontend
-                    area_id: v.operacion_id, // Compatible con la interfaz frontend
+                    operación_id: v.operacion_id,
+                    area_id: v.operacion_id,
                     clase_vehiculo: clase_vehiculo,
                     placa: placaData?.placa || ''
                 };
@@ -1266,27 +1344,33 @@ exports.presupuestosController = {
             const { data: tiposPresupuestoData } = await dbClient
                 .from('tipos_presupuesto')
                 .select('id, nombre')
-                .eq('activo', true)
                 .order('nombre');
-            const finalAreas = uniqueNamedFilter(areasData || [], 'nombre');
-            const finalEmpresas = uniqueNamedFilter(empresasData || [], 'empresa');
-            const finalGrupos = uniqueNamedFilter(groupsRaw || [], 'nombre');
-            const finalSubRubros = uniqueNamedFilter(rubrosRaw || [], 'nombre');
-            const finalTipos = uniqueNamedFilter(tiposPresupuestoData || [], 'nombre');
-            const { anio, empresa, area_operacion, placa, grupo_rubro, rubro, sub_rubro } = req.query;
-            const hasFilters = anio || empresa || area_operacion || placa || grupo_rubro || rubro || sub_rubro;
+            // Conceptos de presupuesto
+            const { data: conceptosData } = await dbClient
+                .from('conceptos_presupuesto')
+                .select('id, nombre')
+                .order('nombre');
+            const finalAreas = areasData || [];
+            const finalEmpresas = empresasData || [];
+            const finalGrupos = groupsRaw || [];
+            const finalSubRubros = rubrosRaw || [];
+            const finalTipos = tiposPresupuestoData || [];
+            const finalConceptos = conceptosData || [];
+            const { anio, empresa, area_operacion, placa, grupo_rubro, rubro, sub_rubro, concepto } = req.query;
+            const hasFilters = anio || empresa || area_operacion || placa || grupo_rubro || rubro || sub_rubro || concepto;
             let responseData = {
                 anios,
-                areas: finalAreas,
-                empresas: finalEmpresas,
+                areas: uniqueNamedFilter(finalAreas, 'nombre'),
+                empresas: uniqueNamedFilter(finalEmpresas, 'empresa'),
                 vehiculos,
-                grupos_rubro: finalGrupos,
-                sub_rubros: finalSubRubros,
-                tipos_presupuesto: finalTipos,
+                grupos_rubro: uniqueNamedFilter(finalGrupos, 'nombre'),
+                sub_rubros: uniqueNamedFilter(finalSubRubros, 'nombre'),
+                tipos_presupuesto: uniqueNamedFilter(finalTipos, 'nombre'),
+                conceptos: uniqueNamedFilter(finalConceptos, 'nombre'),
                 personal: personalData || []
             };
             if (hasFilters) {
-                let query = dbClient.from('presupuestos').select('anio, area_operacion_id, empresa_id, vehiculo_id, grupo_rubro_id, rubro_id, presupuesto_items(tipo_presupuesto_id)');
+                let query = dbClient.from('presupuestos').select('anio, area_operacion_id, empresa_id, vehiculo_id, grupo_rubro_id, rubro_id, presupuesto_items(tipo_presupuesto_id, concepto_presupuesto_id)');
                 if (anio) {
                     query = query.in('anio', String(anio).split(',').map(s => Number(s.trim())));
                 }
@@ -1323,12 +1407,13 @@ exports.presupuestosController = {
                 const { data: rawFilteredBudgets, error: budgetError } = await query;
                 if (!budgetError && rawFilteredBudgets) {
                     let filteredBudgets = rawFilteredBudgets;
-                    if (sub_rubro) {
-                        const names = String(sub_rubro).split(',').map(s => s.trim());
-                        const ids = finalTipos.filter(t => names.includes(t.nombre)).map(t => t.id);
-                        if (ids.length > 0) {
-                            filteredBudgets = filteredBudgets.filter((b) => b.presupuesto_items && b.presupuesto_items.some((i) => ids.includes(i.tipo_presupuesto_id)));
-                        }
+                    const subRubroIds = sub_rubro ? finalTipos.filter(t => String(sub_rubro).split(',').map(s => s.trim()).includes(t.nombre)).map(t => t.id) : [];
+                    const conceptoIds = concepto ? finalConceptos.filter(c => String(concepto).split(',').map(s => s.trim()).includes(c.nombre)).map(c => c.id) : [];
+                    if (subRubroIds.length > 0) {
+                        filteredBudgets = filteredBudgets.filter((b) => b.presupuesto_items && b.presupuesto_items.some((i) => subRubroIds.includes(i.tipo_presupuesto_id)));
+                    }
+                    if (conceptoIds.length > 0) {
+                        filteredBudgets = filteredBudgets.filter((b) => b.presupuesto_items && b.presupuesto_items.some((i) => conceptoIds.includes(i.concepto_presupuesto_id)));
                     }
                     const validAnios = new Set();
                     const validAreas = new Set();
@@ -1337,6 +1422,7 @@ exports.presupuestosController = {
                     const validGrupos = new Set();
                     const validRubros = new Set();
                     const validTipos = new Set();
+                    const validConceptos = new Set();
                     filteredBudgets.forEach((b) => {
                         if (b.anio)
                             validAnios.add(b.anio);
@@ -1352,13 +1438,19 @@ exports.presupuestosController = {
                             validRubros.add(b.rubro_id);
                         if (b.presupuesto_items) {
                             b.presupuesto_items.forEach((i) => {
-                                if (i.tipo_presupuesto_id)
+                                const matchSubRubro = subRubroIds.length === 0 || subRubroIds.includes(i.tipo_presupuesto_id);
+                                const matchConcepto = conceptoIds.length === 0 || conceptoIds.includes(i.concepto_presupuesto_id);
+                                // For the sub_rubro dropdown, we want all sub_rubros that match the OTHER filters (i.e. concepto)
+                                if (matchConcepto && i.tipo_presupuesto_id) {
                                     validTipos.add(i.tipo_presupuesto_id);
+                                }
+                                // For the concepto dropdown, we want all conceptos that match the OTHER filters (i.e. sub_rubro)
+                                if (matchSubRubro && i.concepto_presupuesto_id) {
+                                    validConceptos.add(i.concepto_presupuesto_id);
+                                }
                             });
                         }
                     });
-                    // Subrubro (tipo_presupuesto) filtering logic: since we didn't filter the budgets by sub_rubro above (to simplify),
-                    // if sub_rubro is active, we just use its base options.
                     const filteredAnios = anios.filter(a => validAnios.has(a));
                     const filteredAreas = finalAreas.filter(a => validAreas.has(a.id));
                     const filteredEmpresas = finalEmpresas.filter(e => validEmpresas.has(e.id));
@@ -1366,14 +1458,16 @@ exports.presupuestosController = {
                     const filteredGrupos = finalGrupos.filter(g => validGrupos.has(g.id));
                     const filteredRubros = finalSubRubros.filter(r => validRubros.has(r.id));
                     const filteredTipos = finalTipos.filter(t => validTipos.has(t.id));
+                    const filteredConceptos = finalConceptos.filter(c => validConceptos.has(c.id));
                     responseData = {
                         anios: anio ? anios : filteredAnios,
-                        areas: area_operacion ? finalAreas : filteredAreas,
-                        empresas: empresa ? finalEmpresas : filteredEmpresas,
+                        areas: uniqueNamedFilter(area_operacion ? finalAreas : filteredAreas, 'nombre'),
+                        empresas: uniqueNamedFilter(empresa ? finalEmpresas : filteredEmpresas, 'empresa'),
                         vehiculos: placa ? vehiculos : filteredVehiculos,
-                        grupos_rubro: grupo_rubro ? finalGrupos : filteredGrupos,
-                        sub_rubros: rubro ? finalSubRubros : filteredRubros,
-                        tipos_presupuesto: sub_rubro ? finalTipos : filteredTipos,
+                        grupos_rubro: uniqueNamedFilter(grupo_rubro ? finalGrupos : filteredGrupos, 'nombre'),
+                        sub_rubros: uniqueNamedFilter(rubro ? finalSubRubros : filteredRubros, 'nombre'),
+                        tipos_presupuesto: uniqueNamedFilter(filteredTipos, 'nombre'),
+                        conceptos: uniqueNamedFilter(filteredConceptos, 'nombre'),
                         personal: personalData || []
                     };
                 }
