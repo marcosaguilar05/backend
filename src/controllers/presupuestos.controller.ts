@@ -419,8 +419,9 @@ export const presupuestosController = {
 
             // Resolve sub_rubro names STRICTLY to item types (Level 3) to avoid collision with Rubro (Level 2)
             let budgetIdsFromTipo: number[] = [];
+            let subRubroNames: string[] = [];
             if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') {
-                const subRubroNames = String(sub_rubro).split(',').map(s => s.trim()).filter(Boolean);
+                subRubroNames = String(sub_rubro).split(',').map(s => s.trim()).filter(Boolean);
 
                 if (subRubroNames.length > 0) {
                     // Resolve all matches from tipos_presupuesto (the item-level definition)
@@ -452,8 +453,9 @@ export const presupuestosController = {
             // Resolve concepto names to IDs
             let budgetIdsFromConcepto: number[] = [];
             const conceptoStr = req.query.concepto;
+            let conceptoNames: string[] = [];
             if (conceptoStr && conceptoStr !== 'undefined' && conceptoStr !== '') {
-                const conceptoNames = String(conceptoStr).split(',').map(s => s.trim()).filter(Boolean);
+                conceptoNames = String(conceptoStr).split(',').map(s => s.trim()).filter(Boolean);
 
                 if (conceptoNames.length > 0) {
                     const { data: conceptoData, error: conceptoError } = await dbClient
@@ -949,7 +951,7 @@ export const presupuestosController = {
                 console.error('❌ Error al calcular totalEjecutadoReal desde MongoDB:', mongoError);
             }
 
-            if (data && data.length > 0 && (monthNums.length > 0 || subRubroNames.length > 0)) {
+            if (data && data.length > 0 && (monthNums.length > 0 || subRubroNames.length > 0 || conceptoNames.length > 0)) {
                 data.forEach((p: any) => {
                     if (p.presupuesto_items) {
                         p.presupuesto_items = p.presupuesto_items.filter((item: any) => {
@@ -964,7 +966,13 @@ export const presupuestosController = {
                             // 2. Filtrar por sub rubro
                             if (keep && subRubroNames.length > 0) {
                                 const iNombre = (item.tipo?.nombre || '').toUpperCase().trim();
-                                if (!subRubroNames.includes(iNombre)) keep = false;
+                                if (!subRubroNames.map(n => n.toUpperCase().trim()).includes(iNombre)) keep = false;
+                            }
+
+                            // 3. Filtrar por concepto
+                            if (keep && conceptoNames.length > 0) {
+                                const iNombre = (item.concepto?.nombre || '').toUpperCase().trim();
+                                if (!conceptoNames.map(n => n.toUpperCase().trim()).includes(iNombre)) keep = false;
                             }
 
                             return keep;
