@@ -621,7 +621,7 @@ export const presupuestosController = {
             // 2. Cálculo de estadísticas reales (sin paginación, pero con los mismos filtros base)
             let summaryQuery = dbClient
                 .from('presupuestos')
-                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, tipo:tipos_presupuesto(id, nombre))');
+                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre))');
 
             if (vehiculo_id) summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
             if (vehiculoIdsFromPlaca.length > 0) {
