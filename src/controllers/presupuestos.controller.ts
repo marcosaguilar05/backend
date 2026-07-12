@@ -341,6 +341,7 @@ export const presupuestosController = {
                 grupo_rubro,
                 rubro,
                 sub_rubro,
+                concepto,
                 mes,
                 f_estado,
                 f_ejecucion,
@@ -446,6 +447,36 @@ export const presupuestosController = {
                 }
 
                 console.log(`[Presupuestos Filter] Sub Rubro (L3): "${sub_rubro}" -> BudgetIDsWithTipoCount: ${budgetIdsFromTipo.length}`);
+            }
+
+            // Resolve concepto names to IDs
+            let budgetIdsFromConcepto: number[] = [];
+            const conceptoStr = req.query.concepto;
+            if (conceptoStr && conceptoStr !== 'undefined' && conceptoStr !== '') {
+                const conceptoNames = String(conceptoStr).split(',').map(s => s.trim()).filter(Boolean);
+
+                if (conceptoNames.length > 0) {
+                    const { data: conceptoData, error: conceptoError } = await dbClient
+                        .from('conceptos_presupuesto')
+                        .select('id')
+                        .in('nombre', conceptoNames);
+
+                    if (conceptoError) console.error('Error resolving concepto:', conceptoError);
+
+                    if (conceptoData && conceptoData.length > 0) {
+                        const conceptoIds = conceptoData.map(c => c.id);
+                        const { data: itemData, error: itemError } = await dbClient
+                            .from('presupuesto_items')
+                            .select('presupuesto_id')
+                            .in('concepto_presupuesto_id', conceptoIds);
+                        
+                        if (itemError) console.error('Error finding budgets for concepto:', itemError);
+                        if (itemData && itemData.length > 0) {
+                            budgetIdsFromConcepto = [...new Set((itemData as any[]).map((d: any) => Number(d.presupuesto_id)))];
+                        }
+                    }
+                }
+                console.log(`[Presupuestos Filter] Concepto: "${conceptoStr}" -> BudgetIDsCount: ${budgetIdsFromConcepto.length}`);
             }
 
             const q = req.query.q as string;
@@ -626,6 +657,10 @@ export const presupuestosController = {
                 if (budgetIdsFromTipo.length > 0) summaryQuery = summaryQuery.in('id', budgetIdsFromTipo);
                 else summaryQuery = summaryQuery.eq('id', -1);
             }
+            if (conceptoStr && conceptoStr !== '' && conceptoStr !== 'undefined') {
+                if (budgetIdsFromConcepto.length > 0) summaryQuery = summaryQuery.in('id', budgetIdsFromConcepto);
+                else summaryQuery = summaryQuery.eq('id', -1);
+            }
             if (mes && mes !== '' && mes !== 'undefined') {
                 if (budgetIdsFromMonth.length > 0) summaryQuery = summaryQuery.in('id', budgetIdsFromMonth);
                 else summaryQuery = summaryQuery.eq('id', -1);
@@ -646,6 +681,8 @@ export const presupuestosController = {
 
             const subRubroNames = sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '' ? 
                 String(sub_rubro).split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
+            const conceptoNamesList = conceptoStr && conceptoStr !== 'undefined' && conceptoStr !== '' ? 
+                String(conceptoStr).split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
 
             if (allMatching && allMatching.length > 0) {
                 allMatching.forEach((p: any) => {
@@ -655,6 +692,10 @@ export const presupuestosController = {
                             if (subRubroNames.length > 0) {
                                 const iNombre = (item.tipo?.nombre || '').toUpperCase().trim();
                                 if (!subRubroNames.includes(iNombre)) return; // Skip item not matching sub_rubro filter
+                            }
+                            if (conceptoNamesList.length > 0) {
+                                const cNombre = (item.concepto?.nombre || '').toUpperCase().trim();
+                                if (!conceptoNamesList.includes(cNombre)) return; // Skip item not matching concepto filter
                             }
 
                             let total = item.valor_total || 0;
@@ -727,6 +768,13 @@ export const presupuestosController = {
             if (sub_rubro && sub_rubro !== '' && sub_rubro !== 'undefined') {
                 if (budgetIdsFromTipo.length > 0) {
                     query = query.in('id', budgetIdsFromTipo);
+                } else {
+                    query = query.eq('id', -1);
+                }
+            }
+            if (conceptoStr && conceptoStr !== '' && conceptoStr !== 'undefined') {
+                if (budgetIdsFromConcepto.length > 0) {
+                    query = query.in('id', budgetIdsFromConcepto);
                 } else {
                     query = query.eq('id', -1);
                 }
@@ -1426,14 +1474,22 @@ export const presupuestosController = {
                 .eq('activo', true)
                 .order('nombre');
 
+            // Conceptos de presupuesto
+            const { data: conceptosData } = await dbClient
+                .from('conceptos_presupuesto')
+                .select('id, nombre')
+                .eq('activo', true)
+                .order('nombre');
+
             const finalAreas = uniqueNamedFilter(areasData || [], 'nombre');
             const finalEmpresas = uniqueNamedFilter(empresasData || [], 'empresa');
             const finalGrupos = uniqueNamedFilter(groupsRaw || [], 'nombre');
             const finalSubRubros = uniqueNamedFilter(rubrosRaw || [], 'nombre');
             const finalTipos = uniqueNamedFilter(tiposPresupuestoData || [], 'nombre');
+            const finalConceptos = uniqueNamedFilter(conceptosData || [], 'nombre');
 
-            const { anio, empresa, area_operacion, placa, grupo_rubro, rubro, sub_rubro } = req.query;
-            const hasFilters = anio || empresa || area_operacion || placa || grupo_rubro || rubro || sub_rubro;
+            const { anio, empresa, area_operacion, placa, grupo_rubro, rubro, sub_rubro, concepto } = req.query;
+            const hasFilters = anio || empresa || area_operacion || placa || grupo_rubro || rubro || sub_rubro || concepto;
 
             let responseData = {
                 anios,
@@ -1443,11 +1499,12 @@ export const presupuestosController = {
                 grupos_rubro: finalGrupos,
                 sub_rubros: finalSubRubros,
                 tipos_presupuesto: finalTipos,
+                conceptos: finalConceptos,
                 personal: personalData || []
             };
 
             if (hasFilters) {
-                let query = dbClient.from('presupuestos').select('anio, area_operacion_id, empresa_id, vehiculo_id, grupo_rubro_id, rubro_id, presupuesto_items(tipo_presupuesto_id)');
+                let query = dbClient.from('presupuestos').select('anio, area_operacion_id, empresa_id, vehiculo_id, grupo_rubro_id, rubro_id, presupuesto_items(tipo_presupuesto_id, concepto_presupuesto_id)');
 
                 if (anio) {
                     query = query.in('anio', String(anio).split(',').map(s => Number(s.trim())));
@@ -1499,6 +1556,7 @@ export const presupuestosController = {
                     const validGrupos = new Set();
                     const validRubros = new Set();
                     const validTipos = new Set();
+                    const validConceptos = new Set();
 
                     filteredBudgets.forEach((b: any) => {
                         if (b.anio) validAnios.add(b.anio);
@@ -1510,6 +1568,7 @@ export const presupuestosController = {
                         if (b.presupuesto_items) {
                             b.presupuesto_items.forEach((i: any) => {
                                 if (i.tipo_presupuesto_id) validTipos.add(i.tipo_presupuesto_id);
+                                if (i.concepto_presupuesto_id) validConceptos.add(i.concepto_presupuesto_id);
                             });
                         }
                     });
@@ -1523,6 +1582,7 @@ export const presupuestosController = {
                     const filteredGrupos = finalGrupos.filter(g => validGrupos.has(g.id));
                     const filteredRubros = finalSubRubros.filter(r => validRubros.has(r.id));
                     const filteredTipos = finalTipos.filter(t => validTipos.has(t.id));
+                    const filteredConceptos = finalConceptos.filter(c => validConceptos.has(c.id));
 
                     responseData = {
                         anios: anio ? anios : filteredAnios,
@@ -1532,6 +1592,7 @@ export const presupuestosController = {
                         grupos_rubro: grupo_rubro ? finalGrupos : filteredGrupos,
                         sub_rubros: rubro ? finalSubRubros : filteredRubros,
                         tipos_presupuesto: sub_rubro ? finalTipos : filteredTipos,
+                        conceptos: concepto ? finalConceptos : filteredConceptos,
                         personal: personalData || []
                     };
                 }
