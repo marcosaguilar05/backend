@@ -1471,14 +1471,12 @@ export const presupuestosController = {
             const { data: tiposPresupuestoData } = await dbClient
                 .from('tipos_presupuesto')
                 .select('id, nombre')
-                .eq('activo', true)
                 .order('nombre');
 
             // Conceptos de presupuesto
             const { data: conceptosData } = await dbClient
                 .from('conceptos_presupuesto')
                 .select('id, nombre')
-                .eq('activo', true)
                 .order('nombre');
 
             const finalAreas = uniqueNamedFilter(areasData || [], 'nombre');
