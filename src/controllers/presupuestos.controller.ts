@@ -1116,7 +1116,7 @@ export const presupuestosController = {
                     frecuencia_mes: item.frecuencia_mes,
                     meses_aplicables: item.meses_aplicables,
                     valor_unitario: item.valor_unitario,
-                    valor_total: (item.valor_unitario || 0) * (item.frecuencia_mes || 1) * (item.meses_aplicables?.length || 0),
+                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length,
                     nota: item.nota
                 }));
 
@@ -1181,7 +1181,7 @@ export const presupuestosController = {
                     frecuencia_mes: item.frecuencia_mes,
                     meses_aplicables: item.meses_aplicables,
                     valor_unitario: item.valor_unitario,
-                    valor_total: (item.valor_unitario || 0) * (item.frecuencia_mes || 1) * (item.meses_aplicables?.length || 0),
+                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length,
                     nota: item.nota,
                     ejecutado: item.ejecutado || 'NO',
                     estado: item.estado || 'BORRADOR'
@@ -1195,7 +1195,7 @@ export const presupuestosController = {
                     frecuencia_mes: item.frecuencia_mes,
                     meses_aplicables: item.meses_aplicables,
                     valor_unitario: item.valor_unitario,
-                    valor_total: (item.valor_unitario || 0) * (item.frecuencia_mes || 1) * (item.meses_aplicables?.length || 0),
+                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length,
                     nota: item.nota,
                     ejecutado: item.ejecutado || 'NO',
                     estado: item.estado || 'BORRADOR'
@@ -1219,9 +1219,9 @@ export const presupuestosController = {
             }
 
             res.json(data);
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error en update presupuesto:', error);
-            res.status(500).json({ error: error.message || 'Error en el servidor', details: error });
+            res.status(500).json({ error: 'Error en el servidor' });
         }
     },
 
@@ -1259,7 +1259,7 @@ export const presupuestosController = {
             const { id } = req.params;
             const itemData = req.body as PresupuestoItem;
 
-            const valor_total = (itemData.valor_unitario || 0) * (itemData.frecuencia_mes || 1) * (itemData.meses_aplicables?.length || 0);
+            const valor_total = itemData.valor_unitario * itemData.frecuencia_mes * itemData.meses_aplicables.length;
 
             const { data, error } = await (req.supabase || supabase)
                 .from('presupuesto_items')
@@ -1308,7 +1308,7 @@ export const presupuestosController = {
                     const valor_unitario = itemData.valor_unitario ?? current.valor_unitario;
                     const frecuencia_mes = itemData.frecuencia_mes ?? current.frecuencia_mes;
                     const meses_aplicables = itemData.meses_aplicables ?? current.meses_aplicables;
-                    updateData.valor_total = (valor_unitario || 0) * (frecuencia_mes || 1) * (meses_aplicables?.length || 0);
+                    updateData.valor_total = valor_unitario * frecuencia_mes * meses_aplicables.length;
                 }
             }
 
@@ -1325,9 +1325,9 @@ export const presupuestosController = {
             }
 
             res.json(data);
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error en updateItem:', error);
-            res.status(500).json({ error: error.message || 'Error en el servidor', details: error });
+            res.status(500).json({ error: 'Error en el servidor' });
         }
     },
 
