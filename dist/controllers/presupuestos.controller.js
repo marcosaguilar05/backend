@@ -533,7 +533,14 @@ exports.presupuestosController = {
             // 2. Cálculo de estadísticas reales (sin paginación, pero con los mismos filtros base)
             let summaryQuery = dbClient
                 .from('presupuestos')
-                .select('id, rubro_id, presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre))');
+                .select(`
+                    id, 
+                    rubro_id, 
+                    vehiculo(areas_placas(placa)), 
+                    areas_operacion(nombre), 
+                    empresas(empresa),
+                    presupuesto_items(estado, valor_total, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, nota, tipo:tipos_presupuesto(id, nombre), concepto:conceptos_presupuesto(id, nombre))
+                `);
             if (vehiculo_id)
                 summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
             if (vehiculoIdsFromPlaca.length > 0) {
@@ -608,6 +615,7 @@ exports.presupuestosController = {
             const rubrosIds = new Set();
             const subRubroNamesUpper = subRubroNames.map(s => s.toUpperCase());
             const conceptoNamesUpper = conceptoNames.map(s => s.toUpperCase());
+            const qLower = q && q !== 'undefined' ? String(q).toLowerCase().trim() : '';
             if (allMatching && allMatching.length > 0) {
                 allMatching.forEach((p) => {
                     rubrosIds.add(p.rubro_id);
@@ -622,6 +630,18 @@ exports.presupuestosController = {
                                 const cNombre = (item.concepto?.nombre || '').toUpperCase().trim();
                                 if (!conceptoNamesUpper.includes(cNombre))
                                     return; // Skip item not matching concepto filter
+                            }
+                            if (qLower) {
+                                const headerMatches = (p.vehiculo?.areas_placas?.placa || '').toLowerCase().includes(qLower) ||
+                                    (p.areas_operacion?.nombre || '').toLowerCase().includes(qLower) ||
+                                    (p.empresas?.empresa || '').toLowerCase().includes(qLower);
+                                if (!headerMatches) {
+                                    const itemMatches = (item.concepto?.nombre || '').toLowerCase().includes(qLower) ||
+                                        (item.tipo?.nombre || '').toLowerCase().includes(qLower) ||
+                                        (item.nota || '').toLowerCase().includes(qLower);
+                                    if (!itemMatches)
+                                        return;
+                                }
                             }
                             let total = item.valor_total || 0;
                             if (monthNums.length > 0) {
@@ -1009,7 +1029,7 @@ exports.presupuestosController = {
                     frecuencia_mes: item.frecuencia_mes,
                     meses_aplicables: item.meses_aplicables,
                     valor_unitario: item.valor_unitario,
-                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length,
+                    valor_total: (item.valor_unitario || 0) * (item.frecuencia_mes || 1) * (item.meses_aplicables?.length || 0),
                     nota: item.nota
                 }));
                 const { error: itemsError } = await dbClient
@@ -1067,7 +1087,7 @@ exports.presupuestosController = {
                     frecuencia_mes: item.frecuencia_mes,
                     meses_aplicables: item.meses_aplicables,
                     valor_unitario: item.valor_unitario,
-                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length,
+                    valor_total: (item.valor_unitario || 0) * (item.frecuencia_mes || 1) * (item.meses_aplicables?.length || 0),
                     nota: item.nota,
                     ejecutado: item.ejecutado || 'NO',
                     estado: item.estado || 'BORRADOR'
@@ -1080,7 +1100,7 @@ exports.presupuestosController = {
                     frecuencia_mes: item.frecuencia_mes,
                     meses_aplicables: item.meses_aplicables,
                     valor_unitario: item.valor_unitario,
-                    valor_total: item.valor_unitario * item.frecuencia_mes * item.meses_aplicables.length,
+                    valor_total: (item.valor_unitario || 0) * (item.frecuencia_mes || 1) * (item.meses_aplicables?.length || 0),
                     nota: item.nota,
                     ejecutado: item.ejecutado || 'NO',
                     estado: item.estado || 'BORRADOR'
@@ -1137,7 +1157,7 @@ exports.presupuestosController = {
         try {
             const { id } = req.params;
             const itemData = req.body;
-            const valor_total = itemData.valor_unitario * itemData.frecuencia_mes * itemData.meses_aplicables.length;
+            const valor_total = (itemData.valor_unitario || 0) * (itemData.frecuencia_mes || 1) * (itemData.meses_aplicables?.length || 0);
             const { data, error } = await (req.supabase || supabase_1.supabase)
                 .from('presupuesto_items')
                 .insert({
@@ -1181,7 +1201,7 @@ exports.presupuestosController = {
                     const valor_unitario = itemData.valor_unitario ?? current.valor_unitario;
                     const frecuencia_mes = itemData.frecuencia_mes ?? current.frecuencia_mes;
                     const meses_aplicables = itemData.meses_aplicables ?? current.meses_aplicables;
-                    updateData.valor_total = valor_unitario * frecuencia_mes * meses_aplicables.length;
+                    updateData.valor_total = (valor_unitario || 0) * (frecuencia_mes || 1) * (meses_aplicables?.length || 0);
                 }
             }
             const { data, error } = await (req.supabase || supabase_1.supabase)
