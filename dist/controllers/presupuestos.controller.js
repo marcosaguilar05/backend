@@ -1126,7 +1126,7 @@ exports.presupuestosController = {
         }
         catch (error) {
             console.error('Error en update presupuesto:', error);
-            res.status(500).json({ error: 'Error en el servidor' });
+            res.status(500).json({ error: error.message || 'Error en el servidor', details: error });
         }
     },
     // Eliminar presupuesto
@@ -1218,7 +1218,7 @@ exports.presupuestosController = {
         }
         catch (error) {
             console.error('Error en updateItem:', error);
-            res.status(500).json({ error: 'Error en el servidor' });
+            res.status(500).json({ error: error.message || 'Error en el servidor', details: error });
         }
     },
     // Eliminar item
