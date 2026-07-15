@@ -34,12 +34,12 @@ export const presupuestosMantenimientoController = {
                 .from('presupuesto_unificado')
                 .select(`
                     *,
-                    vehiculo:vehiculos!vehiculo_id(*, areas_placas(*)),
-                    areas_operacion:areas_operacion!area_operacion_id(*),
-                    empresas:empresas!empresa_id(*),
+                    vehiculo(*, areas_placas(*)),
+                    areas_operacion(*),
+                    empresas(*),
                     grupo:rubros!presupuesto_unificado_grupo_rubro_id_fkey(*),
                     rubro:rubros!presupuesto_unificado_rubro_id_fkey(*),
-                    personal:tipos_personal!empleado_id(*),
+                    personal:tipos_personal(*),
                     tipo:conceptos_presupuesto!presupuesto_unificado_tipo_presupuesto_id_fkey(*),
                     concepto:conceptos_presupuesto!presupuesto_unificado_concepto_presupuesto_id_fkey(*)
                 `, { count: 'exact' });
@@ -190,7 +190,7 @@ export const presupuestosMantenimientoController = {
                 .from('presupuesto_unificado')
                 .select(`
                     *,
-                    vehiculo:vehiculos(*, areas_placas(*)),
+                    vehiculo(*, areas_placas(*)),
                     areas_operacion(*),
                     empresas(*),
                     grupo:rubros!presupuesto_unificado_grupo_rubro_id_fkey(*),
