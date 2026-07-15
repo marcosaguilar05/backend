@@ -193,11 +193,11 @@ export const presupuestosMantenimientoController = {
                     vehiculo(*, areas_placas(*)),
                     areas_operacion(*),
                     empresas(*),
-                    grupo:rubros!presupuesto_unificado_grupo_rubro_id_fkey(*),
-                    rubro:rubros!presupuesto_unificado_rubro_id_fkey(*),
-                    personal:tipos_personal(*),
-                    tipo:conceptos_presupuesto!presupuesto_unificado_tipo_presupuesto_id_fkey(*),
-                    concepto:conceptos_presupuesto!presupuesto_unificado_concepto_presupuesto_id_fkey(*)
+                    grupo:maestro_rubros!grupo_rubro_id(*),
+                    rubro:maestro_rubros!rubro_id(*),
+                    personal:Personal(*),
+                    tipo:tipos_presupuesto(*),
+                    concepto:conceptos_presupuesto(*)
                 `)
                 .eq('id', id)
                 .single();
