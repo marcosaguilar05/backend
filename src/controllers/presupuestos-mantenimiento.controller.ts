@@ -111,7 +111,8 @@ export const presupuestosMantenimientoController = {
                 const qConceptosIds = qConceptosData?.map(c => c.id) || [];
 
                 const orConditions = [];
-                orConditions.push(`nota.ilike.%${searchTerm}%`);
+                // Wrap in double quotes so PostgREST supports spaces/commas inside the OR filter string
+                orConditions.push(`nota.ilike."%${searchTerm}%"`);
                 if (qVehiculosIds.length > 0) orConditions.push(`vehiculo_id.in.(${qVehiculosIds.join(',')})`);
                 if (qConceptosIds.length > 0) orConditions.push(`concepto_presupuesto_id.in.(${qConceptosIds.join(',')})`);
                 
