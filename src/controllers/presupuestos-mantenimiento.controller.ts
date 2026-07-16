@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../types';
+import { PagoModel } from '../models/pagos.model';
 
 export const presupuestosMantenimientoController = {
     async getAll(req: AuthRequest, res: Response): Promise<void> {
@@ -247,6 +248,156 @@ export const presupuestosMantenimientoController = {
                 });
             }
 
+            // --- CÁLCULO DE TOTAL EJECUTADO REAL DESDE MONGODB ---
+            let totalEjecutadoReal = 0;
+            try {
+                // Obtener validacionGrupos dinámica basada en los presupuestos del año actual
+                const yearNum = anio && anio !== 'undefined' && anio !== '' ? Number(anio) : new Date().getFullYear();
+                
+                const { data: presupuestosForValidation } = await dbClient
+                    .from('presupuesto_unificado')
+                    .select('grupo_rubro_id, grupo:maestro_rubros!grupo_rubro_id(nombre, codigo_concatenado)')
+                    .eq('anio', yearNum);
+
+                let validacionGrupos: any = { _id: null }; // Fallback para no coincidir nada
+                if (presupuestosForValidation && presupuestosForValidation.length > 0) {
+                    const groups = new Set<string>();
+                    const codigos = new Set<string>();
+                    presupuestosForValidation.forEach((p: any) => {
+                        if (p.grupo?.nombre) groups.add(p.grupo.nombre.trim());
+                        if (p.grupo?.codigo_concatenado) codigos.add(p.grupo.codigo_concatenado.trim());
+                    });
+
+                    const inRegExp = { $in: Array.from(groups).map(g => new RegExp(g, 'i')) };
+                    const orFilters: any[] = [
+                        { grupoRubro: inRegExp },
+                        { nombreGrupoRubro: inRegExp }
+                    ];
+
+                    if (codigos.size > 0) {
+                        const codesArray = Array.from(codigos);
+                        orFilters.push({ grupoRubro: { $in: codesArray } });
+                        orFilters.push({ nombreGrupoRubro: { $in: codesArray } });
+                    }
+
+                    validacionGrupos = { $or: orFilters };
+                }
+
+                const mongoQuery: any = {
+                    activo: true,
+                    ...validacionGrupos
+                };
+
+                const applyMongoFilter = (field: string, val: any) => {
+                    if (!val || val === 'undefined') return;
+                    const arr = String(val).split(',').map(s => s.trim()).filter(Boolean);
+                    if (arr.length > 0) {
+                        mongoQuery[field] = { $in: arr.map(a => new RegExp(a, 'i')) };
+                    }
+                };
+
+                applyMongoFilter('placa', placa);
+                applyMongoFilter('areaOperacion', area_operacion);
+                applyMongoFilter('empresa', empresa);
+
+                if (grupo_rubro && grupo_rubro !== 'undefined') {
+                    const arr = String(grupo_rubro).split(',').map(s => s.trim()).filter(Boolean);
+                    if (arr.length > 0) {
+                        const inRegExp = { $in: arr.map(a => new RegExp(a, 'i')) };
+                        
+                        let codigos: string[] = [];
+                        if (filterGruposIds && filterGruposIds.length > 0) {
+                            const { data: grData } = await dbClient.from('maestro_rubros').select('codigo_concatenado').in('id', filterGruposIds);
+                            codigos = grData?.map(d => d.codigo_concatenado).filter(Boolean) || [];
+                        }
+
+                        const orFilter: any[] = [
+                            { grupoRubro: inRegExp },
+                            { nombreGrupoRubro: inRegExp }
+                        ];
+
+                        if (codigos.length > 0) {
+                            orFilter.push({ grupoRubro: { $in: codigos } });
+                            orFilter.push({ nombreGrupoRubro: { $in: codigos } });
+                        }
+
+                        if (mongoQuery.$and) {
+                            mongoQuery.$and.push({ $or: orFilter });
+                        } else {
+                            mongoQuery.$and = [{ $or: orFilter }];
+                        }
+                    }
+                }
+                applyMongoFilter('rubro', rubro);
+                applyMongoFilter('subRubro', sub_rubro);
+
+                const getDateQuery = (start: Date, end: Date) => {
+                    const dateRange = { $gte: start, $lte: end };
+                    return {
+                        $or: [
+                            { fechaPago: dateRange },
+                            {
+                                $and: [
+                                    { $or: [{ fechaPago: { $exists: false } }, { fechaPago: null }] },
+                                    { fecha: dateRange }
+                                ]
+                            }
+                        ]
+                    };
+                };
+                
+                let monthNums: number[] = [];
+                if (mes && mes !== 'undefined' && mes !== '' && mes !== 'null') {
+                    const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+                    const mesList = String(mes).toLowerCase().trim().split(',').map(s => s.trim()).filter(Boolean);
+                    
+                    mesList.forEach(m => {
+                        const monthIndex = monthNames.indexOf(m);
+                        if (monthIndex !== -1) {
+                            monthNums.push(monthIndex + 1);
+                        }
+                    });
+                }
+
+                if (monthNums.length > 0) {
+                    const ranges = monthNums.map(m => {
+                        const start = new Date(Date.UTC(yearNum, m - 1, 1, 0, 0, 0, 0));
+                        const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
+                        return getDateQuery(start, end);
+                    });
+                    if (mongoQuery.$and) {
+                        mongoQuery.$and.push({ $or: ranges });
+                    } else {
+                        mongoQuery.$and = [{ $or: ranges }];
+                    }
+                } else {
+                    const start = new Date(Date.UTC(yearNum, 0, 1, 0, 0, 0, 0));
+                    const end = new Date(Date.UTC(yearNum, 11, 31, 23, 59, 59, 999));
+                    const baseQuery = getDateQuery(start, end);
+                    if (mongoQuery.$and) {
+                        mongoQuery.$and.push({ $or: baseQuery.$or });
+                    } else {
+                        mongoQuery.$and = [{ $or: baseQuery.$or }];
+                    }
+                }
+
+                const aggregateResult = await PagoModel.aggregate([
+                    { $match: mongoQuery },
+                    {
+                        $group: {
+                            _id: null,
+                            totalOperacion: { $sum: '$valorOperacion' }
+                        }
+                    }
+                ]);
+
+                if (aggregateResult && aggregateResult.length > 0) {
+                    totalEjecutadoReal = aggregateResult[0].totalOperacion || 0;
+                }
+            } catch (mongoError) {
+                console.error('❌ Error al calcular totalEjecutadoReal desde MongoDB:', mongoError);
+            }
+
             res.json({
                 data: mappedData,
                 pagination: {
@@ -261,7 +412,7 @@ export const presupuestosMantenimientoController = {
                     totalBorrador,
                     totalEjecutado,
                     totalNoEjecutado,
-                    totalEjecutadoReal: totalEjecutado, // No mongodb sync for now
+                    totalEjecutadoReal: totalEjecutadoReal,
                     anioVigencia: anio || new Date().getFullYear(),
                     rubrosUtilizados: rubrosIds.size
                 }
