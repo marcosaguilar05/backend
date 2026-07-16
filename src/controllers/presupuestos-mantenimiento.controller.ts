@@ -110,11 +110,22 @@ export const presupuestosMantenimientoController = {
                 const { data: qConceptosData } = await dbClient.from('conceptos_presupuesto').select('id').ilike('nombre', `%${searchTerm}%`);
                 const qConceptosIds = qConceptosData?.map(c => c.id) || [];
 
+                const { data: qTiposData } = await dbClient.from('tipos_presupuesto').select('id').ilike('nombre', `%${searchTerm}%`);
+                const qTiposIds = qTiposData?.map(c => c.id) || [];
+
+                const { data: qRubrosData } = await dbClient.from('maestro_rubros').select('id').ilike('nombre', `%${searchTerm}%`);
+                const qRubrosIds = qRubrosData?.map(c => c.id) || [];
+
                 const orConditions = [];
                 // Wrap in double quotes so PostgREST supports spaces/commas inside the OR filter string
                 orConditions.push(`nota.ilike."%${searchTerm}%"`);
                 if (qVehiculosIds.length > 0) orConditions.push(`vehiculo_id.in.(${qVehiculosIds.join(',')})`);
                 if (qConceptosIds.length > 0) orConditions.push(`concepto_presupuesto_id.in.(${qConceptosIds.join(',')})`);
+                if (qTiposIds.length > 0) orConditions.push(`tipo_presupuesto_id.in.(${qTiposIds.join(',')})`);
+                if (qRubrosIds.length > 0) {
+                    orConditions.push(`rubro_id.in.(${qRubrosIds.join(',')})`);
+                    orConditions.push(`grupo_rubro_id.in.(${qRubrosIds.join(',')})`);
+                }
                 
                 orQueryString = orConditions.join(',');
                 query = query.or(orQueryString);
