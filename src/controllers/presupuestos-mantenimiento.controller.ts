@@ -95,10 +95,28 @@ export const presupuestosMantenimientoController = {
             }
             
             // Text search simple for q
+            let orQueryString = '';
             if (q && q !== 'undefined' && q !== '' && q !== 'null') {
-                const searchTerm = `%${String(q).trim()}%`;
-                // Simplified text search across nota
-                query = query.ilike('nota', searchTerm);
+                const searchTerm = String(q).trim();
+                
+                let qVehiculosIds: number[] = [];
+                const { data: placasData } = await dbClient.from('areas_placas').select('id').ilike('placa', `%${searchTerm}%`);
+                const pIds = placasData?.map(p => p.id) || [];
+                if (pIds.length > 0) {
+                    const { data: vehData } = await dbClient.from('vehiculo').select('id').in('placa_id', pIds);
+                    qVehiculosIds = vehData?.map(v => v.id) || [];
+                }
+                
+                const { data: qConceptosData } = await dbClient.from('conceptos_presupuesto').select('id').ilike('nombre', `%${searchTerm}%`);
+                const qConceptosIds = qConceptosData?.map(c => c.id) || [];
+
+                const orConditions = [];
+                orConditions.push(`nota.ilike.%${searchTerm}%`);
+                if (qVehiculosIds.length > 0) orConditions.push(`vehiculo_id.in.(${qVehiculosIds.join(',')})`);
+                if (qConceptosIds.length > 0) orConditions.push(`concepto_presupuesto_id.in.(${qConceptosIds.join(',')})`);
+                
+                orQueryString = orConditions.join(',');
+                query = query.or(orQueryString);
             }
 
             if (f_estado && f_estado !== 'undefined' && f_estado !== '') {
@@ -186,9 +204,8 @@ export const presupuestosMantenimientoController = {
                 summaryQuery = summaryQuery.contains('meses_aplicables', [mes]);
             }
             
-            if (q && q !== 'undefined' && q !== '' && q !== 'null') {
-                const searchTerm = `%${String(q).trim()}%`;
-                summaryQuery = summaryQuery.ilike('nota', searchTerm);
+            if (q && q !== 'undefined' && q !== '' && q !== 'null' && orQueryString) {
+                summaryQuery = summaryQuery.or(orQueryString);
             }
             if (f_estado && f_estado !== 'undefined' && f_estado !== '') {
                 summaryQuery = summaryQuery.eq('estado', f_estado);
