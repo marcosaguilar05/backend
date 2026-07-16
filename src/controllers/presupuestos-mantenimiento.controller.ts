@@ -59,8 +59,8 @@ export const presupuestosMantenimientoController = {
             const filterVehiculosIds = await getFilterIds('vehiculo', 'placa', placa || vehiculo_id);
             const filterEmpresasIds = await getFilterIds('empresas', 'empresa', empresa);
             const filterAreasIds = await getFilterIds('areas_operacion', 'nombre', area_operacion);
-            const filterGruposIds = await getFilterIds('maestro_rubros', 'nombre', grupo_rubro, {col: 'nivel', val: 1});
-            const filterRubrosIds = await getFilterIds('maestro_rubros', 'nombre', rubro, {col: 'nivel', val: 2});
+            const filterGruposIds = await getFilterIds('maestro_rubros', 'nombre', grupo_rubro, {col: 'nivel', val: 2});
+            const filterRubrosIds = await getFilterIds('maestro_rubros', 'nombre', rubro, {col: 'nivel', val: 3});
             const filterSubRubrosIds = await getFilterIds('tipos_presupuesto', 'nombre', sub_rubro);
             const filterConceptosIds = await getFilterIds('conceptos_presupuesto', 'nombre', concepto);
 
