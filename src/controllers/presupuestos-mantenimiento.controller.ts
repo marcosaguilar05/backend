@@ -56,22 +56,22 @@ export const presupuestosMantenimientoController = {
                 return data && data.length > 0 ? data.map(d => d.id) : [-1]; // -1 to ensure no match if not found
             };
 
-            const vehiculosIds = await getFilterIds('vehiculo', 'placa', placa || vehiculo_id);
-            const empresasIds = await getFilterIds('empresas', 'empresa', empresa);
-            const areasIds = await getFilterIds('areas_operacion', 'nombre', area_operacion);
-            const gruposIds = await getFilterIds('maestro_rubros', 'nombre', grupo_rubro, {col: 'nivel', val: 1});
-            const rubrosIds = await getFilterIds('maestro_rubros', 'nombre', rubro, {col: 'nivel', val: 2});
-            const subRubrosIds = await getFilterIds('tipos_presupuesto', 'nombre', sub_rubro);
-            const conceptosIds = await getFilterIds('conceptos_presupuesto', 'nombre', concepto);
+            const filterVehiculosIds = await getFilterIds('vehiculo', 'placa', placa || vehiculo_id);
+            const filterEmpresasIds = await getFilterIds('empresas', 'empresa', empresa);
+            const filterAreasIds = await getFilterIds('areas_operacion', 'nombre', area_operacion);
+            const filterGruposIds = await getFilterIds('maestro_rubros', 'nombre', grupo_rubro, {col: 'nivel', val: 1});
+            const filterRubrosIds = await getFilterIds('maestro_rubros', 'nombre', rubro, {col: 'nivel', val: 2});
+            const filterSubRubrosIds = await getFilterIds('tipos_presupuesto', 'nombre', sub_rubro);
+            const filterConceptosIds = await getFilterIds('conceptos_presupuesto', 'nombre', concepto);
 
-            if (vehiculosIds) query = query.in('vehiculo_id', vehiculosIds);
-            if (empresasIds) query = query.in('empresa_id', empresasIds);
-            if (areasIds) query = query.in('area_operacion_id', areasIds);
+            if (filterVehiculosIds) query = query.in('vehiculo_id', filterVehiculosIds);
+            if (filterEmpresasIds) query = query.in('empresa_id', filterEmpresasIds);
+            if (filterAreasIds) query = query.in('area_operacion_id', filterAreasIds);
             if (isNum(anio)) query = query.eq('anio', Number(anio));
-            if (gruposIds) query = query.in('grupo_rubro_id', gruposIds);
-            if (rubrosIds) query = query.in('rubro_id', rubrosIds);
-            if (subRubrosIds) query = query.in('tipo_presupuesto_id', subRubrosIds);
-            if (conceptosIds) query = query.in('concepto_presupuesto_id', conceptosIds);
+            if (filterGruposIds) query = query.in('grupo_rubro_id', filterGruposIds);
+            if (filterRubrosIds) query = query.in('rubro_id', filterRubrosIds);
+            if (filterSubRubrosIds) query = query.in('tipo_presupuesto_id', filterSubRubrosIds);
+            if (filterConceptosIds) query = query.in('concepto_presupuesto_id', filterConceptosIds);
             
             if (mes && mes !== 'undefined' && mes !== '' && mes !== 'null') {
                 // If it's a JSON array or PG array, we can use contains or text search
@@ -157,14 +157,14 @@ export const presupuestosMantenimientoController = {
                 .from('presupuesto_unificado')
                 .select('valor_total, estado, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, rubro_id');
                 
-            if (vehiculosIds) summaryQuery = summaryQuery.in('vehiculo_id', vehiculosIds);
-            if (empresasIds) summaryQuery = summaryQuery.in('empresa_id', empresasIds);
-            if (areasIds) summaryQuery = summaryQuery.in('area_operacion_id', areasIds);
+            if (filterVehiculosIds) summaryQuery = summaryQuery.in('vehiculo_id', filterVehiculosIds);
+            if (filterEmpresasIds) summaryQuery = summaryQuery.in('empresa_id', filterEmpresasIds);
+            if (filterAreasIds) summaryQuery = summaryQuery.in('area_operacion_id', filterAreasIds);
             if (isNum(anio)) summaryQuery = summaryQuery.eq('anio', Number(anio));
-            if (gruposIds) summaryQuery = summaryQuery.in('grupo_rubro_id', gruposIds);
-            if (rubrosIds) summaryQuery = summaryQuery.in('rubro_id', rubrosIds);
-            if (subRubrosIds) summaryQuery = summaryQuery.in('tipo_presupuesto_id', subRubrosIds);
-            if (conceptosIds) summaryQuery = summaryQuery.in('concepto_presupuesto_id', conceptosIds);
+            if (filterGruposIds) summaryQuery = summaryQuery.in('grupo_rubro_id', filterGruposIds);
+            if (filterRubrosIds) summaryQuery = summaryQuery.in('rubro_id', filterRubrosIds);
+            if (filterSubRubrosIds) summaryQuery = summaryQuery.in('tipo_presupuesto_id', filterSubRubrosIds);
+            if (filterConceptosIds) summaryQuery = summaryQuery.in('concepto_presupuesto_id', filterConceptosIds);
             
             if (mes && mes !== 'undefined' && mes !== '' && mes !== 'null') {
                 summaryQuery = summaryQuery.contains('meses_aplicables', [mes]);
