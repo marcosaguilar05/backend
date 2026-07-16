@@ -56,7 +56,23 @@ export const presupuestosMantenimientoController = {
                 return data && data.length > 0 ? data.map(d => d.id) : [-1]; // -1 to ensure no match if not found
             };
 
-            const filterVehiculosIds = await getFilterIds('vehiculo', 'placa', placa || vehiculo_id);
+            let filterVehiculosIds: number[] | null = null;
+            const filterPlaca = placa || vehiculo_id;
+            if (filterPlaca && filterPlaca !== 'undefined' && filterPlaca !== '' && filterPlaca !== 'null') {
+                if (isNum(filterPlaca)) {
+                    filterVehiculosIds = [Number(filterPlaca)];
+                } else {
+                    const { data: placasData } = await dbClient.from('areas_placas').select('id').ilike('placa', `%${String(filterPlaca).trim()}%`);
+                    const pIds = placasData?.map(p => p.id) || [];
+                    if (pIds.length > 0) {
+                        const { data: vehData } = await dbClient.from('vehiculo').select('id').in('placa_id', pIds);
+                        filterVehiculosIds = vehData && vehData.length > 0 ? vehData.map(v => v.id) : [-1];
+                    } else {
+                        filterVehiculosIds = [-1];
+                    }
+                }
+            }
+            
             const filterEmpresasIds = await getFilterIds('empresas', 'empresa', empresa);
             const filterAreasIds = await getFilterIds('areas_operacion', 'nombre', area_operacion);
             const filterGruposIds = await getFilterIds('maestro_rubros', 'nombre', grupo_rubro, {col: 'nivel', val: 2});
