@@ -56,7 +56,7 @@ export const presupuestosMantenimientoController = {
             
             if (mes && mes !== 'undefined' && mes !== '') {
                 // If it's a JSON array or PG array, we can use contains or text search
-                query = query.cs('meses_aplicables', [mes]);
+                query = query.contains('meses_aplicables', [mes]);
             }
             
             // Text search simple for q
@@ -149,7 +149,7 @@ export const presupuestosMantenimientoController = {
             if (concepto && concepto !== 'undefined' && concepto !== '') summaryQuery = summaryQuery.eq('concepto_presupuesto_id', Number(concepto));
             
             if (mes && mes !== 'undefined' && mes !== '') {
-                summaryQuery = summaryQuery.cs('meses_aplicables', [mes]);
+                summaryQuery = summaryQuery.contains('meses_aplicables', [mes]);
             }
             
             if (q && q !== 'undefined' && q !== '') {

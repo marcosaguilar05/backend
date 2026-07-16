@@ -19,6 +19,7 @@ const documentos_routes_1 = __importDefault(require("./routes/documentos.routes"
 const upload_routes_1 = __importDefault(require("./routes/upload.routes"));
 const saldosBombas_routes_1 = __importDefault(require("./routes/saldosBombas.routes"));
 const presupuestos_routes_1 = __importDefault(require("./routes/presupuestos.routes"));
+const presupuestos_mantenimiento_routes_1 = __importDefault(require("./routes/presupuestos-mantenimiento.routes"));
 const flota_routes_1 = __importDefault(require("./routes/flota.routes"));
 const mantenimiento_routes_1 = __importDefault(require("./routes/mantenimiento.routes"));
 const horometro_routes_1 = __importDefault(require("./routes/horometro.routes"));
@@ -49,6 +50,7 @@ app.use('/api/documentos', documentos_routes_1.default);
 app.use('/api/upload', upload_routes_1.default);
 app.use('/api/saldos-bombas', saldosBombas_routes_1.default);
 app.use('/api/presupuestos', presupuestos_routes_1.default);
+app.use('/api/presupuestos-mantenimiento', presupuestos_mantenimiento_routes_1.default);
 app.use('/api/flota', flota_routes_1.default);
 app.use('/api/mantenimiento', mantenimiento_routes_1.default);
 app.use('/api/horometro', horometro_routes_1.default);
