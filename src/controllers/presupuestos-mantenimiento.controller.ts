@@ -76,6 +76,11 @@ export const presupuestosMantenimientoController = {
             const mappedData = data?.map(row => ({
                 id: row.id, // For bulk actions, frontend expects parent id, but here item is parent
                 _row_key: `${row.id}`,
+                empresa_id: row.empresa_id,
+                vehiculo_id: row.vehiculo_id,
+                area_operacion_id: row.area_operacion_id,
+                grupo_rubro_id: row.grupo_rubro_id,
+                rubro_id: row.rubro_id,
                 vehiculo: row.vehiculo,
                 areas_operacion: row.areas_operacion,
                 empresas: row.empresas,
@@ -210,6 +215,11 @@ export const presupuestosMantenimientoController = {
             const mappedData = {
                 id: data.id,
                 _row_key: `${data.id}`,
+                empresa_id: data.empresa_id,
+                vehiculo_id: data.vehiculo_id,
+                area_operacion_id: data.area_operacion_id,
+                grupo_rubro_id: data.grupo_rubro_id,
+                rubro_id: data.rubro_id,
                 vehiculo: data.vehiculo,
                 areas_operacion: data.areas_operacion,
                 empresas: data.empresas,
