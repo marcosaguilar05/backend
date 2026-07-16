@@ -45,16 +45,33 @@ export const presupuestosMantenimientoController = {
                 `, { count: 'exact' });
 
             const isNum = (v: any) => v && v !== 'undefined' && v !== 'null' && !isNaN(Number(v));
+            
+            // Helper to get IDs if filter is string
+            const getFilterIds = async (table: string, column: string, value: any, extraFilter?: {col: string, val: any}) => {
+                if (!value || value === 'undefined' || value === 'null' || value === '') return null; // No filter
+                if (isNum(value)) return [Number(value)];
+                let q = dbClient.from(table).select('id').ilike(column, `%${String(value).trim()}%`);
+                if (extraFilter) q = q.eq(extraFilter.col, extraFilter.val);
+                const { data } = await q;
+                return data && data.length > 0 ? data.map(d => d.id) : [-1]; // -1 to ensure no match if not found
+            };
 
-            if (isNum(vehiculo_id)) query = query.eq('vehiculo_id', Number(vehiculo_id));
-            if (isNum(placa) && !isNum(vehiculo_id)) query = query.eq('vehiculo_id', Number(placa));
-            if (isNum(empresa)) query = query.eq('empresa_id', Number(empresa));
-            if (isNum(area_operacion)) query = query.eq('area_operacion_id', Number(area_operacion));
+            const vehiculosIds = await getFilterIds('vehiculo', 'placa', placa || vehiculo_id);
+            const empresasIds = await getFilterIds('empresas', 'empresa', empresa);
+            const areasIds = await getFilterIds('areas_operacion', 'nombre', area_operacion);
+            const gruposIds = await getFilterIds('maestro_rubros', 'nombre', grupo_rubro, {col: 'nivel', val: 1});
+            const rubrosIds = await getFilterIds('maestro_rubros', 'nombre', rubro, {col: 'nivel', val: 2});
+            const subRubrosIds = await getFilterIds('tipos_presupuesto', 'nombre', sub_rubro);
+            const conceptosIds = await getFilterIds('conceptos_presupuesto', 'nombre', concepto);
+
+            if (vehiculosIds) query = query.in('vehiculo_id', vehiculosIds);
+            if (empresasIds) query = query.in('empresa_id', empresasIds);
+            if (areasIds) query = query.in('area_operacion_id', areasIds);
             if (isNum(anio)) query = query.eq('anio', Number(anio));
-            if (isNum(grupo_rubro)) query = query.eq('grupo_rubro_id', Number(grupo_rubro));
-            if (isNum(rubro)) query = query.eq('rubro_id', Number(rubro));
-            if (isNum(sub_rubro)) query = query.eq('tipo_presupuesto_id', Number(sub_rubro));
-            if (isNum(concepto)) query = query.eq('concepto_presupuesto_id', Number(concepto));
+            if (gruposIds) query = query.in('grupo_rubro_id', gruposIds);
+            if (rubrosIds) query = query.in('rubro_id', rubrosIds);
+            if (subRubrosIds) query = query.in('tipo_presupuesto_id', subRubrosIds);
+            if (conceptosIds) query = query.in('concepto_presupuesto_id', conceptosIds);
             
             if (mes && mes !== 'undefined' && mes !== '' && mes !== 'null') {
                 // If it's a JSON array or PG array, we can use contains or text search
@@ -140,15 +157,14 @@ export const presupuestosMantenimientoController = {
                 .from('presupuesto_unificado')
                 .select('valor_total, estado, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, rubro_id');
                 
-            if (isNum(vehiculo_id)) summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
-            if (isNum(placa) && !isNum(vehiculo_id)) summaryQuery = summaryQuery.eq('vehiculo_id', Number(placa));
-            if (isNum(empresa)) summaryQuery = summaryQuery.eq('empresa_id', Number(empresa));
-            if (isNum(area_operacion)) summaryQuery = summaryQuery.eq('area_operacion_id', Number(area_operacion));
+            if (vehiculosIds) summaryQuery = summaryQuery.in('vehiculo_id', vehiculosIds);
+            if (empresasIds) summaryQuery = summaryQuery.in('empresa_id', empresasIds);
+            if (areasIds) summaryQuery = summaryQuery.in('area_operacion_id', areasIds);
             if (isNum(anio)) summaryQuery = summaryQuery.eq('anio', Number(anio));
-            if (isNum(grupo_rubro)) summaryQuery = summaryQuery.eq('grupo_rubro_id', Number(grupo_rubro));
-            if (isNum(rubro)) summaryQuery = summaryQuery.eq('rubro_id', Number(rubro));
-            if (isNum(sub_rubro)) summaryQuery = summaryQuery.eq('tipo_presupuesto_id', Number(sub_rubro));
-            if (isNum(concepto)) summaryQuery = summaryQuery.eq('concepto_presupuesto_id', Number(concepto));
+            if (gruposIds) summaryQuery = summaryQuery.in('grupo_rubro_id', gruposIds);
+            if (rubrosIds) summaryQuery = summaryQuery.in('rubro_id', rubrosIds);
+            if (subRubrosIds) summaryQuery = summaryQuery.in('tipo_presupuesto_id', subRubrosIds);
+            if (conceptosIds) summaryQuery = summaryQuery.in('concepto_presupuesto_id', conceptosIds);
             
             if (mes && mes !== 'undefined' && mes !== '' && mes !== 'null') {
                 summaryQuery = summaryQuery.contains('meses_aplicables', [mes]);
