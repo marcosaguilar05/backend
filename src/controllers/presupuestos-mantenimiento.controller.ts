@@ -45,7 +45,19 @@ export const presupuestosMantenimientoController = {
                 `, { count: 'exact' });
 
             if (vehiculo_id) query = query.eq('vehiculo_id', Number(vehiculo_id));
+            if (placa && !vehiculo_id) query = query.eq('vehiculo_id', Number(placa));
+            if (empresa && empresa !== 'undefined' && empresa !== '') query = query.eq('empresa_id', Number(empresa));
+            if (area_operacion && area_operacion !== 'undefined' && area_operacion !== '') query = query.eq('area_operacion_id', Number(area_operacion));
             if (anio && anio !== 'undefined' && anio !== '') query = query.eq('anio', Number(anio));
+            if (grupo_rubro && grupo_rubro !== 'undefined' && grupo_rubro !== '') query = query.eq('grupo_rubro_id', Number(grupo_rubro));
+            if (rubro && rubro !== 'undefined' && rubro !== '') query = query.eq('rubro_id', Number(rubro));
+            if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') query = query.eq('tipo_presupuesto_id', Number(sub_rubro));
+            if (concepto && concepto !== 'undefined' && concepto !== '') query = query.eq('concepto_presupuesto_id', Number(concepto));
+            
+            if (mes && mes !== 'undefined' && mes !== '') {
+                // If it's a JSON array or PG array, we can use contains or text search
+                query = query.cs('meses_aplicables', [mes]);
+            }
             
             // Text search simple for q
             if (q && q !== 'undefined' && q !== '') {
@@ -127,7 +139,18 @@ export const presupuestosMantenimientoController = {
                 .select('valor_total, estado, ejecutado, meses_aplicables, valor_unitario, frecuencia_mes, rubro_id');
                 
             if (vehiculo_id) summaryQuery = summaryQuery.eq('vehiculo_id', Number(vehiculo_id));
+            if (placa && !vehiculo_id) summaryQuery = summaryQuery.eq('vehiculo_id', Number(placa));
+            if (empresa && empresa !== 'undefined' && empresa !== '') summaryQuery = summaryQuery.eq('empresa_id', Number(empresa));
+            if (area_operacion && area_operacion !== 'undefined' && area_operacion !== '') summaryQuery = summaryQuery.eq('area_operacion_id', Number(area_operacion));
             if (anio && anio !== 'undefined' && anio !== '') summaryQuery = summaryQuery.eq('anio', Number(anio));
+            if (grupo_rubro && grupo_rubro !== 'undefined' && grupo_rubro !== '') summaryQuery = summaryQuery.eq('grupo_rubro_id', Number(grupo_rubro));
+            if (rubro && rubro !== 'undefined' && rubro !== '') summaryQuery = summaryQuery.eq('rubro_id', Number(rubro));
+            if (sub_rubro && sub_rubro !== 'undefined' && sub_rubro !== '') summaryQuery = summaryQuery.eq('tipo_presupuesto_id', Number(sub_rubro));
+            if (concepto && concepto !== 'undefined' && concepto !== '') summaryQuery = summaryQuery.eq('concepto_presupuesto_id', Number(concepto));
+            
+            if (mes && mes !== 'undefined' && mes !== '') {
+                summaryQuery = summaryQuery.cs('meses_aplicables', [mes]);
+            }
             
             if (q && q !== 'undefined' && q !== '') {
                 const searchTerm = `%${String(q).trim()}%`;
