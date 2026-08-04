@@ -8,8 +8,27 @@ export const presupuestosMantenimientoController = {
         try {
             const dbClient = req.supabase || supabase;
             
+            // First fetch vehicles separately to handle joins
+            const { data: vehiculosRaw } = await dbClient
+                .from('vehiculo')
+                .select(`
+                    id,
+                    operacion_id,
+                    areas_placas ( placa, estado ),
+                    vehiculo_caracteristicas ( cat_clase_vehiculo ( nombre ) )
+                `);
+
+            const vehiculos = vehiculosRaw
+                ?.filter((v: any) => v.areas_placas?.estado === 'ACTIVADA')
+                .map((v: any) => ({
+                    id: v.id,
+                    placa: v.areas_placas?.placa,
+                    clase_vehiculo: v.vehiculo_caracteristicas?.cat_clase_vehiculo?.nombre || null,
+                    operacion_id: v.operacion_id
+                }))
+                .sort((a: any, b: any) => (a.placa || '').localeCompare(b.placa || '')) || [];
+
             const [
-                { data: vehiculos },
                 { data: areas },
                 { data: empresas },
                 { data: grupos_rubro },
@@ -17,7 +36,6 @@ export const presupuestosMantenimientoController = {
                 { data: tipos_presupuesto },
                 { data: conceptos }
             ] = await Promise.all([
-                dbClient.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').order('placa'),
                 dbClient.from('areas_operacion').select('id, nombre').order('nombre'),
                 dbClient.from('empresas').select('id, empresa').order('empresa'),
                 dbClient.from('maestro_rubros').select('id, nombre, codigo').eq('nivel', 2).order('nombre'),
@@ -30,7 +48,7 @@ export const presupuestosMantenimientoController = {
             const anios = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
 
             res.json({
-                vehiculos: vehiculos || [],
+                vehiculos,
                 areas: areas || [],
                 empresas: empresas || [],
                 grupos_rubro: grupos_rubro || [],
