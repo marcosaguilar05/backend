@@ -90,9 +90,21 @@ export const presupuestosMantenimientoController = {
             if (filterSubRubrosIds) query = query.in('tipo_presupuesto_id', filterSubRubrosIds);
             if (filterConceptosIds) query = query.in('concepto_presupuesto_id', filterConceptosIds);
             
+            let filterMesNums: number[] = [];
             if (mes && mes !== 'undefined' && mes !== '' && mes !== 'null') {
-                // If it's a JSON array or PG array, we can use contains or text search
-                query = query.contains('meses_aplicables', [mes]);
+                const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+                const mesList = String(mes).toLowerCase().trim().split(',').map(s => s.trim()).filter(Boolean);
+                
+                mesList.forEach(m => {
+                    const monthIndex = monthNames.indexOf(m);
+                    if (monthIndex !== -1) {
+                        filterMesNums.push(monthIndex + 1);
+                    }
+                });
+            }
+
+            if (filterMesNums.length > 0) {
+                query = query.overlaps('meses_aplicables', filterMesNums);
             }
             
             // Text search simple for q
@@ -213,8 +225,8 @@ export const presupuestosMantenimientoController = {
             if (filterSubRubrosIds) summaryQuery = summaryQuery.in('tipo_presupuesto_id', filterSubRubrosIds);
             if (filterConceptosIds) summaryQuery = summaryQuery.in('concepto_presupuesto_id', filterConceptosIds);
             
-            if (mes && mes !== 'undefined' && mes !== '' && mes !== 'null') {
-                summaryQuery = summaryQuery.contains('meses_aplicables', [mes]);
+            if (filterMesNums.length > 0) {
+                summaryQuery = summaryQuery.overlaps('meses_aplicables', filterMesNums);
             }
             
             if (q && q !== 'undefined' && q !== '' && q !== 'null' && orQueryString) {
@@ -346,21 +358,8 @@ export const presupuestosMantenimientoController = {
                     };
                 };
                 
-                let monthNums: number[] = [];
-                if (mes && mes !== 'undefined' && mes !== '' && mes !== 'null') {
-                    const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-                    const mesList = String(mes).toLowerCase().trim().split(',').map(s => s.trim()).filter(Boolean);
-                    
-                    mesList.forEach(m => {
-                        const monthIndex = monthNames.indexOf(m);
-                        if (monthIndex !== -1) {
-                            monthNums.push(monthIndex + 1);
-                        }
-                    });
-                }
-
-                if (monthNums.length > 0) {
-                    const ranges = monthNums.map(m => {
+                if (filterMesNums.length > 0) {
+                    const ranges = filterMesNums.map(m => {
                         const start = new Date(Date.UTC(yearNum, m - 1, 1, 0, 0, 0, 0));
                         const end = new Date(Date.UTC(yearNum, m, 0, 23, 59, 59, 999));
                         return getDateQuery(start, end);
