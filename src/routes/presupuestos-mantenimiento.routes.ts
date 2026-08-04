@@ -9,7 +9,6 @@ router.use(authMiddleware);
 
 // Catálogos y Filtros
 router.get('/filters', presupuestosMantenimientoController.getFilterOptions);
-router.get('/reactive-filters', presupuestosMantenimientoController.getReactiveFilterOptions);
 router.get('/rubros', presupuestosMantenimientoController.getRubros);
 router.get('/tipos', presupuestosMantenimientoController.getTipos);
 router.get('/conceptos', presupuestosMantenimientoController.getConceptos);

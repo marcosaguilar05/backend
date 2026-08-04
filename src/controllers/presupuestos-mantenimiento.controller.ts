@@ -7,6 +7,7 @@ export const presupuestosMantenimientoController = {
     async getFilterOptions(req: AuthRequest, res: Response) {
         try {
             const dbClient = req.supabase || supabase;
+            
             const [
                 { data: vehiculos },
                 { data: areas },
@@ -16,7 +17,7 @@ export const presupuestosMantenimientoController = {
                 { data: tipos_presupuesto },
                 { data: conceptos }
             ] = await Promise.all([
-                dbClient.from('vehiculo').select('id, clase_vehiculo, areas_placas!inner(placa)'),
+                dbClient.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').order('placa'),
                 dbClient.from('areas_operacion').select('id, nombre').order('nombre'),
                 dbClient.from('empresas').select('id, empresa').order('empresa'),
                 dbClient.from('maestro_rubros').select('id, nombre, codigo').eq('nivel', 2).order('nombre'),
@@ -28,15 +29,8 @@ export const presupuestosMantenimientoController = {
             const currentYear = new Date().getFullYear();
             const anios = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
 
-            // Map vehiculos to flatten placa
-            const vehiculosMapped = vehiculos?.map((v: any) => ({
-                id: v.id,
-                clase_vehiculo: v.clase_vehiculo,
-                placa: Array.isArray(v.areas_placas) ? v.areas_placas[0]?.placa : v.areas_placas?.placa
-            })) || [];
-
             res.json({
-                vehiculos: vehiculosMapped,
+                vehiculos: vehiculos || [],
                 areas: areas || [],
                 empresas: empresas || [],
                 grupos_rubro: grupos_rubro || [],
@@ -51,139 +45,17 @@ export const presupuestosMantenimientoController = {
         }
     },
 
-    async getReactiveFilterOptions(req: AuthRequest, res: Response) {
-        try {
-            const dbClient = req.supabase || supabase;
-            const {
-                empresa, vehiculo_id, placa, area_operacion, anio,
-                grupo_rubro, rubro, sub_rubro, concepto, mes
-            } = req.query;
-
-            let query = dbClient
-                .from('presupuesto_unificado')
-                .select(`
-                    vehiculo(*, areas_placas(*)),
-                    areas_operacion(*),
-                    empresas(*),
-                    grupo:maestro_rubros!grupo_rubro_id(*),
-                    rubro:maestro_rubros!rubro_id(*),
-                    tipo:tipos_presupuesto(*),
-                    concepto:conceptos_presupuesto(*)
-                `);
-
-            const isNum = (v: any) => v && v !== 'undefined' && v !== 'null' && !isNaN(Number(v));
-            
-            const getFilterIds = async (table: string, column: string, value: any, extraFilter?: {col: string, val: any}) => {
-                if (!value || value === 'undefined' || value === 'null' || value === '') return null;
-                if (isNum(value)) return [Number(value)];
-                let q = dbClient.from(table).select('id').ilike(column, `%${String(value).trim()}%`);
-                if (extraFilter) q = q.eq(extraFilter.col, extraFilter.val);
-                const { data } = await q;
-                return data && data.length > 0 ? data.map(d => d.id) : [-1];
-            };
-
-            const filterPlaca = placa || vehiculo_id;
-            if (filterPlaca && filterPlaca !== 'undefined' && filterPlaca !== '' && filterPlaca !== 'null') {
-                if (isNum(filterPlaca)) {
-                    query = query.eq('vehiculo_id', Number(filterPlaca));
-                } else {
-                    const { data: placasData } = await dbClient.from('areas_placas').select('id').ilike('placa', `%${String(filterPlaca).trim()}%`);
-                    const pIds = placasData?.map(p => p.id) || [];
-                    if (pIds.length > 0) {
-                        const { data: vehData } = await dbClient.from('vehiculo').select('id').in('placa_id', pIds);
-                        const vIds = vehData?.map(v => v.id) || [-1];
-                        query = query.in('vehiculo_id', vIds);
-                    } else {
-                        query = query.in('vehiculo_id', [-1]);
-                    }
-                }
-            }
-
-            const empIds = await getFilterIds('empresas', 'empresa', empresa);
-            if (empIds) query = query.in('empresa_id', empIds);
-
-            const areaIds = await getFilterIds('areas_operacion', 'nombre', area_operacion);
-            if (areaIds) query = query.in('area_id', areaIds);
-
-            const grpIds = await getFilterIds('maestro_rubros', 'nombre', grupo_rubro, { col: 'nivel', val: 2 });
-            if (grpIds) query = query.in('grupo_rubro_id', grpIds);
-
-            const rbIds = await getFilterIds('maestro_rubros', 'nombre', rubro || sub_rubro, { col: 'nivel', val: 3 });
-            if (rbIds) query = query.in('rubro_id', rbIds);
-
-            const conIds = await getFilterIds('conceptos_presupuesto', 'nombre', concepto);
-            if (conIds) query = query.in('concepto_presupuesto_id', conIds);
-
-            if (anio && anio !== 'undefined' && anio !== 'null' && anio !== '') {
-                query = query.eq('anio', Number(anio));
-            }
-
-            if (mes && mes !== 'undefined' && mes !== 'null' && mes !== '') {
-                const mesNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-                const mesIndex = mesNames.indexOf(String(mes).toLowerCase());
-                if (mesIndex !== -1) query = query.overlaps('meses_aplicables', [mesIndex + 1]);
-            }
-
-            const { data } = await query;
-            const records = data || [];
-
-            const vehiculosMap = new Map();
-            const areasMap = new Map();
-            const empresasMap = new Map();
-            const gruposMap = new Map();
-            const subRubrosMap = new Map();
-            const tiposMap = new Map();
-            const conceptosMap = new Map();
-
-            records.forEach((r: any) => {
-                if (r.vehiculo?.areas_placas) {
-                    vehiculosMap.set(r.vehiculo.id, { id: r.vehiculo.id, placa: r.vehiculo.areas_placas.placa });
-                }
-                if (r.areas_operacion) areasMap.set(r.areas_operacion.id, r.areas_operacion);
-                if (r.empresas) empresasMap.set(r.empresas.id, r.empresas);
-                if (r.grupo) gruposMap.set(r.grupo.id, r.grupo);
-                if (r.rubro) subRubrosMap.set(r.rubro.id, r.rubro);
-                if (r.tipo) tiposMap.set(r.tipo.id, r.tipo);
-                if (r.concepto) conceptosMap.set(r.concepto.id, r.concepto);
-            });
-
-            const currentYear = new Date().getFullYear();
-            
-            // If no records found but no filters applied, fallback to fetch all distinct to not show empty on first load if tables are huge
-            // Actually, we just extracted all from what is in presupuestos! That's perfect.
-
-            res.json({
-                vehiculos: Array.from(vehiculosMap.values()).sort((a: any, b: any) => a.placa.localeCompare(b.placa)),
-                areas: Array.from(areasMap.values()).sort((a: any, b: any) => a.nombre.localeCompare(b.nombre)),
-                empresas: Array.from(empresasMap.values()).sort((a: any, b: any) => a.empresa.localeCompare(b.empresa)),
-                grupos_rubro: Array.from(gruposMap.values()).sort((a: any, b: any) => a.nombre.localeCompare(b.nombre)),
-                sub_rubros: Array.from(subRubrosMap.values()).sort((a: any, b: any) => a.nombre.localeCompare(b.nombre)),
-                tipos_presupuesto: Array.from(tiposMap.values()).sort((a: any, b: any) => a.nombre.localeCompare(b.nombre)),
-                conceptos: Array.from(conceptosMap.values()).sort((a: any, b: any) => a.nombre.localeCompare(b.nombre)),
-                anios: [currentYear - 1, currentYear, currentYear + 1, currentYear + 2]
-            });
-        } catch (error) {
-            console.error('Error getFilterOptions:', error);
-            res.status(500).json({ error: 'Error en el servidor' });
-        }
-    },
-
     async getRubros(req: AuthRequest, res: Response) {
         try {
             const { tipo, nivel, padre_id } = req.query;
             let query = (req.supabase || supabase).from('maestro_rubros').select('*');
-            if (tipo) query = query.eq('tipo_rubro', tipo);
+            if (tipo) query = query.eq('tipo', tipo);
             if (nivel) query = query.eq('nivel', Number(nivel));
-            if (padre_id) query = query.eq('rubro_padre_id', Number(padre_id));
+            if (padre_id) query = query.eq('padre_id', Number(padre_id));
             query = query.order('codigo');
-            const { data, error } = await query;
-            if (error) {
-                console.error('Supabase error getRubros:', error);
-                return res.status(400).json({ error: error.message });
-            }
+            const { data } = await query;
             res.json(data || []);
         } catch (error) {
-            console.error('Server error getRubros:', error);
             res.status(500).json({ error: 'Error en el servidor' });
         }
     },
