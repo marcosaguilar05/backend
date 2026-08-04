@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { presupuestosMantenimientoController } from '../controllers/presupuestos-mantenimiento.controller';
-import { presupuestosController } from '../controllers/presupuestos.controller'; // Reusing for catalog routes
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
