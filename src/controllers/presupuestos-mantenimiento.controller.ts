@@ -15,13 +15,13 @@ export const presupuestosMantenimientoController = {
             let query = dbClient
                 .from('presupuesto_unificado')
                 .select(`
-                    vehiculo:vehiculo_id ( id, areas_placas ( placa ) ),
-                    areas_operacion ( id, nombre ),
-                    empresas ( id, empresa ),
-                    grupo:maestro_rubros!grupo_rubro_id ( id, nombre, codigo ),
-                    rubro:maestro_rubros!rubro_id ( id, nombre, codigo ),
-                    tipo:tipos_presupuesto ( id, nombre ),
-                    concepto:conceptos_presupuesto ( id, nombre )
+                    vehiculo(*, areas_placas(*)),
+                    areas_operacion(*),
+                    empresas(*),
+                    grupo:maestro_rubros!grupo_rubro_id(*),
+                    rubro:maestro_rubros!rubro_id(*),
+                    tipo:tipos_presupuesto(*),
+                    concepto:conceptos_presupuesto(*)
                 `);
 
             const isNum = (v: any) => v && v !== 'undefined' && v !== 'null' && !isNaN(Number(v));
