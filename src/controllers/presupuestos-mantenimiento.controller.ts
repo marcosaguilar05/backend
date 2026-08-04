@@ -51,7 +51,7 @@ export const presupuestosMantenimientoController = {
             let query = (req.supabase || supabase).from('maestro_rubros').select('*');
             if (tipo) query = query.eq('tipo', tipo);
             if (nivel) query = query.eq('nivel', Number(nivel));
-            if (padre_id) query = query.eq('padre_id', Number(padre_id));
+            if (padre_id) query = query.eq('rubro_padre_id', Number(padre_id));
             query = query.order('codigo');
             const { data } = await query;
             res.json(data || []);
@@ -64,7 +64,7 @@ export const presupuestosMantenimientoController = {
         try {
             const { padre_id } = req.query;
             let query = (req.supabase || supabase).from('tipos_presupuesto').select('*');
-            if (padre_id) query = query.eq('padre_id', Number(padre_id));
+            if (padre_id) query = query.eq('padre', Number(padre_id));
             query = query.order('nombre');
             const { data } = await query;
             res.json(data || []);
