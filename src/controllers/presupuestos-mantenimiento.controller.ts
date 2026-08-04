@@ -4,6 +4,88 @@ import { AuthRequest } from '../types';
 import { PagoModel } from '../models/pagos.model';
 
 export const presupuestosMantenimientoController = {
+    async getFilterOptions(req: AuthRequest, res: Response) {
+        try {
+            const dbClient = req.supabase || supabase;
+            
+            const [
+                { data: vehiculos },
+                { data: areas },
+                { data: empresas },
+                { data: grupos_rubro },
+                { data: sub_rubros },
+                { data: tipos_presupuesto },
+                { data: conceptos }
+            ] = await Promise.all([
+                dbClient.from('areas_placas').select('id, placa').eq('estado', 'ACTIVADA').order('placa'),
+                dbClient.from('areas_operacion').select('id, nombre').order('nombre'),
+                dbClient.from('empresas').select('id, empresa').order('empresa'),
+                dbClient.from('maestro_rubros').select('id, nombre, codigo').eq('nivel', 2).order('nombre'),
+                dbClient.from('maestro_rubros').select('id, nombre, codigo').eq('nivel', 3).order('nombre'),
+                dbClient.from('tipos_presupuesto').select('id, nombre').order('nombre'),
+                dbClient.from('conceptos_presupuesto').select('id, nombre').order('nombre')
+            ]);
+
+            const currentYear = new Date().getFullYear();
+            const anios = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
+
+            res.json({
+                vehiculos: vehiculos || [],
+                areas: areas || [],
+                empresas: empresas || [],
+                grupos_rubro: grupos_rubro || [],
+                sub_rubros: sub_rubros || [],
+                tipos_presupuesto: tipos_presupuesto || [],
+                conceptos: conceptos || [],
+                anios
+            });
+        } catch (error) {
+            console.error('Error getFilterOptions:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    async getRubros(req: AuthRequest, res: Response) {
+        try {
+            const { tipo, nivel, padre_id } = req.query;
+            let query = (req.supabase || supabase).from('maestro_rubros').select('*');
+            if (tipo) query = query.eq('tipo', tipo);
+            if (nivel) query = query.eq('nivel', Number(nivel));
+            if (padre_id) query = query.eq('padre_id', Number(padre_id));
+            query = query.order('codigo');
+            const { data } = await query;
+            res.json(data || []);
+        } catch (error) {
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    async getTipos(req: AuthRequest, res: Response) {
+        try {
+            const { padre_id } = req.query;
+            let query = (req.supabase || supabase).from('tipos_presupuesto').select('*');
+            if (padre_id) query = query.eq('padre_id', Number(padre_id));
+            query = query.order('nombre');
+            const { data } = await query;
+            res.json(data || []);
+        } catch (error) {
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    async getConceptos(req: AuthRequest, res: Response) {
+        try {
+            const { tipo_id } = req.query;
+            let query = (req.supabase || supabase).from('conceptos_presupuesto').select('*');
+            if (tipo_id) query = query.eq('tipo_presupuesto_id', Number(tipo_id));
+            query = query.order('nombre');
+            const { data } = await query;
+            res.json(data || []);
+        } catch (error) {
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
     async getAll(req: AuthRequest, res: Response): Promise<void> {
         try {
             const dbClient = req.supabase || supabase;

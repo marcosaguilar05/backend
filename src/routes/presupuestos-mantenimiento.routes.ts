@@ -7,6 +7,12 @@ const router = Router();
 // Proteger todas las rutas
 router.use(authMiddleware);
 
+// Catálogos y Filtros
+router.get('/filters', presupuestosMantenimientoController.getFilterOptions);
+router.get('/rubros', presupuestosMantenimientoController.getRubros);
+router.get('/tipos', presupuestosMantenimientoController.getTipos);
+router.get('/conceptos', presupuestosMantenimientoController.getConceptos);
+
 // CRUD Presupuesto Unificado
 router.get('/', presupuestosMantenimientoController.getAll);
 router.get('/:id', presupuestosMantenimientoController.getById);
