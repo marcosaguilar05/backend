@@ -7,6 +7,53 @@ export const presupuestosMantenimientoController = {
     async getFilterOptions(req: AuthRequest, res: Response) {
         try {
             const dbClient = req.supabase || supabase;
+            const [
+                { data: vehiculos },
+                { data: areas },
+                { data: empresas },
+                { data: grupos_rubro },
+                { data: sub_rubros },
+                { data: tipos_presupuesto },
+                { data: conceptos }
+            ] = await Promise.all([
+                dbClient.from('vehiculo').select('id, clase_vehiculo, areas_placas!inner(placa)'),
+                dbClient.from('areas_operacion').select('id, nombre').order('nombre'),
+                dbClient.from('empresas').select('id, empresa').order('empresa'),
+                dbClient.from('maestro_rubros').select('id, nombre, codigo').eq('nivel', 2).order('nombre'),
+                dbClient.from('maestro_rubros').select('id, nombre, codigo').eq('nivel', 3).order('nombre'),
+                dbClient.from('tipos_presupuesto').select('id, nombre').order('nombre'),
+                dbClient.from('conceptos_presupuesto').select('id, nombre').order('nombre')
+            ]);
+
+            const currentYear = new Date().getFullYear();
+            const anios = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
+
+            // Map vehiculos to flatten placa
+            const vehiculosMapped = vehiculos?.map((v: any) => ({
+                id: v.id,
+                clase_vehiculo: v.clase_vehiculo,
+                placa: Array.isArray(v.areas_placas) ? v.areas_placas[0]?.placa : v.areas_placas?.placa
+            })) || [];
+
+            res.json({
+                vehiculos: vehiculosMapped,
+                areas: areas || [],
+                empresas: empresas || [],
+                grupos_rubro: grupos_rubro || [],
+                sub_rubros: sub_rubros || [],
+                tipos_presupuesto: tipos_presupuesto || [],
+                conceptos: conceptos || [],
+                anios
+            });
+        } catch (error) {
+            console.error('Error getFilterOptions:', error);
+            res.status(500).json({ error: 'Error en el servidor' });
+        }
+    },
+
+    async getReactiveFilterOptions(req: AuthRequest, res: Response) {
+        try {
+            const dbClient = req.supabase || supabase;
             const {
                 empresa, vehiculo_id, placa, area_operacion, anio,
                 grupo_rubro, rubro, sub_rubro, concepto, mes
@@ -125,13 +172,18 @@ export const presupuestosMantenimientoController = {
         try {
             const { tipo, nivel, padre_id } = req.query;
             let query = (req.supabase || supabase).from('maestro_rubros').select('*');
-            if (tipo) query = query.eq('tipo', tipo);
+            if (tipo) query = query.eq('tipo_rubro', tipo);
             if (nivel) query = query.eq('nivel', Number(nivel));
-            if (padre_id) query = query.eq('padre_id', Number(padre_id));
+            if (padre_id) query = query.eq('rubro_padre_id', Number(padre_id));
             query = query.order('codigo');
-            const { data } = await query;
+            const { data, error } = await query;
+            if (error) {
+                console.error('Supabase error getRubros:', error);
+                return res.status(400).json({ error: error.message });
+            }
             res.json(data || []);
         } catch (error) {
+            console.error('Server error getRubros:', error);
             res.status(500).json({ error: 'Error en el servidor' });
         }
     },
