@@ -72,6 +72,17 @@ app.use((req: Request, res: Response) => {
     res.status(404).json({ error: 'Ruta no encontrada' });
 });
 
+// Manejo de errores global
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error('Error no manejado:', err);
+    if (err.name === 'MulterError') {
+        return res.status(400).json({ error: err.message || 'Error al procesar el archivo' });
+    }
+    res.status(err.status || 500).json({ 
+        error: err.message || 'Error interno del servidor' 
+    });
+});
+
 // Escuchar siempre (Railway provee PORT via env var)
 app.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
