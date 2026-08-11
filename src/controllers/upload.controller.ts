@@ -39,8 +39,9 @@ export const uploadController = {
 
             // Generar nombre de archivo
             const year = new Date().getFullYear();
+            const timestamp = Date.now();
             const cleanPlaca = placa.replace(/[^a-zA-Z0-9-]/g, '');
-            const fileName = `${cleanPlaca}_${year}.pdf`;
+            const fileName = `${cleanPlaca}_${year}_${timestamp}.pdf`;
             const filePath = `${folder}/${fileName}`;
 
             // Subir a Supabase Storage
