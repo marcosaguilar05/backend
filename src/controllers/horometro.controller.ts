@@ -102,14 +102,16 @@ export const createHorometro = async (req: AuthRequest, res: Response, next: Nex
         const row: Record<string, any> = {
             placa_id: body.placa_id,
             fecha_lectura: body.fecha_lectura,
-            hr: body.hr != null ? Number(body.hr) : null,
-            km: body.km != null ? Number(body.km) : null,
+            hr: body.hr != null && body.hr !== '' ? Number(body.hr) : null,
+            km: body.km != null && body.km !== '' ? Number(body.km) : null,
             tipo: body.tipo || null,
             observaciones: body.observaciones || null,
             hubo_reinicio_hr: body.hubo_reinicio_hr || 'NO',
             hubo_reinicio_km: body.hubo_reinicio_km || 'NO',
-            valor_hr_original: body.hr != null ? Number(body.hr) : null,
-            valor_km_original: body.km != null ? Number(body.km) : null,
+            valor_hr_original: body.hr != null && body.hr !== '' ? Number(body.hr) : null,
+            valor_km_original: body.km != null && body.km !== '' ? Number(body.km) : null,
+            last_reinicio_value_hr: body.last_reinicio_value_hr != null && body.last_reinicio_value_hr !== '' ? Number(body.last_reinicio_value_hr) : null,
+            last_reinicio_value_km: body.last_reinicio_value_km != null && body.last_reinicio_value_km !== '' ? Number(body.last_reinicio_value_km) : null,
         };
 
         const { data, error } = await db
@@ -122,6 +124,51 @@ export const createHorometro = async (req: AuthRequest, res: Response, next: Nex
         res.status(201).json(data);
     } catch (error) {
         console.error('Error creating horometro:', error);
+        next(error);
+    }
+};
+
+// PUT /horometro/:id — update a record
+export const updateHorometro = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const db = req.supabase!;
+        const body = req.body;
+
+        const row: Record<string, any> = {};
+        if (body.placa_id !== undefined) row.placa_id = Number(body.placa_id);
+        if (body.fecha_lectura !== undefined) row.fecha_lectura = body.fecha_lectura;
+        if (body.hr !== undefined) {
+            row.hr = body.hr != null && body.hr !== '' ? Number(body.hr) : null;
+            if (body.valor_hr_original === undefined) {
+                row.valor_hr_original = row.hr;
+            }
+        }
+        if (body.km !== undefined) {
+            row.km = body.km != null && body.km !== '' ? Number(body.km) : null;
+            if (body.valor_km_original === undefined) {
+                row.valor_km_original = row.km;
+            }
+        }
+        if (body.tipo !== undefined) row.tipo = body.tipo || null;
+        if (body.observaciones !== undefined) row.observaciones = body.observaciones || null;
+        if (body.hubo_reinicio_hr !== undefined) row.hubo_reinicio_hr = body.hubo_reinicio_hr || 'NO';
+        if (body.hubo_reinicio_km !== undefined) row.hubo_reinicio_km = body.hubo_reinicio_km || 'NO';
+        if (body.valor_hr_original !== undefined) row.valor_hr_original = body.valor_hr_original != null && body.valor_hr_original !== '' ? Number(body.valor_hr_original) : null;
+        if (body.valor_km_original !== undefined) row.valor_km_original = body.valor_km_original != null && body.valor_km_original !== '' ? Number(body.valor_km_original) : null;
+        if (body.last_reinicio_value_hr !== undefined) row.last_reinicio_value_hr = body.last_reinicio_value_hr != null && body.last_reinicio_value_hr !== '' ? Number(body.last_reinicio_value_hr) : null;
+        if (body.last_reinicio_value_km !== undefined) row.last_reinicio_value_km = body.last_reinicio_value_km != null && body.last_reinicio_value_km !== '' ? Number(body.last_reinicio_value_km) : null;
+
+        const { data, error } = await db
+            .from('horometro')
+            .update(row)
+            .eq('id', Number(id))
+            .select();
+
+        if (error) throw error;
+        res.json(data?.[0] || null);
+    } catch (error) {
+        console.error('Error updating horometro:', error);
         next(error);
     }
 };

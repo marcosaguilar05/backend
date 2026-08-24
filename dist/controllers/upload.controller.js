@@ -10,7 +10,7 @@ const supabase_1 = require("../config/supabase");
 const storage = multer_1.default.memoryStorage();
 exports.upload = (0, multer_1.default)({
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
     fileFilter: (req, file, cb) => {
         if (file.mimetype === 'application/pdf') {
             cb(null, true);
@@ -38,8 +38,9 @@ exports.uploadController = {
             }
             // Generar nombre de archivo
             const year = new Date().getFullYear();
+            const timestamp = Date.now();
             const cleanPlaca = placa.replace(/[^a-zA-Z0-9-]/g, '');
-            const fileName = `${cleanPlaca}_${year}.pdf`;
+            const fileName = `${cleanPlaca}_${year}_${timestamp}.pdf`;
             const filePath = `${folder}/${fileName}`;
             // Subir a Supabase Storage
             const { data, error } = await (req.supabase || supabase_1.supabase).storage

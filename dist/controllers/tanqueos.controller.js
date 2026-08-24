@@ -159,7 +159,7 @@ exports.tanqueosController = {
                 placas: [...new Set(placasRes.data?.map(t => t.placa))].filter(Boolean).sort(),
                 bombas: [...new Set(bombasRes.data?.map(t => t.bomba))].filter(Boolean).sort(),
                 areas_operacion: [...new Set(areasRes.data?.map(t => t.nombre))].filter(Boolean).sort(),
-                tipos_combustible: ['ACPM', 'GASOLINA', 'EXTRA', 'GAS'],
+                tipos_combustible: ['ACPM', 'GASOLINA', 'UREA', 'LUBRICANTE', 'HIDRAULICO', 'ACEITE MOTOR', 'LAVADO', 'ENGRASE', 'CONSUMIBLES LIMPIEZA'],
                 conceptos: ['OPERATIVO', 'ADMINISTRATIVO'],
                 tipos_operacion: ['TANQUEO', 'ANTICIPO']
             };
