@@ -1,12 +1,18 @@
 import { Router } from 'express';
 import { tanqueosController } from '../controllers/tanqueos.controller';
 import { tanqueosDashboardController } from '../controllers/tanqueos-dashboard.controller';
+import { tanqueosCierresController } from '../controllers/tanqueos-cierres.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 
 // Todas las rutas requieren autenticación
 router.use(authMiddleware);
+
+// Rutas de Cierres Mensuales
+router.get('/cierres/resumen', tanqueosCierresController.getMonthlySummary);
+router.post('/cierres/cerrar', tanqueosCierresController.closeMonth);
+router.post('/cierres/reabrir', tanqueosCierresController.reopenMonth);
 
 router.get('/', tanqueosController.getAll);
 router.get('/filter-options', tanqueosController.getFilterOptions); // Nueva ruta

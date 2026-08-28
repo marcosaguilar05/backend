@@ -8,6 +8,7 @@ export interface Usuario {
     rol: string;
     creado_en?: string;
     isAuditor?: boolean;
+    isCierreAdmin?: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -38,6 +39,7 @@ export interface Tanqueo {
     creado_por?: string;
     actualizado_por?: string;
     actualizado_en?: string;
+    estado_De_Cierre?: string | null;
 }
 
 export interface TanqueoRelacion {
@@ -62,6 +64,7 @@ export interface TanqueoRelacion {
     concepto: string;
     tipo_operacion: string;
     observacion: string | null;
+    estado_De_Cierre?: string | null;
 }
 
 export interface LoginRequest {

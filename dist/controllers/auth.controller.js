@@ -29,11 +29,17 @@ exports.authController = {
                 res.status(404).json({ error: 'Usuario no encontrado en la base de datos' });
                 return;
             }
-            // Verificar si es auditor usando maybeSingle en lugar de single, con el cliente global (seguro para roles admin)
+            // Verificar si es auditor usando maybeSingle
             const { data: auditorData } = await supabase_1.supabase
                 .from('Auditores')
                 .select('id')
                 .eq('id_usuario', authData.user.id)
+                .maybeSingle();
+            // Verificar si es administrador de cierres
+            const { data: cierreAdminData } = await supabase_1.supabase
+                .from('Administrador_De_Cierres')
+                .select('id')
+                .eq('usuario', authData.user.id)
                 .maybeSingle();
             const response = {
                 user: {
@@ -41,7 +47,8 @@ exports.authController = {
                     email: userData.email,
                     nombre: userData.nombre,
                     rol: userData.rol,
-                    isAuditor: !!auditorData
+                    isAuditor: !!auditorData,
+                    isCierreAdmin: !!cierreAdminData
                 },
                 access_token: authData.session.access_token,
                 refresh_token: authData.session.refresh_token,
@@ -76,7 +83,18 @@ exports.authController = {
                 .select('id')
                 .eq('id_usuario', req.user?.id)
                 .maybeSingle();
-            res.json({ user: { ...req.user, isAuditor: !!auditorData } });
+            const { data: cierreAdminData } = await supabase_1.supabase
+                .from('Administrador_De_Cierres')
+                .select('id')
+                .eq('usuario', req.user?.id)
+                .maybeSingle();
+            res.json({
+                user: {
+                    ...req.user,
+                    isAuditor: !!auditorData,
+                    isCierreAdmin: !!cierreAdminData
+                }
+            });
         }
         catch (error) {
             console.error('Error obteniendo usuario:', error);

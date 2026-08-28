@@ -307,6 +307,26 @@ export const tanqueosController = {
     async update(req: AuthRequest, res: Response): Promise<void> {
         try {
             const { id } = req.params;
+
+            // Verificar si el registro existe y su estado de cierre
+            const dbClient = req.supabase || supabase;
+            const { data: currentRecord, error: checkError } = await dbClient
+                .from('tanqueo')
+                .select('id, "estado_De_Cierre"')
+                .eq('id', id)
+                .single();
+
+            if (checkError || !currentRecord) {
+                res.status(404).json({ error: 'Tanqueo no encontrado' });
+                return;
+            }
+
+            const isCerrado = currentRecord.estado_De_Cierre && String(currentRecord.estado_De_Cierre).toUpperCase() === 'CERRADO';
+            if (isCerrado && !req.user?.isCierreAdmin) {
+                res.status(403).json({ error: 'No se puede modificar este registro porque pertenece a un periodo cerrado.' });
+                return;
+            }
+
             const tipo_operacion = req.body.tipo_operacion || 'TANQUEO';
 
             const updateData: Partial<Tanqueo> = {
@@ -372,7 +392,25 @@ export const tanqueosController = {
         try {
             const { id } = req.params;
 
-            const { error } = await (req.supabase || supabase)
+            const dbClient = req.supabase || supabase;
+            const { data: currentRecord, error: checkError } = await dbClient
+                .from('tanqueo')
+                .select('id, "estado_De_Cierre"')
+                .eq('id', id)
+                .single();
+
+            if (checkError || !currentRecord) {
+                res.status(404).json({ error: 'Tanqueo no encontrado' });
+                return;
+            }
+
+            const isCerrado = currentRecord.estado_De_Cierre && String(currentRecord.estado_De_Cierre).toUpperCase() === 'CERRADO';
+            if (isCerrado && !req.user?.isCierreAdmin) {
+                res.status(403).json({ error: 'No se puede eliminar este registro porque pertenece a un periodo cerrado.' });
+                return;
+            }
+
+            const { error } = await dbClient
                 .from('tanqueo')
                 .delete()
                 .eq('id', id);
@@ -398,7 +436,30 @@ export const tanqueosController = {
                 return;
             }
 
-            const { error } = await (req.supabase || supabase)
+            const dbClient = req.supabase || supabase;
+
+            // Si no es administrador de cierres, verificar que ninguno de los registros esté cerrado
+            if (!req.user?.isCierreAdmin) {
+                const { data: closedRecords, error: checkError } = await dbClient
+                    .from('tanqueo')
+                    .select('id')
+                    .in('id', ids)
+                    .ilike('estado_De_Cierre', 'CERRADO');
+
+                if (checkError) {
+                    res.status(400).json({ error: checkError.message });
+                    return;
+                }
+
+                if (closedRecords && closedRecords.length > 0) {
+                    res.status(403).json({ 
+                        error: `No se pueden eliminar los registros seleccionados porque ${closedRecords.length} de ellos pertenecen a un periodo cerrado.` 
+                    });
+                    return;
+                }
+            }
+
+            const { error } = await dbClient
                 .from('tanqueo')
                 .delete()
                 .in('id', ids);

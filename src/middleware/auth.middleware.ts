@@ -41,12 +41,20 @@ export async function authMiddleware(
             .eq('id_usuario', user.id)
             .maybeSingle();
 
+        // Verificar si el usuario es administrador de cierres
+        const { data: cierreAdminData } = await supabase
+            .from('Administrador_De_Cierres')
+            .select('id')
+            .eq('usuario', user.id)
+            .maybeSingle();
+
         req.user = {
             id: user.id,
             email: userData.email,
             nombre: userData.nombre,
             rol: userData.rol,
-            isAuditor: !!auditorData
+            isAuditor: !!auditorData,
+            isCierreAdmin: !!cierreAdminData
         };
 
         // Guardar token y crear cliente autenticado para RLS

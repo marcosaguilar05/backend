@@ -3,10 +3,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const tanqueos_controller_1 = require("../controllers/tanqueos.controller");
 const tanqueos_dashboard_controller_1 = require("../controllers/tanqueos-dashboard.controller");
+const tanqueos_cierres_controller_1 = require("../controllers/tanqueos-cierres.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const router = (0, express_1.Router)();
 // Todas las rutas requieren autenticación
 router.use(auth_middleware_1.authMiddleware);
+// Rutas de Cierres Mensuales
+router.get('/cierres/resumen', tanqueos_cierres_controller_1.tanqueosCierresController.getMonthlySummary);
+router.post('/cierres/cerrar', tanqueos_cierres_controller_1.tanqueosCierresController.closeMonth);
+router.post('/cierres/reabrir', tanqueos_cierres_controller_1.tanqueosCierresController.reopenMonth);
 router.get('/', tanqueos_controller_1.tanqueosController.getAll);
 router.get('/filter-options', tanqueos_controller_1.tanqueosController.getFilterOptions); // Nueva ruta
 // Dashboard Analytics Routes
