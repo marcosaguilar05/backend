@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { supabase } from '../config/supabase';
+import { supabase, adminSupabase } from '../config/supabase';
 import { AuthRequest, Engrase, EngraseRelacion } from '../types';
 
 // Caché simple en memoria para filter options (5 minutos)
@@ -213,6 +213,25 @@ export const engrasesController = {
         try {
             const { id } = req.params;
 
+            // Verificar si el registro existe y su estado de cierre
+            const checkClient = (process.env.SUPABASE_SERVICE_ROLE_KEY ? adminSupabase : null) || req.supabase || supabase;
+            const { data: currentRecord, error: checkError } = await checkClient
+                .from('engrase')
+                .select('id, "estado_De_Cierre"')
+                .eq('id', id)
+                .single();
+
+            if (checkError || !currentRecord) {
+                res.status(404).json({ error: 'Engrase no encontrado' });
+                return;
+            }
+
+            const isCerrado = currentRecord.estado_De_Cierre && String(currentRecord.estado_De_Cierre).toUpperCase() === 'CERRADO';
+            if (isCerrado && !req.user?.isCierreAdmin) {
+                res.status(403).json({ error: 'No se puede modificar este registro porque pertenece a un periodo cerrado.' });
+                return;
+            }
+
             const updateData: Partial<Engrase> = {
                 fecha: req.body.fecha,
                 conductor_id: parseInt(req.body.conductor_id),
@@ -225,6 +244,7 @@ export const engrasesController = {
                 actualizado_por: req.user?.id,
                 actualizado_en: new Date().toISOString()
             };
+
 
             updateData.suma = (updateData.lavado || 0) + (updateData.engrase || 0) + (updateData.otros || 0);
 
@@ -256,6 +276,24 @@ export const engrasesController = {
         try {
             const { id } = req.params;
 
+            const checkClient = (process.env.SUPABASE_SERVICE_ROLE_KEY ? adminSupabase : null) || req.supabase || supabase;
+            const { data: currentRecord, error: checkError } = await checkClient
+                .from('engrase')
+                .select('id, "estado_De_Cierre"')
+                .eq('id', id)
+                .single();
+
+            if (checkError || !currentRecord) {
+                res.status(404).json({ error: 'Engrase no encontrado' });
+                return;
+            }
+
+            const isCerrado = currentRecord.estado_De_Cierre && String(currentRecord.estado_De_Cierre).toUpperCase() === 'CERRADO';
+            if (isCerrado && !req.user?.isCierreAdmin) {
+                res.status(403).json({ error: 'No se puede eliminar este registro porque pertenece a un periodo cerrado.' });
+                return;
+            }
+
             const { error } = await (req.supabase || supabase)
                 .from('engrase')
                 .delete()
@@ -282,7 +320,31 @@ export const engrasesController = {
                 return;
             }
 
-            const { error } = await (req.supabase || supabase)
+            const dbClient = req.supabase || supabase;
+
+            // Si no es administrador de cierres, verificar que ninguno esté cerrado
+            if (!req.user?.isCierreAdmin) {
+                const checkClient = (process.env.SUPABASE_SERVICE_ROLE_KEY ? adminSupabase : null) || req.supabase || supabase;
+                const { data: closedRecords, error: checkError } = await checkClient
+                    .from('engrase')
+                    .select('id')
+                    .in('id', ids)
+                    .ilike('estado_De_Cierre', 'CERRADO');
+
+                if (checkError) {
+                    res.status(400).json({ error: checkError.message });
+                    return;
+                }
+
+                if (closedRecords && closedRecords.length > 0) {
+                    res.status(403).json({
+                        error: `No se pueden eliminar los registros seleccionados porque ${closedRecords.length} de ellos pertenecen a un periodo cerrado.`
+                    });
+                    return;
+                }
+            }
+
+            const { error } = await dbClient
                 .from('engrase')
                 .delete()
                 .in('id', ids);

@@ -1,12 +1,18 @@
 import { Router } from 'express';
 import { engrasesController } from '../controllers/engrases.controller';
 import { engrasesDashboardController } from '../controllers/engrases-dashboard.controller';
+import { engrasesCierresController } from '../controllers/engrases-cierres.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 
 // Todas las rutas requieren autenticación
 router.use(authMiddleware);
+
+// Rutas de Cierres Mensuales
+router.get('/cierres/resumen', engrasesCierresController.getMonthlySummary);
+router.post('/cierres/cerrar', engrasesCierresController.closeMonth);
+router.post('/cierres/reabrir', engrasesCierresController.reopenMonth);
 
 // Dashboard routes (before :id to avoid conflicts)
 router.get('/dashboard/kpis', engrasesDashboardController.getKPIs);

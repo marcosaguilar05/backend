@@ -125,6 +125,7 @@ export interface Engrase {
     creado_por?: string;
     actualizado_por?: string;
     actualizado_en?: string;
+    estado_De_Cierre?: string | null;
 }
 
 export interface EngraseRelacion {
@@ -142,6 +143,7 @@ export interface EngraseRelacion {
     otros: number;
     suma: number;
     observaciones: string | null;
+    estado_De_Cierre?: string | null;
 }
 
 export interface EngraseFilters {

@@ -3,10 +3,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const engrases_controller_1 = require("../controllers/engrases.controller");
 const engrases_dashboard_controller_1 = require("../controllers/engrases-dashboard.controller");
+const engrases_cierres_controller_1 = require("../controllers/engrases-cierres.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const router = (0, express_1.Router)();
 // Todas las rutas requieren autenticación
 router.use(auth_middleware_1.authMiddleware);
+// Rutas de Cierres Mensuales
+router.get('/cierres/resumen', engrases_cierres_controller_1.engrasesCierresController.getMonthlySummary);
+router.post('/cierres/cerrar', engrases_cierres_controller_1.engrasesCierresController.closeMonth);
+router.post('/cierres/reabrir', engrases_cierres_controller_1.engrasesCierresController.reopenMonth);
 // Dashboard routes (before :id to avoid conflicts)
 router.get('/dashboard/kpis', engrases_dashboard_controller_1.engrasesDashboardController.getKPIs);
 router.get('/dashboard/spending-time', engrases_dashboard_controller_1.engrasesDashboardController.getSpendingOverTime);
