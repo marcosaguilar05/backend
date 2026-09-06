@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.tanqueosController = void 0;
 const supabase_1 = require("../config/supabase");
+const cierres_utils_1 = require("../utils/cierres.utils");
 // Caché simple en memoria para filter options (5 minutos)
 let filterOptionsCache = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
@@ -249,6 +250,15 @@ exports.tanqueosController = {
     },
     async create(req, res) {
         try {
+            // Validar que el mes no esté cerrado contablemente
+            if (!req.user?.isCierreAdmin && req.body.fecha) {
+                const checkClient = (process.env.SUPABASE_SERVICE_ROLE_KEY ? supabase_1.adminSupabase : null) || req.supabase || supabase_1.supabase;
+                const monthClosed = await (0, cierres_utils_1.isMonthClosed)(checkClient, 'tanqueo', req.body.fecha);
+                if (monthClosed) {
+                    res.status(403).json({ error: 'No se pueden agregar registros en un mes que se encuentra cerrado contablemente.' });
+                    return;
+                }
+            }
             const tipo_operacion = req.body.tipo_operacion || 'TANQUEO';
             // Datos base comunes
             const tanqueoData = {
@@ -297,8 +307,8 @@ exports.tanqueosController = {
         try {
             const { id } = req.params;
             // Verificar si el registro existe y su estado de cierre
-            const dbClient = req.supabase || supabase_1.supabase;
-            const { data: currentRecord, error: checkError } = await dbClient
+            const checkClient = (process.env.SUPABASE_SERVICE_ROLE_KEY ? supabase_1.adminSupabase : null) || req.supabase || supabase_1.supabase;
+            const { data: currentRecord, error: checkError } = await checkClient
                 .from('tanqueo')
                 .select('id, "estado_De_Cierre"')
                 .eq('id', id)
@@ -311,6 +321,14 @@ exports.tanqueosController = {
             if (isCerrado && !req.user?.isCierreAdmin) {
                 res.status(403).json({ error: 'No se puede modificar este registro porque pertenece a un periodo cerrado.' });
                 return;
+            }
+            // Validar que la nueva fecha destino no pertenezca a un mes cerrado
+            if (!req.user?.isCierreAdmin && req.body.fecha) {
+                const monthClosed = await (0, cierres_utils_1.isMonthClosed)(checkClient, 'tanqueo', req.body.fecha);
+                if (monthClosed) {
+                    res.status(403).json({ error: 'No se puede asignar una fecha perteneciente a un periodo contable cerrado.' });
+                    return;
+                }
             }
             const tipo_operacion = req.body.tipo_operacion || 'TANQUEO';
             const updateData = {

@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { supabase, adminSupabase } from '../config/supabase';
 import { AuthRequest, Engrase, EngraseRelacion } from '../types';
+import { isMonthClosed } from '../utils/cierres.utils';
 
 // Caché simple en memoria para filter options (5 minutos)
 let filterOptionsCache: { data: any; timestamp: number } | null = null;
@@ -178,6 +179,16 @@ export const engrasesController = {
 
     async create(req: AuthRequest, res: Response): Promise<void> {
         try {
+            // Validar que el mes no esté cerrado contablemente
+            if (!req.user?.isCierreAdmin && req.body.fecha) {
+                const checkClient = (process.env.SUPABASE_SERVICE_ROLE_KEY ? adminSupabase : null) || req.supabase || supabase;
+                const monthClosed = await isMonthClosed(checkClient, 'engrase', req.body.fecha);
+                if (monthClosed) {
+                    res.status(403).json({ error: 'No se pueden agregar registros en un mes que se encuentra cerrado contablemente.' });
+                    return;
+                }
+            }
+
             const engraseData: Engrase = {
                 fecha: req.body.fecha,
                 conductor_id: parseInt(req.body.conductor_id),
@@ -230,6 +241,15 @@ export const engrasesController = {
             if (isCerrado && !req.user?.isCierreAdmin) {
                 res.status(403).json({ error: 'No se puede modificar este registro porque pertenece a un periodo cerrado.' });
                 return;
+            }
+
+            // Validar que la nueva fecha destino no pertenezca a un mes cerrado
+            if (!req.user?.isCierreAdmin && req.body.fecha) {
+                const monthClosed = await isMonthClosed(checkClient, 'engrase', req.body.fecha);
+                if (monthClosed) {
+                    res.status(403).json({ error: 'No se puede asignar una fecha perteneciente a un periodo contable cerrado.' });
+                    return;
+                }
             }
 
             const updateData: Partial<Engrase> = {
