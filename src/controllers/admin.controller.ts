@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { supabase, adminSupabase } from '../config/supabase';
 import { AuthRequest } from '../types';
+import { clearDeactivatedAreasCache } from '../utils/areas.utils';
 
 export const adminController = {
     // ==================== AREAS BOMBAS ====================
@@ -125,6 +126,7 @@ export const adminController = {
             .single();
 
         if (error) return res.status(400).json({ error: error.message });
+        clearDeactivatedAreasCache();
         res.status(201).json(data);
     },
 
@@ -138,6 +140,7 @@ export const adminController = {
             .single();
 
         if (error) return res.status(400).json({ error: error.message });
+        clearDeactivatedAreasCache();
         res.json(data);
     },
 
@@ -149,6 +152,7 @@ export const adminController = {
             .eq('id', id);
 
         if (error) return res.status(400).json({ error: error.message });
+        clearDeactivatedAreasCache();
         res.status(204).send();
     },
 

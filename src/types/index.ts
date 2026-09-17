@@ -429,6 +429,7 @@ export interface AreaOperacion {
     nombre: string;
     empresa_id: number | null;
     nombre_financiero: string | null;
+    estado?: string | null;
 }
 
 export interface AreaPlaca {

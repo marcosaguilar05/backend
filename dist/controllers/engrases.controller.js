@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.engrasesController = void 0;
 const supabase_1 = require("../config/supabase");
 const cierres_utils_1 = require("../utils/cierres.utils");
+const areas_utils_1 = require("../utils/areas.utils");
 // Caché simple en memoria para filter options (5 minutos)
 let filterOptionsCache = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
@@ -44,6 +45,8 @@ exports.engrasesController = {
             if (fecha_fin) {
                 query = query.lte('fecha', fecha_fin);
             }
+            // Excluir registros de áreas desactivadas
+            query = await (0, areas_utils_1.applyActiveAreasFilter)(query, req.supabase);
             // Ordenamiento
             const sort_by = req.query.sort_by || 'fecha';
             const sort_order = req.query.sort_order;
@@ -70,6 +73,8 @@ exports.engrasesController = {
                 summaryQuery = summaryQuery.gte('fecha', fecha_inicio);
             if (fecha_fin)
                 summaryQuery = summaryQuery.lte('fecha', fecha_fin);
+            // Excluir registros de áreas desactivadas en el summary
+            summaryQuery = await (0, areas_utils_1.applyActiveAreasFilter)(summaryQuery, req.supabase);
             // Ejecutar ambas consultas en paralelo para mejorar rendimiento
             const [pageRes, summaryRes] = await Promise.all([
                 query.range(offset, offset + limit - 1),
@@ -125,7 +130,7 @@ exports.engrasesController = {
             const [conductoresRes, placasRes, areasRes] = await Promise.all([
                 dbClient.from('areas_conductores').select('conductor').order('conductor'),
                 dbClient.from('areas_placas').select('placa').eq('estado', 'ACTIVADA').order('placa'),
-                dbClient.from('areas_operacion').select('nombre').order('nombre')
+                dbClient.from('areas_operacion').select('nombre').or('estado.eq.ACTIVADA,estado.is.null').order('nombre')
             ]);
             // Extraer valores únicos
             const conductores = [...new Set(conductoresRes.data?.map(t => t.conductor))].filter(Boolean).sort();
@@ -408,6 +413,8 @@ exports.engrasesController = {
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
+            // Excluir áreas desactivadas en exportación
+            query = await (0, areas_utils_1.applyActiveAreasFilter)(query, req.supabase);
             const { data, error } = await query.order('fecha', { ascending: false });
             if (error) {
                 res.status(400).json({ error: error.message });

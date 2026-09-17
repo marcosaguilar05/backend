@@ -1,6 +1,12 @@
 import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../types';
+import { applyActiveAreasFilter, getDeactivatedAreas } from '../utils/areas.utils';
+
+const createDashboardQuery = async (req: AuthRequest, select: string = '*', count?: any): Promise<any> => {
+    const q: any = (req.supabase || supabase).from('tanqueo_relaciones').select(select, count ? { count } : undefined);
+    return await applyActiveAreasFilter(q, req.supabase);
+};
 
 // Configuración de umbrales para alertas
 const FUEL_PRICE_THRESHOLDS = {
@@ -71,9 +77,7 @@ export const tanqueosDashboardController = {
             const placa = req.query.placa as string;
             const bomba = req.query.bomba as string;
 
-            let query = (req.supabase || supabase)
-                .from('tanqueo_relaciones')
-                .select('*');
+            let query = await createDashboardQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -85,7 +89,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO').order('fecha', { ascending: false });
 
-            const { data, error } = await query;
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query;
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -128,7 +132,7 @@ export const tanqueosDashboardController = {
             const tipo_combustible = req.query.tipo_combustible as string;
 
             // Query base con filtros
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*');
+            let query = await createDashboardQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -141,7 +145,7 @@ export const tanqueosDashboardController = {
             // Solo tanqueos (no anticipos)
             query = query.eq('tipo_operacion', 'TANQUEO');
 
-            const { data, error } = await query.order('fecha', { ascending: false }).limit(100000);
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query.order('fecha', { ascending: false }).limit(100000);
 
             if (error) {
                 console.error('Error en getKPIs:', error);
@@ -301,7 +305,7 @@ export const tanqueosDashboardController = {
             const placa = req.query.placa as string;
             const bomba = req.query.bomba as string;
 
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('fecha, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'fecha, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -313,7 +317,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO').order('fecha');
 
-            const { data, error } = await query;
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query;
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -355,7 +359,7 @@ export const tanqueosDashboardController = {
             const placa = req.query.placa as string;
             const bomba = req.query.bomba as string;
 
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -366,7 +370,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
-            const { data, error } = await query;
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query;
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -418,7 +422,7 @@ export const tanqueosDashboardController = {
             const placa = req.query.placa as string;
             const bomba = req.query.bomba as string;
 
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('area_operacion, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'area_operacion, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -430,7 +434,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
-            const { data, error } = await query;
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query;
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -468,7 +472,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('placa, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'placa, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -477,7 +481,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
-            const { data, error } = await query;
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query;
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -524,7 +528,7 @@ export const tanqueosDashboardController = {
             const bomba = req.query.bomba as string;
 
             // Obtener solo últimos 2 meses si no hay filtro
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('placa, area_operacion, conductor, tipo_combustible, cantidad_galones, valor_tanqueo, fecha');
+            let query = await createDashboardQuery(req, 'placa, area_operacion, conductor, tipo_combustible, cantidad_galones, valor_tanqueo, fecha');
 
             if (fecha_inicio) {
                 query = query.gte('fecha', fecha_inicio);
@@ -543,7 +547,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO').order('fecha', { ascending: false });
 
-            const { data, error } = await query;
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query;
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -643,7 +647,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('conductor, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'conductor, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -652,7 +656,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
-            const { data, error } = await query;
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query;
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -696,7 +700,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('bomba, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'bomba, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -705,7 +709,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
-            const { data, error } = await query;
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query;
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -746,7 +750,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*');
+            let query = await createDashboardQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -758,7 +762,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
-            const { data, error } = await query.order('fecha', { ascending: false }).limit(100000);
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query.order('fecha', { ascending: false }).limit(100000);
             const { data: limitesData } = await (req.supabase || supabase).from('limites_combustible').select('*');
 
             if (error) {
@@ -834,7 +838,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*', { count: 'exact' });
+            let query = await createDashboardQuery(req, '*', 'exact');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -848,7 +852,7 @@ export const tanqueosDashboardController = {
                 .order('fecha', { ascending: false })
                 .order('id', { ascending: false });
 
-            const { data, error, count } = await query.range(offset, offset + limit - 1);
+            const { data, error, count }: { data: Record<string, any>[] | null; error: any; count?: number | null } = await query.range(offset, offset + limit - 1);
             const { data: limitesData } = await (req.supabase || supabase).from('limites_combustible').select('*');
 
             if (error) {
@@ -894,7 +898,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*');
+            let query = await createDashboardQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -906,7 +910,7 @@ export const tanqueosDashboardController = {
 
             query = query.eq('tipo_operacion', 'TANQUEO');
 
-            const { data, error } = await query.order('fecha', { ascending: false }).limit(100000);
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query.order('fecha', { ascending: false }).limit(100000);
             const { data: limitesData } = await (req.supabase || supabase).from('limites_combustible').select('*');
 
             if (error) {
@@ -963,7 +967,12 @@ export const tanqueosDashboardController = {
             if (vehiculo) query = applyFilter(query, 'vehiculo', vehiculo as string);
             if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion as string);
 
-            const { data, error } = await query.order('mes', { ascending: false }).order('vehiculo');
+            const { names: deactivatedNames } = await getDeactivatedAreas(dbClient);
+            if (deactivatedNames.length > 0) {
+                query = query.not('area_operacion', 'in', `(${deactivatedNames.map(n => `"${n}"`).join(',')})`);
+            }
+
+            const { data, error }: { data: Record<string, any>[] | null; error: any } = await query.order('mes', { ascending: false }).order('vehiculo');
 
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -996,7 +1005,7 @@ export const tanqueosDashboardController = {
                 .order('saldo_disponible', { ascending: true });
 
             // 2. Fetch all filtered tanqueo records for aggregation
-            let query = (req.supabase || supabase).from('tanqueo_relaciones').select('*');
+            let query = await createDashboardQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -1009,7 +1018,7 @@ export const tanqueosDashboardController = {
             query = query.eq('tipo_operacion', 'TANQUEO').order('fecha', { ascending: false }).limit(100000);
 
             const limitesPromise = (req.supabase || supabase).from('limites_combustible').select('*');
-            const [saldosRes, tanqueosRes, limitesRes] = await Promise.all([saldosPromise, query, limitesPromise]);
+            const [saldosRes, tanqueosRes, limitesRes]: [{ data: Record<string, any>[] | null; error: any }, { data: Record<string, any>[] | null; error: any }, { data: any; error: any }] = await Promise.all([saldosPromise, query, limitesPromise]);
 
             if (tanqueosRes.error) throw tanqueosRes.error;
             if (saldosRes.error) throw saldosRes.error;

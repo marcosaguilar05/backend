@@ -2,6 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.tanqueosDashboardController = void 0;
 const supabase_1 = require("../config/supabase");
+const areas_utils_1 = require("../utils/areas.utils");
+const createDashboardQuery = async (req, select = '*', count) => {
+    const q = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select(select, count ? { count } : undefined);
+    return await (0, areas_utils_1.applyActiveAreasFilter)(q, req.supabase);
+};
 // Configuración de umbrales para alertas
 const FUEL_PRICE_THRESHOLDS = {
     ACPM: { min: 9000, max: 15000 },
@@ -62,9 +67,7 @@ exports.tanqueosDashboardController = {
             const conductor = req.query.conductor;
             const placa = req.query.placa;
             const bomba = req.query.bomba;
-            let query = (req.supabase || supabase_1.supabase)
-                .from('tanqueo_relaciones')
-                .select('*');
+            let query = await createDashboardQuery(req, '*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -117,7 +120,7 @@ exports.tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion;
             const tipo_combustible = req.query.tipo_combustible;
             // Query base con filtros
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('*');
+            let query = await createDashboardQuery(req, '*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -277,7 +280,7 @@ exports.tanqueosDashboardController = {
             const conductor = req.query.conductor;
             const placa = req.query.placa;
             const bomba = req.query.bomba;
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('fecha, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'fecha, tipo_combustible, cantidad_galones, valor_tanqueo');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -331,7 +334,7 @@ exports.tanqueosDashboardController = {
             const conductor = req.query.conductor;
             const placa = req.query.placa;
             const bomba = req.query.bomba;
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'tipo_combustible, cantidad_galones, valor_tanqueo');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -391,7 +394,7 @@ exports.tanqueosDashboardController = {
             const conductor = req.query.conductor;
             const placa = req.query.placa;
             const bomba = req.query.bomba;
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('area_operacion, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'area_operacion, tipo_combustible, cantidad_galones, valor_tanqueo');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -441,7 +444,7 @@ exports.tanqueosDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const tipo_combustible = req.query.tipo_combustible;
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('placa, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'placa, tipo_combustible, cantidad_galones, valor_tanqueo');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -493,7 +496,7 @@ exports.tanqueosDashboardController = {
             const placa = req.query.placa;
             const bomba = req.query.bomba;
             // Obtener solo últimos 2 meses si no hay filtro
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('placa, area_operacion, conductor, tipo_combustible, cantidad_galones, valor_tanqueo, fecha');
+            let query = await createDashboardQuery(req, 'placa, area_operacion, conductor, tipo_combustible, cantidad_galones, valor_tanqueo, fecha');
             if (fecha_inicio) {
                 query = query.gte('fecha', fecha_inicio);
             }
@@ -600,7 +603,7 @@ exports.tanqueosDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const tipo_combustible = req.query.tipo_combustible;
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('conductor, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'conductor, tipo_combustible, cantidad_galones, valor_tanqueo');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -649,7 +652,7 @@ exports.tanqueosDashboardController = {
             const fecha_fin = req.query.fecha_fin;
             const area_operacion = req.query.area_operacion;
             const tipo_combustible = req.query.tipo_combustible;
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('bomba, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = await createDashboardQuery(req, 'bomba, tipo_combustible, cantidad_galones, valor_tanqueo');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -696,7 +699,7 @@ exports.tanqueosDashboardController = {
             const bomba = req.query.bomba;
             const area_operacion = req.query.area_operacion;
             const tipo_combustible = req.query.tipo_combustible;
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('*');
+            let query = await createDashboardQuery(req, '*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -776,7 +779,7 @@ exports.tanqueosDashboardController = {
             const bomba = req.query.bomba;
             const area_operacion = req.query.area_operacion;
             const tipo_combustible = req.query.tipo_combustible;
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('*', { count: 'exact' });
+            let query = await createDashboardQuery(req, '*', 'exact');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -836,7 +839,7 @@ exports.tanqueosDashboardController = {
             const bomba = req.query.bomba;
             const area_operacion = req.query.area_operacion;
             const tipo_combustible = req.query.tipo_combustible;
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('*');
+            let query = await createDashboardQuery(req, '*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -902,6 +905,10 @@ exports.tanqueosDashboardController = {
                 query = applyFilter(query, 'vehiculo', vehiculo);
             if (area_operacion)
                 query = applyFilter(query, 'area_operacion', area_operacion);
+            const { names: deactivatedNames } = await (0, areas_utils_1.getDeactivatedAreas)(dbClient);
+            if (deactivatedNames.length > 0) {
+                query = query.not('area_operacion', 'in', `(${deactivatedNames.map(n => `"${n}"`).join(',')})`);
+            }
             const { data, error } = await query.order('mes', { ascending: false }).order('vehiculo');
             if (error) {
                 res.status(400).json({ error: error.message });
@@ -931,7 +938,7 @@ exports.tanqueosDashboardController = {
                 .eq('actividad', 'ACTIVADA')
                 .order('saldo_disponible', { ascending: true });
             // 2. Fetch all filtered tanqueo records for aggregation
-            let query = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select('*');
+            let query = await createDashboardQuery(req, '*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)

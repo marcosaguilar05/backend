@@ -39,6 +39,7 @@ export const catalogosController = {
         const { data, error } = await (req.supabase || supabase)
             .from('areas_operacion')
             .select('id, nombre')
+            .or('estado.eq.ACTIVADA,estado.is.null')
             .order('nombre');
 
         if (error) return res.status(400).json({ error: error.message });
