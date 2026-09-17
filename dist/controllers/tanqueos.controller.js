@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.tanqueosController = void 0;
 const supabase_1 = require("../config/supabase");
 const cierres_utils_1 = require("../utils/cierres.utils");
-const areas_utils_1 = require("../utils/areas.utils");
 // Caché simple en memoria para filter options (5 minutos)
 let filterOptionsCache = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
@@ -57,8 +56,6 @@ exports.tanqueosController = {
             if (fecha_fin) {
                 query = query.lte('fecha', fecha_fin);
             }
-            // Excluir registros de áreas desactivadas
-            query = await (0, areas_utils_1.applyActiveAreasFilter)(query, req.supabase);
             // Ordenamiento
             const sort_by = req.query.sort_by || 'fecha';
             const sort_order = req.query.sort_order;
@@ -96,8 +93,6 @@ exports.tanqueosController = {
                 summaryQuery = summaryQuery.gte('fecha', fecha_inicio);
             if (fecha_fin)
                 summaryQuery = summaryQuery.lte('fecha', fecha_fin);
-            // Excluir registros de áreas desactivadas en el summary
-            summaryQuery = await (0, areas_utils_1.applyActiveAreasFilter)(summaryQuery, req.supabase);
             // Ejecutar ambas consultas en paralelo para reducir el tiempo de espera a la mitad
             const [pageRes, summaryRes] = await Promise.all([
                 query.range(offset, offset + limit - 1),
@@ -158,7 +153,7 @@ exports.tanqueosController = {
                 dbClient.from('areas_conductores').select('conductor').order('conductor'),
                 dbClient.from('areas_placas').select('placa').eq('estado', 'ACTIVADA').order('placa'),
                 dbClient.from('areas_bombas').select('bomba').eq('estado', 'ACTIVADA').order('bomba'),
-                dbClient.from('areas_operacion').select('nombre').or('estado.eq.ACTIVADA,estado.is.null').order('nombre')
+                dbClient.from('areas_operacion').select('nombre').order('nombre')
             ]);
             const baseOptions = {
                 conductores: [...new Set(conductoresRes.data?.map(t => t.conductor))].filter(Boolean).sort(),
@@ -181,7 +176,6 @@ exports.tanqueosController = {
                 // Query from view/table with limit to prevent overload but get a good sample for distinct values
                 // It is better to rely on actual data when filters are applied
                 let query = dbClient.from('tanqueo_relaciones').select('conductor, placa, bomba, area_operacion, tipo_combustible, concepto, tipo_operacion');
-                query = await (0, areas_utils_1.applyActiveAreasFilter)(query, dbClient);
                 if (conductor)
                     query = applyFilter(query, 'conductor', conductor);
                 if (placa)
@@ -505,10 +499,6 @@ exports.tanqueosController = {
                 query = applyFilter(query, 'Concepto', concepto);
             if (tipo_combustible)
                 query = applyFilter(query, 'Sub-Rubro', tipo_combustible);
-            const { names: deactivatedAreaNames } = await (0, areas_utils_1.getDeactivatedAreas)(req.supabase);
-            if (deactivatedAreaNames.length > 0) {
-                query = query.not('Área de Operacion', 'in', `(${deactivatedAreaNames.map((n) => `"${n}"`).join(',')})`);
-            }
             query = query.order('Fecha de Creacion', { ascending: false });
             const { data, error } = await query;
             if (error) {
@@ -561,8 +551,6 @@ exports.tanqueosController = {
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
                 query = query.lte('fecha', fecha_fin);
-            // Excluir áreas desactivadas en la exportación
-            query = await (0, areas_utils_1.applyActiveAreasFilter)(query, req.supabase);
             const hasFilters = conductor || placa || bomba || area_operacion || tipo_combustible || concepto || tipo_operacion;
             if (hasFilters) {
                 query = query.order('id', { ascending: false });

@@ -2,10 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.engrasesDashboardController = void 0;
 const supabase_1 = require("../config/supabase");
-const areas_utils_1 = require("../utils/areas.utils");
 const createEngrasesQuery = async (req, select = '*', count) => {
-    const q = (req.supabase || supabase_1.supabase).from('engrases_relaciones').select(select, count ? { count } : undefined);
-    return await (0, areas_utils_1.applyActiveAreasFilter)(q, req.supabase);
+    return (req.supabase || supabase_1.supabase).from('engrases_relaciones').select(select, count ? { count } : undefined);
 };
 // Umbrales para alertas
 const LAVADO_THRESHOLD = { normal: 150000, alto: 250000 };

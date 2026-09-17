@@ -1,11 +1,9 @@
 import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../types';
-import { applyActiveAreasFilter, getDeactivatedAreas } from '../utils/areas.utils';
 
 const createDashboardQuery = async (req: AuthRequest, select: string = '*', count?: any): Promise<any> => {
-    const q: any = (req.supabase || supabase).from('tanqueo_relaciones').select(select, count ? { count } : undefined);
-    return await applyActiveAreasFilter(q, req.supabase);
+    return (req.supabase || supabase).from('tanqueo_relaciones').select(select, count ? { count } : undefined);
 };
 
 // Configuración de umbrales para alertas
@@ -966,11 +964,6 @@ export const tanqueosDashboardController = {
             if (fecha_fin) query = query.lte('mes', fecha_fin);
             if (vehiculo) query = applyFilter(query, 'vehiculo', vehiculo as string);
             if (area_operacion) query = applyFilter(query, 'area_operacion', area_operacion as string);
-
-            const { names: deactivatedNames } = await getDeactivatedAreas(dbClient);
-            if (deactivatedNames.length > 0) {
-                query = query.not('area_operacion', 'in', `(${deactivatedNames.map(n => `"${n}"`).join(',')})`);
-            }
 
             const { data, error }: { data: Record<string, any>[] | null; error: any } = await query.order('mes', { ascending: false }).order('vehiculo');
 

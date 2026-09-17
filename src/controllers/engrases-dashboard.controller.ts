@@ -1,11 +1,9 @@
 import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../types';
-import { applyActiveAreasFilter } from '../utils/areas.utils';
 
 const createEngrasesQuery = async (req: AuthRequest, select: string = '*', count?: any): Promise<any> => {
-    const q: any = (req.supabase || supabase).from('engrases_relaciones').select(select, count ? { count } : undefined);
-    return await applyActiveAreasFilter(q, req.supabase);
+    return (req.supabase || supabase).from('engrases_relaciones').select(select, count ? { count } : undefined);
 };
 
 // Umbrales para alertas

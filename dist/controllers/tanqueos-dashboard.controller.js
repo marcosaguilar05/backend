@@ -2,10 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.tanqueosDashboardController = void 0;
 const supabase_1 = require("../config/supabase");
-const areas_utils_1 = require("../utils/areas.utils");
 const createDashboardQuery = async (req, select = '*', count) => {
-    const q = (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select(select, count ? { count } : undefined);
-    return await (0, areas_utils_1.applyActiveAreasFilter)(q, req.supabase);
+    return (req.supabase || supabase_1.supabase).from('tanqueo_relaciones').select(select, count ? { count } : undefined);
 };
 // Configuración de umbrales para alertas
 const FUEL_PRICE_THRESHOLDS = {
@@ -905,10 +903,6 @@ exports.tanqueosDashboardController = {
                 query = applyFilter(query, 'vehiculo', vehiculo);
             if (area_operacion)
                 query = applyFilter(query, 'area_operacion', area_operacion);
-            const { names: deactivatedNames } = await (0, areas_utils_1.getDeactivatedAreas)(dbClient);
-            if (deactivatedNames.length > 0) {
-                query = query.not('area_operacion', 'in', `(${deactivatedNames.map(n => `"${n}"`).join(',')})`);
-            }
             const { data, error } = await query.order('mes', { ascending: false }).order('vehiculo');
             if (error) {
                 res.status(400).json({ error: error.message });
