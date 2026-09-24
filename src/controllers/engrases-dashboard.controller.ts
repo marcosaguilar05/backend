@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../types';
 
-const createEngrasesQuery = async (req: AuthRequest, select: string = '*', count?: any): Promise<any> => {
+const createEngrasesQuery = (req: AuthRequest, select: string = '*', count?: any): any => {
     return (req.supabase || supabase).from('engrases_relaciones').select(select, count ? { count } : undefined);
 };
 
@@ -10,9 +10,14 @@ const createEngrasesQuery = async (req: AuthRequest, select: string = '*', count
 const LAVADO_THRESHOLD = { normal: 150000, alto: 250000 };
 const ENGRASE_THRESHOLD = { normal: 60000, alto: 100000 };
 
-const applyFilter = (q: any, field: string, value: string) => {
+const applyFilter = (q: any, field: string, value: any) => {
     if (!value) return q;
-    const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+    let arr: string[] = [];
+    if (Array.isArray(value)) {
+        arr = value.map(s => String(s).trim()).filter(s => s && !s.toLowerCase().startsWith('tod'));
+    } else if (typeof value === 'string') {
+        arr = value.split(',').map(s => s.trim()).filter(s => s && !s.toLowerCase().startsWith('tod'));
+    }
     if (arr.length === 0) return q;
     return q.in(field, arr);
 };
@@ -27,7 +32,7 @@ export const engrasesDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const conductor = req.query.conductor as string;
 
-            let query = await createEngrasesQuery(req, '*');
+            let query = createEngrasesQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -90,7 +95,7 @@ export const engrasesDashboardController = {
             const placa = req.query.placa as string;
             const conductor = req.query.conductor as string;
 
-            let query = await createEngrasesQuery(req, 'fecha, lavado, engrase, otros, suma');
+            let query = createEngrasesQuery(req, 'fecha, lavado, engrase, otros, suma');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -138,7 +143,7 @@ export const engrasesDashboardController = {
             const placa = req.query.placa as string;
             const conductor = req.query.conductor as string;
 
-            let query = await createEngrasesQuery(req, 'fecha, lavado, engrase');
+            let query = createEngrasesQuery(req, 'fecha, lavado, engrase');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -185,7 +190,7 @@ export const engrasesDashboardController = {
             const placa = req.query.placa as string;
             const conductor = req.query.conductor as string;
 
-            let query = await createEngrasesQuery(req, 'placa, conductor, lavado, engrase, otros, suma, fecha');
+            let query = createEngrasesQuery(req, 'placa, conductor, lavado, engrase, otros, suma, fecha');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -246,7 +251,7 @@ export const engrasesDashboardController = {
             const placa = req.params.placa;
             const year = req.query.year as string;
 
-            let query = (await createEngrasesQuery(req, 'fecha, lavado, engrase, otros, suma, observaciones'))
+            let query = (createEngrasesQuery(req, 'fecha, lavado, engrase, otros, suma, observaciones'))
                 .ilike('placa', `%${placa}%`);
 
             if (year) {
@@ -304,7 +309,7 @@ export const engrasesDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const conductor = req.query.conductor as string;
 
-            let query = await createEngrasesQuery(req, 'area_operacion, lavado, engrase, otros, suma');
+            let query = createEngrasesQuery(req, 'area_operacion, lavado, engrase, otros, suma');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -366,7 +371,7 @@ export const engrasesDashboardController = {
             const placa = req.query.placa as string;
             const conductor = req.query.conductor as string;
 
-            let query = await createEngrasesQuery(req, '*');
+            let query = createEngrasesQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -469,7 +474,7 @@ export const engrasesDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const conductor = req.query.conductor as string;
 
-            let query = await createEngrasesQuery(req, '*', 'exact');
+            let query = createEngrasesQuery(req, '*', 'exact');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -531,7 +536,7 @@ export const engrasesDashboardController = {
             const fecha_inicio = req.query.fecha_inicio as string;
             const fecha_fin = req.query.fecha_fin as string;
 
-            let query = await createEngrasesQuery(req, '*');
+            let query = createEngrasesQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -586,7 +591,7 @@ export const engrasesDashboardController = {
             const placa = req.query.placa as string;
             const conductor = req.query.conductor as string;
 
-            let query = await createEngrasesQuery(req, 'placa, fecha, lavado, engrase, suma');
+            let query = createEngrasesQuery(req, 'placa, fecha, lavado, engrase, suma');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);

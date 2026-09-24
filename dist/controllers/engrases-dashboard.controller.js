@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.engrasesDashboardController = void 0;
 const supabase_1 = require("../config/supabase");
-const createEngrasesQuery = async (req, select = '*', count) => {
+const createEngrasesQuery = (req, select = '*', count) => {
     return (req.supabase || supabase_1.supabase).from('engrases_relaciones').select(select, count ? { count } : undefined);
 };
 // Umbrales para alertas
@@ -11,7 +11,13 @@ const ENGRASE_THRESHOLD = { normal: 60000, alto: 100000 };
 const applyFilter = (q, field, value) => {
     if (!value)
         return q;
-    const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+    let arr = [];
+    if (Array.isArray(value)) {
+        arr = value.map(s => String(s).trim()).filter(s => s && !s.toLowerCase().startsWith('tod'));
+    }
+    else if (typeof value === 'string') {
+        arr = value.split(',').map(s => s.trim()).filter(s => s && !s.toLowerCase().startsWith('tod'));
+    }
     if (arr.length === 0)
         return q;
     return q.in(field, arr);
@@ -25,7 +31,7 @@ exports.engrasesDashboardController = {
             const placa = req.query.placa;
             const area_operacion = req.query.area_operacion;
             const conductor = req.query.conductor;
-            let query = await createEngrasesQuery(req, '*');
+            let query = createEngrasesQuery(req, '*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -85,7 +91,7 @@ exports.engrasesDashboardController = {
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
             const conductor = req.query.conductor;
-            let query = await createEngrasesQuery(req, 'fecha, lavado, engrase, otros, suma');
+            let query = createEngrasesQuery(req, 'fecha, lavado, engrase, otros, suma');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -130,7 +136,7 @@ exports.engrasesDashboardController = {
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
             const conductor = req.query.conductor;
-            let query = await createEngrasesQuery(req, 'fecha, lavado, engrase');
+            let query = createEngrasesQuery(req, 'fecha, lavado, engrase');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -176,7 +182,7 @@ exports.engrasesDashboardController = {
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
             const conductor = req.query.conductor;
-            let query = await createEngrasesQuery(req, 'placa, conductor, lavado, engrase, otros, suma, fecha');
+            let query = createEngrasesQuery(req, 'placa, conductor, lavado, engrase, otros, suma, fecha');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -237,7 +243,7 @@ exports.engrasesDashboardController = {
         try {
             const placa = req.params.placa;
             const year = req.query.year;
-            let query = (await createEngrasesQuery(req, 'fecha, lavado, engrase, otros, suma, observaciones'))
+            let query = (createEngrasesQuery(req, 'fecha, lavado, engrase, otros, suma, observaciones'))
                 .ilike('placa', `%${placa}%`);
             if (year) {
                 query = query.gte('fecha', `${year}-01-01`).lte('fecha', `${year}-12-31`);
@@ -290,7 +296,7 @@ exports.engrasesDashboardController = {
             const placa = req.query.placa;
             const area_operacion = req.query.area_operacion;
             const conductor = req.query.conductor;
-            let query = await createEngrasesQuery(req, 'area_operacion, lavado, engrase, otros, suma');
+            let query = createEngrasesQuery(req, 'area_operacion, lavado, engrase, otros, suma');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -349,7 +355,7 @@ exports.engrasesDashboardController = {
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
             const conductor = req.query.conductor;
-            let query = await createEngrasesQuery(req, '*');
+            let query = createEngrasesQuery(req, '*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -444,7 +450,7 @@ exports.engrasesDashboardController = {
             const placa = req.query.placa;
             const area_operacion = req.query.area_operacion;
             const conductor = req.query.conductor;
-            let query = await createEngrasesQuery(req, '*', 'exact');
+            let query = createEngrasesQuery(req, '*', 'exact');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -506,7 +512,7 @@ exports.engrasesDashboardController = {
             const alertType = req.params.alertType;
             const fecha_inicio = req.query.fecha_inicio;
             const fecha_fin = req.query.fecha_fin;
-            let query = await createEngrasesQuery(req, '*');
+            let query = createEngrasesQuery(req, '*');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)
@@ -557,7 +563,7 @@ exports.engrasesDashboardController = {
             const area_operacion = req.query.area_operacion;
             const placa = req.query.placa;
             const conductor = req.query.conductor;
-            let query = await createEngrasesQuery(req, 'placa, fecha, lavado, engrase, suma');
+            let query = createEngrasesQuery(req, 'placa, fecha, lavado, engrase, suma');
             if (fecha_inicio)
                 query = query.gte('fecha', fecha_inicio);
             if (fecha_fin)

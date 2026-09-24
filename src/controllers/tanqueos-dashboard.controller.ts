@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../types';
 
-const createDashboardQuery = async (req: AuthRequest, select: string = '*', count?: any): Promise<any> => {
+const createDashboardQuery = (req: AuthRequest, select: string = '*', count?: any): any => {
     return (req.supabase || supabase).from('tanqueo_relaciones').select(select, count ? { count } : undefined);
 };
 
@@ -15,9 +15,14 @@ const FUEL_PRICE_THRESHOLDS = {
 
 const SALDO_CRITICO = -500000;
 
-const applyFilter = (q: any, field: string, value: string) => {
+const applyFilter = (q: any, field: string, value: any) => {
     if (!value) return q;
-    const arr = value.split(',').map(s => s.trim()).filter(Boolean);
+    let arr: string[] = [];
+    if (Array.isArray(value)) {
+        arr = value.map(s => String(s).trim()).filter(s => s && !s.toLowerCase().startsWith('tod'));
+    } else if (typeof value === 'string') {
+        arr = value.split(',').map(s => s.trim()).filter(s => s && !s.toLowerCase().startsWith('tod'));
+    }
     if (arr.length === 0) return q;
     return q.in(field, arr);
 };
@@ -75,7 +80,7 @@ export const tanqueosDashboardController = {
             const placa = req.query.placa as string;
             const bomba = req.query.bomba as string;
 
-            let query = await createDashboardQuery(req, '*');
+            let query = createDashboardQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -130,7 +135,7 @@ export const tanqueosDashboardController = {
             const tipo_combustible = req.query.tipo_combustible as string;
 
             // Query base con filtros
-            let query = await createDashboardQuery(req, '*');
+            let query = createDashboardQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -303,7 +308,7 @@ export const tanqueosDashboardController = {
             const placa = req.query.placa as string;
             const bomba = req.query.bomba as string;
 
-            let query = await createDashboardQuery(req, 'fecha, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = createDashboardQuery(req, 'fecha, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -357,7 +362,7 @@ export const tanqueosDashboardController = {
             const placa = req.query.placa as string;
             const bomba = req.query.bomba as string;
 
-            let query = await createDashboardQuery(req, 'tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = createDashboardQuery(req, 'tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -420,7 +425,7 @@ export const tanqueosDashboardController = {
             const placa = req.query.placa as string;
             const bomba = req.query.bomba as string;
 
-            let query = await createDashboardQuery(req, 'area_operacion, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = createDashboardQuery(req, 'area_operacion, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -470,7 +475,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = await createDashboardQuery(req, 'placa, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = createDashboardQuery(req, 'placa, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -526,7 +531,7 @@ export const tanqueosDashboardController = {
             const bomba = req.query.bomba as string;
 
             // Obtener solo últimos 2 meses si no hay filtro
-            let query = await createDashboardQuery(req, 'placa, area_operacion, conductor, tipo_combustible, cantidad_galones, valor_tanqueo, fecha');
+            let query = createDashboardQuery(req, 'placa, area_operacion, conductor, tipo_combustible, cantidad_galones, valor_tanqueo, fecha');
 
             if (fecha_inicio) {
                 query = query.gte('fecha', fecha_inicio);
@@ -645,7 +650,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = await createDashboardQuery(req, 'conductor, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = createDashboardQuery(req, 'conductor, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -698,7 +703,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = await createDashboardQuery(req, 'bomba, tipo_combustible, cantidad_galones, valor_tanqueo');
+            let query = createDashboardQuery(req, 'bomba, tipo_combustible, cantidad_galones, valor_tanqueo');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -748,7 +753,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = await createDashboardQuery(req, '*');
+            let query = createDashboardQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -836,7 +841,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = await createDashboardQuery(req, '*', 'exact');
+            let query = createDashboardQuery(req, '*', 'exact');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -896,7 +901,7 @@ export const tanqueosDashboardController = {
             const area_operacion = req.query.area_operacion as string;
             const tipo_combustible = req.query.tipo_combustible as string;
 
-            let query = await createDashboardQuery(req, '*');
+            let query = createDashboardQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
@@ -998,7 +1003,7 @@ export const tanqueosDashboardController = {
                 .order('saldo_disponible', { ascending: true });
 
             // 2. Fetch all filtered tanqueo records for aggregation
-            let query = await createDashboardQuery(req, '*');
+            let query = createDashboardQuery(req, '*');
 
             if (fecha_inicio) query = query.gte('fecha', fecha_inicio);
             if (fecha_fin) query = query.lte('fecha', fecha_fin);
