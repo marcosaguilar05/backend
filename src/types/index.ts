@@ -36,6 +36,7 @@ export interface Tanqueo {
     tipo_operacion: string;
     observacion?: string | null;
     horometro?: number | null;
+    hubo_reinicio_horometro?: boolean;
     creado_por?: string;
     actualizado_por?: string;
     actualizado_en?: string;
@@ -58,6 +59,7 @@ export interface TanqueoRelacion {
     valor_tanqueo: number;
     cantidad_galones: number;
     horometro: number | null;
+    hubo_reinicio_horometro?: boolean;
     costo_por_galon: number | null;
     valor_anticipo: number | null;
     saldo_disponible: number;

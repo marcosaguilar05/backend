@@ -282,6 +282,7 @@ exports.tanqueosController = {
                 tanqueoData.valor_tanqueo = parseFloat(req.body.valor_tanqueo);
                 tanqueoData.cantidad_galones = parseFloat(req.body.cantidad_galones);
                 tanqueoData.horometro = req.body.horometro ? parseFloat(req.body.horometro) : null;
+                tanqueoData.hubo_reinicio_horometro = req.body.hubo_reinicio_horometro === true || req.body.hubo_reinicio_horometro === 'true';
                 // Calcular costo por galón si es posible
                 if (tanqueoData.valor_tanqueo && tanqueoData.cantidad_galones && tanqueoData.cantidad_galones > 0) {
                     tanqueoData.costo_por_galon = tanqueoData.valor_tanqueo / tanqueoData.cantidad_galones;
@@ -350,6 +351,7 @@ exports.tanqueosController = {
                 updateData.valor_tanqueo = null;
                 updateData.cantidad_galones = null;
                 updateData.horometro = null;
+                updateData.hubo_reinicio_horometro = false;
                 updateData.costo_por_galon = null;
             }
             else {
@@ -359,6 +361,7 @@ exports.tanqueosController = {
                 updateData.valor_tanqueo = parseFloat(req.body.valor_tanqueo);
                 updateData.cantidad_galones = parseFloat(req.body.cantidad_galones);
                 updateData.horometro = req.body.horometro ? parseFloat(req.body.horometro) : null;
+                updateData.hubo_reinicio_horometro = req.body.hubo_reinicio_horometro === true || req.body.hubo_reinicio_horometro === 'true';
                 updateData.valor_anticipo = null;
                 if (updateData.valor_tanqueo && updateData.cantidad_galones && updateData.cantidad_galones > 0) {
                     updateData.costo_por_galon = updateData.valor_tanqueo / updateData.cantidad_galones;
